@@ -1,7 +1,6 @@
 package org.cubexmc.booklite;
 
 import org.bukkit.command.PluginCommand;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.cubexmc.booklite.command.BookLiteCommand;
 import org.cubexmc.booklite.config.ConfigManager;
 import org.cubexmc.booklite.lang.LanguageManager;
@@ -12,8 +11,9 @@ import org.cubexmc.booklite.service.BookRestorer;
 import org.cubexmc.booklite.service.BookService;
 import org.cubexmc.booklite.service.PdcKeys;
 import org.cubexmc.booklite.storage.BookRepository;
+import org.cubexmc.core.CubexPlugin;
 
-public class BookLitePlugin extends JavaPlugin {
+public class BookLitePlugin extends CubexPlugin {
 
     private ConfigManager configManager;
     private LanguageManager languageManager;
@@ -25,7 +25,7 @@ public class BookLitePlugin extends JavaPlugin {
     private BookRestorer bookRestorer;
 
     @Override
-    public void onEnable() {
+    protected void enablePlugin() {
         saveDefaultResources();
 
         this.configManager = new ConfigManager(this);
@@ -37,6 +37,8 @@ public class BookLitePlugin extends JavaPlugin {
         this.pdcKeys = new PdcKeys(this);
         this.repository = new BookRepository(this, configManager);
         this.repository.init();
+        Runnable closeRepository = repository::close;
+        bind(closeRepository);
 
         this.cache = new BookCache(configManager.getCacheMaximumSize(),
                 configManager.getCacheExpireAfterAccessMillis());
@@ -61,8 +63,7 @@ public class BookLitePlugin extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {
-        if (repository != null) repository.close();
+    protected void disablePlugin() {
     }
 
     public void reloadAll() {
@@ -82,15 +83,7 @@ public class BookLitePlugin extends JavaPlugin {
     }
 
     private void saveDefaultResources() {
-        saveDefaultConfig();
-        saveResourceIfMissing("lang/zh_CN.yml");
-        saveResourceIfMissing("lang/en_US.yml");
-    }
-
-    private void saveResourceIfMissing(String name) {
-        if (!new java.io.File(getDataFolder(), name).exists()) {
-            saveResource(name, false);
-        }
+        saveResourcesIfMissing("config.yml", "lang/zh_CN.yml", "lang/en_US.yml");
     }
 
     public ConfigManager configManager() {
