@@ -6,6 +6,7 @@ description = "Contract"
 dependencies {
     compileOnly(CubexDeps.spigotApi("1.18.2-R0.1-SNAPSHOT"))
     compileOnly(CubexDeps.vault)
+    implementation(project(":modules:cubex-core"))
     implementation("net.wesjd:anvilgui:1.10.13-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
 }
@@ -13,6 +14,7 @@ dependencies {
 tasks.shadowJar {
     archiveBaseName.set("contract")
     dependencies {
+        include(project(":modules:cubex-core"))
         include(dependency("net.wesjd:anvilgui:.*"))
     }
     relocate("net.wesjd.anvilgui", "org.cubexmc.contract.lib.anvilgui")

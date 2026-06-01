@@ -8,10 +8,10 @@ import org.cubexmc.fawereplace.commands.FaweReplaceCommand;
 import org.cubexmc.fawereplace.commands.FaweReplaceTabCompleter;
 import org.cubexmc.fawereplace.metrics.Metrics;
 import org.cubexmc.fawereplace.tasks.CleaningTask;
+import org.cubexmc.core.CubexPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.util.*;
@@ -23,7 +23,7 @@ import java.util.*;
  * @author cong0707, angushushu
  * @version 1.0.3
  */
-public final class FAWEReplace extends JavaPlugin {
+public final class FAWEReplace extends CubexPlugin {
 
     private CleaningTask cleaningTask;
     private World world;
@@ -32,13 +32,13 @@ public final class FAWEReplace extends JavaPlugin {
     private File rulesFile;
 
     @Override
-    public void onEnable() {
+    protected void enablePlugin() {
 
         // 初始化统计
         Metrics metrics = new Metrics(this, 28977);
 
         // 保存默认配置
-        saveDefaultConfig();
+        saveResourcesIfMissing("config.yml");
 
         // 加载/创建 rules.yml
         rulesFile = new File(getDataFolder(), "rules.yml");
@@ -57,6 +57,12 @@ public final class FAWEReplace extends JavaPlugin {
 
         // 初始化清理任务
         cleaningTask = new CleaningTask(getLogger(), getDataFolder(), languageManager);
+        Runnable stopCleaningTask = () -> {
+            if (cleaningTask != null && cleaningTask.isRunning()) {
+                cleaningTask.stop(null);
+            }
+        };
+        bind(stopCleaningTask);
 
         // 注册命令 (Paper Plugin API) - 无论配置是否成功都注册命令
         registerCommands();
@@ -76,11 +82,7 @@ public final class FAWEReplace extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {
-        // 停止清理任务
-        if (cleaningTask != null && cleaningTask.isRunning()) {
-            cleaningTask.stop(null);
-        }
+    protected void disablePlugin() {
         getLogger().info(languageManager.getMessage("plugin.disabled"));
     }
 

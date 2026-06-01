@@ -1,7 +1,7 @@
 package org.cubexmc.contract;
 
 import org.bukkit.command.PluginCommand;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 import org.cubexmc.contract.command.ContractCommand;
 import org.cubexmc.contract.config.LanguageManager;
 import org.cubexmc.contract.economy.EconomyService;
@@ -10,11 +10,12 @@ import org.cubexmc.contract.service.ContractService;
 import org.cubexmc.contract.storage.ContractStorage;
 import org.cubexmc.contract.storage.EventLog;
 import org.cubexmc.contract.storage.PendingTransactionStore;
+import org.cubexmc.core.CubexPlugin;
 
 import java.io.File;
 import java.io.IOException;
 
-public final class ContractPlugin extends JavaPlugin {
+public final class ContractPlugin extends CubexPlugin {
     private LanguageManager languageManager;
     private EconomyService economyService;
     private ContractStorage contractStorage;
@@ -24,7 +25,7 @@ public final class ContractPlugin extends JavaPlugin {
     private ContractGui contractGui;
 
     @Override
-    public void onEnable() {
+    protected void enablePlugin() {
         saveDefaultFiles();
 
         languageManager = new LanguageManager(this);
@@ -32,18 +33,32 @@ public final class ContractPlugin extends JavaPlugin {
 
         economyService = new EconomyService(this);
         if (!economyService.setup()) {
-            getLogger().severe("Vault economy provider not found. Contracts will be disabled.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
+            abortEnable("Vault economy provider not found. Contracts will be disabled.");
         }
 
         contractStorage = new ContractStorage(this);
         contractStorage.load();
+        Runnable saveContractStorage = () -> {
+            if (contractStorage != null) {
+                try {
+                    contractStorage.save();
+                } catch (IOException ex) {
+                    getLogger().warning("Failed to save contracts on disable: " + ex.getMessage());
+                }
+            }
+        };
+        bind(saveContractStorage);
         pendingStore = new PendingTransactionStore(this);
         eventLog = new EventLog(this);
         contractService = new ContractService(this, contractStorage, economyService, pendingStore, eventLog);
         contractService.recoverPendingTransactions();
         contractGui = new ContractGui(this);
+        Runnable closeContractGui = () -> {
+            if (contractGui != null) {
+                contractGui.closeSessions();
+            }
+        };
+        bind(closeContractGui);
         getServer().getPluginManager().registerEvents(contractGui, this);
 
         ContractCommand command = new ContractCommand(this);
@@ -60,17 +75,7 @@ public final class ContractPlugin extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {
-        if (contractGui != null) {
-            contractGui.closeSessions();
-        }
-        if (contractStorage != null) {
-            try {
-                contractStorage.save();
-            } catch (IOException ex) {
-                getLogger().warning("Failed to save contracts on disable: " + ex.getMessage());
-            }
-        }
+    protected void disablePlugin() {
     }
 
     public void reloadContracts() {
@@ -104,42 +109,31 @@ public final class ContractPlugin extends JavaPlugin {
     }
 
     private void saveDefaultFiles() {
-        saveDefaultConfig();
-        saveLanguage();
-    }
-
-    private void saveLanguage() {
-        saveLanguage("zh_CN");
-        saveLanguage("en_US");
-    }
-
-    private void saveLanguage(String language) {
-        File langFile = new File(getDataFolder(), "lang/" + language + ".yml");
-        if (!langFile.exists()) {
-            saveResource("lang/" + language + ".yml", false);
-        }
+        saveResourcesIfMissing("config.yml", "lang/zh_CN.yml", "lang/en_US.yml");
     }
 
     private void scheduleFlush() {
         long intervalSeconds = Math.max(5, getConfig().getLong("storage.flush-interval-seconds", 30));
         long periodTicks = intervalSeconds * 20L;
-        getServer().getScheduler().runTaskTimer(this, () -> {
+        BukkitTask task = getServer().getScheduler().runTaskTimer(this, () -> {
             try {
                 contractStorage.flushIfDirty();
             } catch (IOException ex) {
                 getLogger().warning("Async flush failed: " + ex.getMessage());
             }
         }, periodTicks, periodTicks);
+        bindTask(task, handle -> ((BukkitTask) handle).cancel());
     }
 
     private void scheduleCleanup() {
         long intervalMinutes = Math.max(1, getConfig().getLong("expiry.cleanup-interval-minutes", 10));
         long periodTicks = intervalMinutes * 60L * 20L;
-        getServer().getScheduler().runTaskTimer(this, () -> {
+        BukkitTask task = getServer().getScheduler().runTaskTimer(this, () -> {
             int changed = contractService.cleanupExpired();
             if (changed > 0) {
                 getLogger().info("Processed " + changed + " expired or auto-approved contracts.");
             }
         }, periodTicks, periodTicks);
+        bindTask(task, handle -> ((BukkitTask) handle).cancel());
     }
 }

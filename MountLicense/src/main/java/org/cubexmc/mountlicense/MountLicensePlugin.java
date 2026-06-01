@@ -1,7 +1,7 @@
 package org.cubexmc.mountlicense;
 
 import org.bukkit.command.PluginCommand;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.cubexmc.core.CubexPlugin;
 import org.cubexmc.mountlicense.command.MountLicenseCommand;
 import org.cubexmc.mountlicense.config.ConfigManager;
 import org.cubexmc.mountlicense.config.ProfileRegistry;
@@ -19,7 +19,7 @@ import org.cubexmc.mountlicense.service.PdcKeys;
 import org.cubexmc.mountlicense.service.RecallService;
 import org.cubexmc.mountlicense.service.RegistryService;
 
-public class MountLicensePlugin extends JavaPlugin {
+public class MountLicensePlugin extends CubexPlugin {
 
     private ConfigManager configManager;
     private LanguageManager languageManager;
@@ -33,7 +33,7 @@ public class MountLicensePlugin extends JavaPlugin {
     private RecallService recallService;
 
     @Override
-    public void onEnable() {
+    protected void enablePlugin() {
         saveDefaultResources();
 
         this.configManager = new ConfigManager(this);
@@ -48,6 +48,12 @@ public class MountLicensePlugin extends JavaPlugin {
         this.pdcKeys = new PdcKeys(this);
         this.vehicleIndex = new VehicleIndex(this);
         this.vehicleIndex.load();
+        Runnable flushVehicleIndex = () -> {
+            if (vehicleIndex != null) {
+                vehicleIndex.flush();
+            }
+        };
+        bind(flushVehicleIndex);
 
         this.itemFactory = new ItemFactory(this, pdcKeys, languageManager);
         this.ownershipService = new OwnershipService(pdcKeys, vehicleIndex);
@@ -83,10 +89,7 @@ public class MountLicensePlugin extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {
-        if (vehicleIndex != null) {
-            vehicleIndex.flush();
-        }
+    protected void disablePlugin() {
     }
 
     public ConfigManager configManager() {
@@ -141,15 +144,6 @@ public class MountLicensePlugin extends JavaPlugin {
     }
 
     private void saveDefaultResources() {
-        saveDefaultConfig();
-        saveResourceIfMissing("vehicle-profiles.yml");
-        saveResourceIfMissing("lang/zh_CN.yml");
-        saveResourceIfMissing("lang/en_US.yml");
-    }
-
-    private void saveResourceIfMissing(String name) {
-        if (!new java.io.File(getDataFolder(), name).exists()) {
-            saveResource(name, false);
-        }
+        saveResourcesIfMissing("config.yml", "vehicle-profiles.yml", "lang/zh_CN.yml", "lang/en_US.yml");
     }
 }
