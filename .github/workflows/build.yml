@@ -1,0 +1,93 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shadow-jars:
+    name: Build all plugin jars
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build shadow jars
+        run: ./gradlew shadowJarAll
+
+      - name: Upload plugin jars
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-jars
+          if-no-files-found: error
+          path: |
+            BookLite/build/libs/*.jar
+            !BookLite/build/libs/*-plain.jar
+            FAWEReplacer/build/libs/*.jar
+            !FAWEReplacer/build/libs/*-plain.jar
+            MountLicense/build/libs/*.jar
+            !MountLicense/build/libs/*-plain.jar
+            Contracts/build/libs/*.jar
+            !Contracts/build/libs/*-plain.jar
+            EcoBalancer/build/libs/*.jar
+            !EcoBalancer/build/libs/*-plain.jar
+            RuleGems/build/libs/*.jar
+            !RuleGems/build/libs/*-plain.jar
+            Metro/build/libs/*.jar
+            !Metro/build/libs/*-plain.jar
+            Railway/build/libs/*.jar
+            !Railway/build/libs/*-plain.jar
+
+  plugin-build:
+    name: Build ${{ matrix.plugin }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin:
+          - BookLite
+          - FAWEReplacer
+          - MountLicense
+          - Contracts
+          - EcoBalancer
+          - RuleGems
+          - Metro
+          - Railway
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin
+        run: ./gradlew :${{ matrix.plugin }}:build
+
+      - name: Upload ${{ matrix.plugin }} jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.plugin }}-jar
+          if-no-files-found: error
+          path: |
+            ${{ matrix.plugin }}/build/libs/*.jar
+            !${{ matrix.plugin }}/build/libs/*-plain.jar
