@@ -8,10 +8,10 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Minecart;
 import org.bukkit.entity.Player;
 import org.bukkit.Location;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import org.incendo.cloud.annotations.AnnotationParser;
 
+import org.cubexmc.core.CubexPlugin;
 import org.cubexmc.metro.config.ConfigFacade;
 import org.cubexmc.metro.gui.ChatInputManager;
 import org.cubexmc.metro.gui.GuiListener;
@@ -45,7 +45,7 @@ import org.cubexmc.metro.model.EntityModelController;
 import org.cubexmc.metro.model.Stop;
 import org.cubexmc.metro.service.LineServiceManager;
 
-public final class Metro extends JavaPlugin {
+public final class Metro extends CubexPlugin {
 
     private LineManager lineManager;
     private StopManager stopManager;
@@ -79,7 +79,9 @@ public final class Metro extends JavaPlugin {
     private EntityModelController entityModelController;
 
     @Override
-    public void onEnable() {
+    protected void enablePlugin() {
+        bindShutdownActions();
+
         // 创建配置目录
         if (!getDataFolder().exists()) {
             getDataFolder().mkdirs();
@@ -202,36 +204,87 @@ public final class Metro extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {
-        if (this.mapIntegrationLifecycle != null) {
-            this.mapIntegrationLifecycle.disable();
-        }
+    protected void disablePlugin() {
+    }
 
-        // 主动清理任务与显示，避免 reload 残留状态
-        if (playerMoveListener != null) {
-            playerMoveListener.shutdown();
-        }
-        if (playerInteractListener != null) {
-            playerInteractListener.shutdown();
-        }
-        if (scoreboardManager != null) {
-            scoreboardManager.shutdown();
-        }
-        if (globalScoreboardLibrary != null) {
-            globalScoreboardLibrary.close();
-        }
+    private void bindShutdownActions() {
+        Runnable logDisabled = () -> {
+            if (languageManager != null) {
+                Bukkit.getConsoleSender().sendMessage(languageManager.getMessage("plugin.disabled"));
+            } else {
+                getLogger().info("Metro plugin disabled.");
+            }
+        };
+        Runnable flushData = this::flushPersistentData;
+        Runnable cancelRouteRecorder = () -> {
+            if (routeRecorder != null) {
+                routeRecorder.cancelAll();
+            }
+        };
+        Runnable shutdownScheduledTasks = () -> {
+            if (scheduledTaskLifecycle != null) {
+                scheduledTaskLifecycle.shutdown();
+            }
+        };
+        Runnable removeFallbackMinecarts = this::removeFallbackMinecarts;
+        Runnable shutdownActiveTrains = this::shutdownActiveTrains;
+        Runnable clearPlayerDisplays = this::clearPlayerDisplays;
+        Runnable closeScoreboardLibrary = () -> {
+            if (globalScoreboardLibrary != null) {
+                globalScoreboardLibrary.close();
+            }
+        };
+        Runnable shutdownScoreboardManager = () -> {
+            if (scoreboardManager != null) {
+                scoreboardManager.shutdown();
+            }
+        };
+        Runnable shutdownPlayerInteractListener = () -> {
+            if (playerInteractListener != null) {
+                playerInteractListener.shutdown();
+            }
+        };
+        Runnable shutdownPlayerMoveListener = () -> {
+            if (playerMoveListener != null) {
+                playerMoveListener.shutdown();
+            }
+        };
+        Runnable disableMapIntegrations = () -> {
+            if (this.mapIntegrationLifecycle != null) {
+                this.mapIntegrationLifecycle.disable();
+            }
+        };
 
-        // 清理在线玩家显示与本次生命周期内仍在运行的地铁矿车。
+        bind(logDisabled);
+        bind(flushData);
+        bind(cancelRouteRecorder);
+        bind(shutdownScheduledTasks);
+        bind(removeFallbackMinecarts);
+        bind(shutdownActiveTrains);
+        bind(clearPlayerDisplays);
+        bind(closeScoreboardLibrary);
+        bind(shutdownScoreboardManager);
+        bind(shutdownPlayerInteractListener);
+        bind(shutdownPlayerMoveListener);
+        bind(disableMapIntegrations);
+    }
+
+    private void clearPlayerDisplays() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (scoreboardManager != null) {
                 scoreboardManager.clearPlayerDisplay(player);
             }
         }
+    }
+
+    private void shutdownActiveTrains() {
         int activeTrainCount = TrainMovementTask.shutdownActiveTasks(this, VersionUtil.isFolia());
         if (activeTrainCount > 0) {
             getLogger().info("Cleaned up " + activeTrainCount + " active Metro train(s).");
         }
+    }
 
+    private void removeFallbackMinecarts() {
         // Paper/Bukkit 兜底清理旧残留；Folia 不做全世界实体扫描，避免跨 region 访问风险。
         if (!VersionUtil.isFolia()) {
             for (org.bukkit.World world : Bukkit.getWorlds()) {
@@ -247,20 +300,6 @@ public final class Metro extends JavaPlugin {
             }
         } else {
             getLogger().info("Skipped fallback world minecart scan during Folia shutdown; active trains were cleaned through the train registry.");
-        }
-
-        if (scheduledTaskLifecycle != null) {
-            scheduledTaskLifecycle.shutdown();
-        }
-        if (routeRecorder != null) {
-            routeRecorder.cancelAll();
-        }
-        flushPersistentData();
-
-        if (languageManager != null) {
-            Bukkit.getConsoleSender().sendMessage(languageManager.getMessage("plugin.disabled"));
-        } else {
-            getLogger().info("Metro plugin disabled.");
         }
     }
 

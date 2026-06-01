@@ -41,6 +41,7 @@ dependencies {
     implementation("org.incendo:cloud-minecraft-extras") {
         version { strictly("2.0.0-beta.10") }
     }
+    implementation(project(":modules:cubex-core"))
 
     compileOnly("de.bluecolored.bluemap:BlueMapAPI:2.7.2")
     compileOnly("us.dynmap:DynmapCoreAPI:3.7-beta-6")
