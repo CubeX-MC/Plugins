@@ -1,0 +1,702 @@
+package org.cubexmc.metro.config;
+
+import java.util.List;
+
+import org.bukkit.Material;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.cubexmc.metro.Metro;
+import org.cubexmc.metro.util.ColorUtil;
+
+/**
+ * Centralized read access and memory cache for plugin configuration values.
+ */
+public class ConfigFacade {
+
+    private static final String STOP_CONTINUOUS_PATH = "titles.stop_continuous";
+    private static final String LEGACY_ENTER_STOP_PATH = "titles.enter_stop";
+
+    private final Metro plugin;
+
+    // Stop continuous titles. titles.enter_stop is kept only as a legacy fallback.
+    private boolean stopContinuousTitleEnabled;
+    private int stopContinuousInterval;
+    private boolean stopContinuousAlways;
+    private String stopContinuousTitle;
+    private String stopContinuousSubtitle;
+    private String stopContinuousActionbar;
+    private String stopContinuousStartTitle;
+    private String stopContinuousStartSubtitle;
+    private String stopContinuousStartActionbar;
+    private String stopContinuousEndTitle;
+    private String stopContinuousEndSubtitle;
+    private String stopContinuousEndActionbar;
+    private int stopContinuousFadeIn;
+    private int stopContinuousStay;
+    private int stopContinuousFadeOut;
+
+    // Arrive Stop Titles
+    private boolean arriveStopTitleEnabled;
+    private String arriveStopTitle;
+    private String arriveStopSubtitle;
+    private int arriveStopFadeIn;
+    private int arriveStopStay;
+    private int arriveStopFadeOut;
+
+    // Terminal Stop Titles
+    private boolean terminalStopTitleEnabled;
+    private String terminalStopTitle;
+    private String terminalStopSubtitle;
+    private int terminalStopFadeIn;
+    private int terminalStopStay;
+    private int terminalStopFadeOut;
+
+    // Departure Titles
+    private boolean departureTitleEnabled;
+    private String departureTitle;
+    private String departureSubtitle;
+    private String departureActionbar;
+    private int departureFadeIn;
+    private int departureStay;
+    private int departureFadeOut;
+
+    // Waiting Titles
+    private boolean waitingTitleEnabled;
+    private String waitingTitle;
+    private String waitingSubtitle;
+    private String waitingActionbar;
+
+    // Sounds
+    private boolean departureSoundEnabled;
+    private List<String> departureNotes;
+    private int departureInitialDelay;
+
+    private boolean arrivalSoundEnabled;
+    private List<String> arrivalNotes;
+    private int arrivalInitialDelay;
+    private boolean enableParticles;
+    
+    // Scoreboard
+    private boolean isScoreboardEnabled;
+    private String sbStyleCurrent;
+    private String sbStylePassed;
+    private String sbStyleWaitingNext;
+    private String sbStyleMovingNext;
+    private String sbStyleTerminal;
+    private String sbStyleNext;
+    private String sbStyleOther;
+    private String sbStyleFolding;
+    private String lineSymbol;
+
+    // Speed Control
+    private String speedControlMode;
+    private java.util.Map<String, java.util.Map<String, Double>> blockSpeedMap;
+
+    // Map Integration
+    private boolean mapIntegrationEnabled;
+    private String mapProvider;
+    private String mapMarkerSetLabel;
+    private boolean mapDefaultVisible;
+    private int mapLineWidth;
+    private boolean mapShowStopMarkers;
+    private boolean mapShowTransferInfo;
+    private long mapRefreshDelayTicks;
+
+    // Route Recording
+    private double routeRecordingMinSampleDistanceBlocks;
+    private boolean routeRecordingSimplifyCollinearPoints;
+    private double routeRecordingSimplifyEpsilonBlocks;
+
+    // Portals
+    private boolean portalsEnabled;
+    private String portalTriggerBlock;
+    private int portalTeleportDelay;
+    private boolean portalEffectParticles;
+    private boolean portalEffectSound;
+
+    private boolean stationArrivalSoundEnabled;
+    private List<String> stationArrivalNotes;
+    private int stationArrivalInitialDelay;
+
+    private boolean waitingSoundEnabled;
+    private List<String> waitingNotes;
+    private int waitingInitialDelay;
+    private int waitingSoundInterval;
+
+    // Settings
+    private double cartSpeed;
+    private long cartSpawnDelay;
+    private long cartDepartureDelay;
+    private long interactCooldown;
+    private long minecartPendingTimeout;
+    private String interactDisplayType;
+    private int interactStayTicks;
+    private boolean debugEnabled;
+    private boolean safeModeEnabled;
+    private boolean safeModeEntityPushProtection;
+    private boolean safeModeDamageProtection;
+    private boolean safeModeMovementAssist;
+    private boolean safeModePassengerRailBreakProtection;
+    private double safeModeMinCruiseSpeed;
+    private long safeModeStallRecoveryTicks;
+    private boolean economyEnabled;
+
+    private Material selectionTool;
+    private String selectionToolName;
+
+    public ConfigFacade(Metro plugin) {
+        this.plugin = plugin;
+    }
+
+    public void reload() {
+        // Stop continuous display. New configs use titles.stop_continuous; titles.enter_stop
+        // remains readable so upgraded servers keep their previous station prompts.
+        stopContinuousTitleEnabled = getStopContinuousBoolean("enabled", true);
+        stopContinuousInterval = getStopContinuousInt("interval", 40);
+        stopContinuousAlways = getStopContinuousBoolean("always", true);
+        stopContinuousTitle = colorize(getStopContinuousString("title", "&b{stop_name}"));
+        stopContinuousSubtitle = colorize(getStopContinuousString("subtitle",
+                "&d➔ {terminus_name} &8| &e» {next_stop_name} &8| &a⇄ {stop_transfers}"));
+        stopContinuousActionbar = getStopContinuousString("actionbar",
+                "&fNext train &e{eta_formatted} &7| &fRight-click rail to board &7[&r{line_color_code}{line}&7]");
+        stopContinuousStartTitle = colorize(getStopContinuousString("start_stop.title", stopContinuousTitle));
+        stopContinuousStartSubtitle = colorize(getStopContinuousString("start_stop.subtitle",
+                "&d➔ {terminus_name} &8| &fOrigin &8| &a⇄ {stop_transfers}"));
+        stopContinuousStartActionbar = getStopContinuousString("start_stop.actionbar", stopContinuousActionbar);
+        stopContinuousEndTitle = colorize(getStopContinuousString("end_stop.title", stopContinuousTitle));
+        stopContinuousEndSubtitle = colorize(getStopContinuousString("end_stop.subtitle",
+                "&c🛑 Terminal Station &8| &a⇄ {stop_transfers}"));
+        stopContinuousEndActionbar = getStopContinuousString("end_stop.actionbar",
+                "&cEnd of line. Please allow passengers to exit.");
+        stopContinuousFadeIn = getStopContinuousInt("fade_in", 10);
+        stopContinuousStay = getStopContinuousInt("stay", 40);
+        stopContinuousFadeOut = getStopContinuousInt("fade_out", 10);
+
+        // Arrive Stop
+        arriveStopTitleEnabled = plugin.getConfig().getBoolean("titles.arrive_stop.enabled", true);
+        arriveStopTitle = colorize(plugin.getConfig().getString("titles.arrive_stop.title", "&a已到站"));
+        arriveStopSubtitle = colorize(plugin.getConfig().getString("titles.arrive_stop.subtitle", "&6{stop_name}"));
+        arriveStopFadeIn = plugin.getConfig().getInt("titles.arrive_stop.fade_in", 10);
+        arriveStopStay = plugin.getConfig().getInt("titles.arrive_stop.stay", 40);
+        arriveStopFadeOut = plugin.getConfig().getInt("titles.arrive_stop.fade_out", 10);
+
+        // Terminal Stop
+        terminalStopTitleEnabled = plugin.getConfig().getBoolean("titles.terminal_stop.enabled", true);
+        terminalStopTitle = colorize(plugin.getConfig().getString("titles.terminal_stop.title", "&c终点站"));
+        terminalStopSubtitle = colorize(plugin.getConfig().getString("titles.terminal_stop.subtitle", "&6请下车"));
+        terminalStopFadeIn = plugin.getConfig().getInt("titles.terminal_stop.fade_in", 10);
+        terminalStopStay = plugin.getConfig().getInt("titles.terminal_stop.stay", 60);
+        terminalStopFadeOut = plugin.getConfig().getInt("titles.terminal_stop.fade_out", 10);
+
+        // Departure
+        departureTitleEnabled = plugin.getConfig().getBoolean("titles.departure.enabled", true);
+        departureTitle = plugin.getConfig().getString("titles.departure.title", "");
+        departureSubtitle = plugin.getConfig().getString("titles.departure.subtitle", "");
+        departureActionbar = plugin.getConfig().getString("titles.departure.actionbar", "列车已启动，请扶好站稳，注意安全");
+        departureFadeIn = plugin.getConfig().getInt("titles.departure.fade_in", 5);
+        departureStay = plugin.getConfig().getInt("titles.departure.stay", 40);
+        departureFadeOut = plugin.getConfig().getInt("titles.departure.fade_out", 5);
+
+        // Waiting
+        waitingTitleEnabled = plugin.getConfig().getBoolean("titles.waiting.enabled", true);
+        waitingTitle = plugin.getConfig().getString("titles.waiting.title", "列车即将发车");
+        waitingSubtitle = plugin.getConfig().getString("titles.waiting.subtitle",
+                "当前站点: &a{stop_name} | 下一站: &e{next_stop_name}");
+        waitingActionbar = plugin.getConfig().getString("titles.waiting.actionbar", "列车将在 &c{countdown} &f秒后发车");
+
+        // Sounds
+        departureSoundEnabled = plugin.getConfig().getBoolean("sounds.departure.enabled", true);
+        departureNotes = plugin.getConfig().getStringList("sounds.departure.notes");
+        departureInitialDelay = plugin.getConfig().getInt("sounds.departure.initial_delay", 0);
+
+        arrivalSoundEnabled = plugin.getConfig().getBoolean("sounds.arrival.enabled", true);
+        arrivalNotes = plugin.getConfig().getStringList("sounds.arrival.notes");
+        arrivalInitialDelay = plugin.getConfig().getInt("sounds.arrival.initial_delay", 0);
+        enableParticles = plugin.getConfig().getBoolean("particles.enabled", true);
+        
+        isScoreboardEnabled = plugin.getConfig().getBoolean("scoreboard.enabled", true);
+        sbStyleCurrent = colorize(plugin.getConfig().getString("scoreboard.styles.current_stop", "&6☛ &l"));
+        sbStylePassed = colorize(plugin.getConfig().getString("scoreboard.styles.passed_stop", "&8▼ &7&o"));
+        sbStyleWaitingNext = colorize(plugin.getConfig().getString("scoreboard.styles.waiting_next_stop", "&f▽ &l"));
+        sbStyleMovingNext = colorize(plugin.getConfig().getString("scoreboard.styles.moving_next_stop", "&6☛ &l"));
+        sbStyleTerminal = colorize(plugin.getConfig().getString("scoreboard.styles.terminal_stop", " ◇ &f&n"));
+        sbStyleNext = colorize(plugin.getConfig().getString("scoreboard.styles.next_stop", "&a○ "));
+        sbStyleOther = colorize(plugin.getConfig().getString("scoreboard.styles.other_stops", "&7· "));
+        sbStyleFolding = colorize(plugin.getConfig().getString("scoreboard.styles.folding_symbol", "     &8...     "));
+        lineSymbol = plugin.getConfig().getString("scoreboard.line_symbol", "❙");
+
+        speedControlMode = plugin.getConfig().getString("speed_control.mode", "VANILLA_MOMENTUM");
+        blockSpeedMap = new java.util.HashMap<>();
+        if (plugin.getConfig().isConfigurationSection("speed_control.worlds")) {
+            org.bukkit.configuration.ConfigurationSection worldsSection = plugin.getConfig().getConfigurationSection("speed_control.worlds");
+            for (String worldName : worldsSection.getKeys(false)) {
+                java.util.Map<String, Double> worldMap = new java.util.HashMap<>();
+                org.bukkit.configuration.ConfigurationSection blockSection = worldsSection.getConfigurationSection(worldName);
+                if (blockSection != null) {
+                    for (String blockName : blockSection.getKeys(false)) {
+                        worldMap.put(blockName.toUpperCase(), blockSection.getDouble(blockName));
+                    }
+                }
+                blockSpeedMap.put(worldName, worldMap);
+            }
+        } else if (plugin.getConfig().isConfigurationSection("speed_control.block_speed_map")) {
+             // 兼容老版本配置
+             java.util.Map<String, Double> defaultMap = new java.util.HashMap<>();
+             for (String key : plugin.getConfig().getConfigurationSection("speed_control.block_speed_map").getKeys(false)) {
+                 defaultMap.put(key.toUpperCase(), plugin.getConfig().getDouble("speed_control.block_speed_map." + key));
+             }
+             blockSpeedMap.put("default", defaultMap);
+        }
+
+        // Map Integration
+        mapIntegrationEnabled = plugin.getConfig().getBoolean("map_integration.enabled", false);
+        mapProvider = plugin.getConfig().getString("map_integration.provider", "AUTO").toUpperCase();
+        mapMarkerSetLabel = plugin.getConfig().getString("map_integration.marker_set_label", "Metro Network");
+        mapDefaultVisible = plugin.getConfig().getBoolean("map_integration.default_visible", true);
+        mapLineWidth = plugin.getConfig().getInt("map_integration.line_width", 3);
+        mapShowStopMarkers = plugin.getConfig().getBoolean("map_integration.show_stop_markers", true);
+        mapShowTransferInfo = plugin.getConfig().getBoolean("map_integration.show_transfer_info", true);
+        mapRefreshDelayTicks = Math.max(1L, plugin.getConfig().getLong("map_integration.refresh_delay_ticks", 20L));
+
+        // Route Recording
+        routeRecordingMinSampleDistanceBlocks = Math.max(0.1D,
+                plugin.getConfig().getDouble("route_recording.min_sample_distance_blocks", 1.0D));
+        routeRecordingSimplifyCollinearPoints = plugin.getConfig()
+                .getBoolean("route_recording.simplify_collinear_points", true);
+        routeRecordingSimplifyEpsilonBlocks = Math.max(0.0D,
+                plugin.getConfig().getDouble("route_recording.simplify_epsilon_blocks", 0.15D));
+
+        // Portals
+        portalsEnabled = plugin.getConfig().getBoolean("portals.enabled", true);
+        portalTriggerBlock = plugin.getConfig().getString("portals.trigger_block", "CRYING_OBSIDIAN").toUpperCase();
+        portalTeleportDelay = plugin.getConfig().getInt("portals.teleport_delay", 5);
+        portalEffectParticles = plugin.getConfig().getBoolean("portals.effects.particles", true);
+        portalEffectSound = plugin.getConfig().getBoolean("portals.effects.sound", true);
+
+        stationArrivalSoundEnabled = plugin.getConfig().getBoolean("sounds.station_arrival.enabled", true);
+        stationArrivalNotes = plugin.getConfig().getStringList("sounds.station_arrival.notes");
+        stationArrivalInitialDelay = plugin.getConfig().getInt("sounds.station_arrival.initial_delay", 0);
+
+        waitingSoundEnabled = plugin.getConfig().getBoolean("sounds.waiting.enabled", true);
+        waitingNotes = plugin.getConfig().getStringList("sounds.waiting.notes");
+        waitingInitialDelay = plugin.getConfig().getInt("sounds.waiting.initial_delay", 0);
+        waitingSoundInterval = plugin.getConfig().getInt("sounds.waiting.interval", 20);
+
+        // Settings
+        cartSpeed = plugin.getConfig().getDouble("settings.cart_speed", 0.3);
+        cartSpawnDelay = plugin.getConfig().getLong("settings.cart_spawn_delay", 60L);
+        cartDepartureDelay = plugin.getConfig().getLong("settings.cart_departure_delay", 100L);
+        interactCooldown = plugin.getConfig().getLong("settings.interact_cooldown", 2000L);
+        minecartPendingTimeout = plugin.getConfig().getLong("settings.minecart_pending_timeout", 60000L);
+        interactDisplayType = plugin.getConfig().getString("settings.interact.type", "SUBTITLE").toUpperCase();
+        interactStayTicks = plugin.getConfig().getInt("settings.interact.stay_ticks", 60);
+        debugEnabled = plugin.getConfig().getBoolean("settings.debug.enabled", false);
+        safeModeEnabled = plugin.getConfig().getBoolean("settings.safe_mode.enabled", true);
+        safeModeEntityPushProtection = plugin.getConfig().getBoolean("settings.safe_mode.entity_push_protection", true);
+        safeModeDamageProtection = plugin.getConfig().getBoolean("settings.safe_mode.damage_protection", true);
+        safeModeMovementAssist = plugin.getConfig().getBoolean("settings.safe_mode.movement_assist", true);
+        safeModePassengerRailBreakProtection = plugin.getConfig().getBoolean("settings.safe_mode.passenger_rail_break_protection", true);
+        safeModeMinCruiseSpeed = plugin.getConfig().getDouble("settings.safe_mode.min_cruise_speed", 0.08);
+        safeModeStallRecoveryTicks = plugin.getConfig().getLong("settings.safe_mode.stall_recovery_ticks", 8L);
+        economyEnabled = plugin.getConfig().getBoolean("economy.enabled", true);
+
+        String toolName = plugin.getConfig().getString("settings.selection_tool", "GOLDEN_SHOVEL");
+        try {
+            selectionTool = Material.valueOf(toolName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            plugin.getLogger()
+                    .warning("Invalid selection tool in config: " + toolName + ", using default GOLDEN_SHOVEL");
+            selectionTool = Material.GOLDEN_SHOVEL;
+        }
+
+        String name = selectionTool.name().toLowerCase().replace('_', ' ');
+        StringBuilder result = new StringBuilder();
+        for (String word : name.split(" ")) {
+            if (!word.isEmpty()) {
+                result.append(Character.toUpperCase(word.charAt(0)))
+                        .append(word.substring(1))
+                        .append(" ");
+            }
+        }
+        selectionToolName = result.toString().trim();
+    }
+
+    public boolean isEnterStopTitleEnabled() {
+        return isStopContinuousTitleEnabled();
+    }
+
+    public String getEnterStopTitle() {
+        return getStopContinuousTitle(false, false);
+    }
+
+    public String getEnterStopSubtitle() {
+        return getStopContinuousSubtitle(false, false);
+    }
+
+    public int getEnterStopFadeIn() {
+        return getStopContinuousFadeIn();
+    }
+
+    public int getEnterStopStay() {
+        return getStopContinuousStay();
+    }
+
+    public int getEnterStopFadeOut() {
+        return getStopContinuousFadeOut();
+    }
+
+    public boolean isStopContinuousTitleEnabled() {
+        return stopContinuousTitleEnabled;
+    }
+
+    public int getStopContinuousInterval() {
+        return stopContinuousInterval;
+    }
+
+    public boolean isStopContinuousAlways() {
+        return stopContinuousAlways;
+    }
+
+    public String getStopContinuousTitle(boolean startStop, boolean endStop) {
+        if (startStop) {
+            return stopContinuousStartTitle;
+        }
+        if (endStop) {
+            return stopContinuousEndTitle;
+        }
+        return stopContinuousTitle;
+    }
+
+    public String getStopContinuousSubtitle(boolean startStop, boolean endStop) {
+        if (startStop) {
+            return stopContinuousStartSubtitle;
+        }
+        if (endStop) {
+            return stopContinuousEndSubtitle;
+        }
+        return stopContinuousSubtitle;
+    }
+
+    public String getStopContinuousActionbar(boolean startStop, boolean endStop) {
+        if (startStop) {
+            return stopContinuousStartActionbar;
+        }
+        if (endStop) {
+            return stopContinuousEndActionbar;
+        }
+        return stopContinuousActionbar;
+    }
+
+    public int getStopContinuousFadeIn() {
+        return stopContinuousFadeIn;
+    }
+
+    public int getStopContinuousStay() {
+        return stopContinuousStay;
+    }
+
+    public int getStopContinuousFadeOut() {
+        return stopContinuousFadeOut;
+    }
+
+    public boolean isArriveStopTitleEnabled() {
+        return arriveStopTitleEnabled;
+    }
+
+    public String getArriveStopTitle() {
+        return arriveStopTitle;
+    }
+
+    public String getArriveStopSubtitle() {
+        return arriveStopSubtitle;
+    }
+
+    public int getArriveStopFadeIn() {
+        return arriveStopFadeIn;
+    }
+
+    public int getArriveStopStay() {
+        return arriveStopStay;
+    }
+
+    public int getArriveStopFadeOut() {
+        return arriveStopFadeOut;
+    }
+
+    public boolean isTerminalStopTitleEnabled() {
+        return terminalStopTitleEnabled;
+    }
+
+    public String getTerminalStopTitle() {
+        return terminalStopTitle;
+    }
+
+    public String getTerminalStopSubtitle() {
+        return terminalStopSubtitle;
+    }
+
+    public int getTerminalStopFadeIn() {
+        return terminalStopFadeIn;
+    }
+
+    public int getTerminalStopStay() {
+        return terminalStopStay;
+    }
+
+    public int getTerminalStopFadeOut() {
+        return terminalStopFadeOut;
+    }
+
+    public boolean isDepartureTitleEnabled() {
+        return departureTitleEnabled;
+    }
+
+    public String getDepartureTitle() {
+        return departureTitle;
+    }
+
+    public String getDepartureSubtitle() {
+        return departureSubtitle;
+    }
+
+    public String getDepartureActionbar() {
+        return departureActionbar;
+    }
+
+    public int getDepartureFadeIn() {
+        return departureFadeIn;
+    }
+
+    public int getDepartureStay() {
+        return departureStay;
+    }
+
+    public int getDepartureFadeOut() {
+        return departureFadeOut;
+    }
+
+    public boolean isWaitingTitleEnabled() {
+        return waitingTitleEnabled;
+    }
+
+    public String getWaitingTitle() {
+        return waitingTitle;
+    }
+
+    public String getWaitingSubtitle() {
+        return waitingSubtitle;
+    }
+
+    public String getWaitingActionbar() {
+        return waitingActionbar;
+    }
+
+    public boolean isDepartureSoundEnabled() {
+        return departureSoundEnabled;
+    }
+
+    public List<String> getDepartureNotes() {
+        return departureNotes;
+    }
+
+    public int getDepartureInitialDelay() {
+        return departureInitialDelay;
+    }
+
+    public boolean isArrivalSoundEnabled() {
+        return arrivalSoundEnabled;
+    }
+
+    public List<String> getArrivalNotes() {
+        return arrivalNotes;
+    }
+
+    public int getArrivalInitialDelay() {
+        return arrivalInitialDelay;
+    }
+
+    public boolean isEnableParticles() {
+        return enableParticles;
+    }
+
+    public boolean isScoreboardEnabled() {
+        return isScoreboardEnabled;
+    }
+
+    public String getSbStyleCurrent() { return sbStyleCurrent; }
+    public String getSbStylePassed() { return sbStylePassed; }
+    public String getSbStyleWaitingNext() { return sbStyleWaitingNext; }
+    public String getSbStyleMovingNext() { return sbStyleMovingNext; }
+    public String getSbStyleTerminal() { return sbStyleTerminal; }
+    public String getSbStyleNext() { return sbStyleNext; }
+    public String getSbStyleOther() { return sbStyleOther; }
+    public String getSbStyleFolding() { return sbStyleFolding; }
+    public String getLineSymbol() { return lineSymbol; }
+
+    public String getSpeedControlMode() {
+        return speedControlMode;
+    }
+
+    public java.util.Map<String, java.util.Map<String, Double>> getBlockSpeedMap() {
+        return blockSpeedMap;
+    }
+
+    public boolean isStationArrivalSoundEnabled() {
+        return stationArrivalSoundEnabled;
+    }
+
+    public List<String> getStationArrivalNotes() {
+        return stationArrivalNotes;
+    }
+
+    public int getStationArrivalInitialDelay() {
+        return stationArrivalInitialDelay;
+    }
+
+    public boolean isWaitingSoundEnabled() {
+        return waitingSoundEnabled;
+    }
+
+    public List<String> getWaitingNotes() {
+        return waitingNotes;
+    }
+
+    public int getWaitingInitialDelay() {
+        return waitingInitialDelay;
+    }
+
+    public int getWaitingSoundInterval() {
+        return waitingSoundInterval;
+    }
+
+    public double getCartSpeed() {
+        return cartSpeed;
+    }
+
+    public long getCartSpawnDelay() {
+        return cartSpawnDelay;
+    }
+
+    public long getCartDepartureDelay() {
+        return cartDepartureDelay;
+    }
+
+    public long getInteractCooldown() {
+        return interactCooldown;
+    }
+
+    public long getMinecartPendingTimeout() {
+        return minecartPendingTimeout;
+    }
+
+    public String getInteractDisplayType() {
+        return interactDisplayType;
+    }
+
+    public int getInteractStayTicks() {
+        return interactStayTicks;
+    }
+
+    public boolean isDebugEnabled() {
+        return debugEnabled;
+    }
+
+    public boolean isSafeModeEnabled() {
+        return safeModeEnabled;
+    }
+
+    public boolean isSafeModeEntityPushProtection() {
+        return safeModeEnabled && safeModeEntityPushProtection;
+    }
+
+    public boolean isSafeModeDamageProtection() {
+        return safeModeEnabled && safeModeDamageProtection;
+    }
+
+    public boolean isSafeModeMovementAssist() {
+        return safeModeEnabled && safeModeMovementAssist;
+    }
+
+    public boolean isSafeModePassengerRailBreakProtection() {
+        return safeModeEnabled && safeModePassengerRailBreakProtection;
+    }
+
+    public double getSafeModeMinCruiseSpeed() {
+        return safeModeMinCruiseSpeed;
+    }
+
+    public long getSafeModeStallRecoveryTicks() {
+        return safeModeStallRecoveryTicks;
+    }
+
+    public boolean isEconomyEnabled() {
+        return economyEnabled;
+    }
+
+    public boolean isDebugCategoryEnabled(String category) {
+        if (!isDebugEnabled() || category == null || category.isEmpty()) {
+            return false;
+        }
+        return plugin.getConfig().getBoolean("settings.debug." + category, true);
+    }
+
+    public Material getSelectionTool() {
+        return selectionTool;
+    }
+
+    public String getSelectionToolName() {
+        return selectionToolName;
+    }
+
+    private String colorize(String text) {
+        return ColorUtil.colorize(text);
+    }
+
+    private boolean getStopContinuousBoolean(String key, boolean defaultValue) {
+        FileConfiguration config = plugin.getConfig();
+        String newPath = STOP_CONTINUOUS_PATH + "." + key;
+        if (config.contains(newPath)) {
+            return config.getBoolean(newPath, defaultValue);
+        }
+        return config.getBoolean(LEGACY_ENTER_STOP_PATH + "." + key, defaultValue);
+    }
+
+    private int getStopContinuousInt(String key, int defaultValue) {
+        FileConfiguration config = plugin.getConfig();
+        String newPath = STOP_CONTINUOUS_PATH + "." + key;
+        if (config.contains(newPath)) {
+            return config.getInt(newPath, defaultValue);
+        }
+        return config.getInt(LEGACY_ENTER_STOP_PATH + "." + key, defaultValue);
+    }
+
+    private String getStopContinuousString(String key, String defaultValue) {
+        FileConfiguration config = plugin.getConfig();
+        String newPath = STOP_CONTINUOUS_PATH + "." + key;
+        if (config.contains(newPath)) {
+            return config.getString(newPath, defaultValue);
+        }
+        return config.getString(LEGACY_ENTER_STOP_PATH + "." + key, defaultValue);
+    }
+
+    // Map Integration Getters
+    public boolean isMapIntegrationEnabled() { return mapIntegrationEnabled; }
+    public String getMapProvider() { return mapProvider; }
+    public String getMapMarkerSetLabel() { return mapMarkerSetLabel; }
+    public boolean isMapDefaultVisible() { return mapDefaultVisible; }
+    public int getMapLineWidth() { return mapLineWidth; }
+    public boolean isMapShowStopMarkers() { return mapShowStopMarkers; }
+    public boolean isMapShowTransferInfo() { return mapShowTransferInfo; }
+    public long getMapRefreshDelayTicks() { return mapRefreshDelayTicks; }
+
+    // Route Recording Getters
+    public double getRouteRecordingMinSampleDistanceBlocks() { return routeRecordingMinSampleDistanceBlocks; }
+    public boolean isRouteRecordingSimplifyCollinearPoints() { return routeRecordingSimplifyCollinearPoints; }
+    public double getRouteRecordingSimplifyEpsilonBlocks() { return routeRecordingSimplifyEpsilonBlocks; }
+
+    // Portal Getters
+    public boolean isPortalsEnabled() { return portalsEnabled; }
+    public String getPortalTriggerBlock() { return portalTriggerBlock; }
+    public int getPortalTeleportDelay() { return portalTeleportDelay; }
+    public boolean isPortalEffectParticles() { return portalEffectParticles; }
+    public boolean isPortalEffectSound() { return portalEffectSound; }
+}

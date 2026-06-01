@@ -1,0 +1,16 @@
+name: FAWEReplace
+version: '1.0.3'
+main: org.cubexmc.fawereplace.FAWEReplace
+api-version: '1.20'
+authors: [ cong0707, angushushu ]
+depend: [ WorldEdit ]
+commands:
+  fawereplace:
+    description: Start/stop/status for FAWE-based world cleaning
+    usage: /<command> <start|stop|status>
+    permission: fawereplace.use
+    aliases: [fawerl, frl]
+permissions:
+  fawereplace.use:
+    description: Allows using /fawereplace commands
+    default: op

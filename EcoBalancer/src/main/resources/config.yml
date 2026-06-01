@@ -1,0 +1,44 @@
+config-version: 4
+language: 'en_US' # 语言 # Language en_US, zh_CN
+info-on-login: true # 登录时显示用户信息 # Show user info on login
+file-logging: true # 是否将日志写入插件日志文件（最新日志位于 plugins/EcoBalancer/logs/latest.log）# Whether to write messages to plugin log file
+record-retention-days: 30 # 保留记录天数 # Record retention days
+check-time: "20:00"  # 格式为 HH:mm # Time format is HH:mm
+check-schedule:
+  type: 'weekly' # 选项: 'daily', 'weekly', 'monthly' # Options: 'daily', 'weekly', 'monthly'
+  days-of-week: [2, 4, 6] # 周一, 周三, 周五 (7 = 周六, 1 = 周日) # Monday, Wednesday, Friday (7 = Saturday, 1 = Sunday)
+  dates-of-month: [1] # 每月一号 # 1st day of each month
+deduct-based-on-time: true
+# 下面两个选项仅在 deduct-based-on-time 为 true 时生效 # The following two options only take effect when deduct-based-on-time is true
+inactive-days-to-deduct: 50  # 未上线扣款开始的天数 # Days inactive before starting deductions
+inactive-days-to-clear: 500 # 未上线清空余额的天数 # Days inactive before clearing balance
+max-deduction-per-player: 0 # 单次最大扣款额 (0为不限制) # Max deduction per player per cycle (0 for unlimited)
+min-balance-protection: 0 # 余额保护阈值，低于此值不征税 (0为不保护) # Minimum balance protection threshold
+tax-exempt-permission: 'ecobalancer.exempt' # 免税权限节点 # Permission node for tax exemption
+tax-exempt:
+  enabled: true
+  global-permission: 'ecobalancer.exempt'
+  policy-permission-prefix: 'ecobalancer.exempt.policy'
+  operation-permission-prefix: 'ecobalancer.exempt.operation'
+debt-mode: 'skip' # skip, drain, allow-negative # 余额不足处理方式
+debt-commands:
+  - 'broadcast &e%player% &cdoes not have enough money to pay taxes.'
+# 按阶级扣税 # Tax brackets for deductions
+# 阈值解释方式：
+# - 当 percentile-thresholds 为 false 时，threshold 使用“绝对余额”数值（默认行为）
+# - 当 percentile-thresholds 为 true 时，threshold 使用“财富分布百分比（0-100）”，如 80 代表前 80% 的阈值
+percentile-thresholds: true
+tax-brackets:
+  - threshold: 80   # Top 20%
+    rate: 0.01
+  - threshold: 95   # Top 5%
+    rate: 0.02
+  - threshold: 99   # Top 1%
+    rate: 0.04
+tax-account: true # 是否使用税金账户 # Whether to use tax account
+tax-account-name: 'tax' # 税金账户名称 # Tax account name
+only-offline-players: true # 只针对离线玩家收税（在线玩家跳过）# Only deduct from offline players
+stats-world: '' # 读取 vanilla 统计(stats/)的世界名，留空则取第一个世界 # World name for stats dir, empty uses first world
+tax-filters: '' # 默认征税过滤器（与分析命令相同的 key:value 语法）# Default tax filters
+require-confirmation: true # 执行毁灭性命令时是否需要确认 # Require confirmation for destructive commands
+record-zero-deduction: false # 是否记录扣款为0的记录 # Record zero-deduction entries

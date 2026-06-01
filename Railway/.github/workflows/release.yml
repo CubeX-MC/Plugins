@@ -1,0 +1,45 @@
+name: metro-release
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.1.5)"
+        required: true
+      release_name:
+        description: "Release title"
+        required: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Verify quality gates and build artifact
+        run: mvn -B clean verify package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metro-jar
+          path: target/metro-*.jar
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.release_name || github.ref_name }}
+          files: target/metro-*.jar

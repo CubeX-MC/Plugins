@@ -1,0 +1,55 @@
+name: MountLicense
+version: ${project.version}
+main: org.cubexmc.mountlicense.MountLicensePlugin
+api-version: '1.18'
+author: CubeX-MC
+description: Register, protect, park, and recall mounts and physical vehicles as transport assets.
+softdepend:
+  - Vault
+
+commands:
+  mountlicense:
+    description: MountLicense root command.
+    aliases: [ml]
+    usage: /ml help
+
+permissions:
+  mountlicense.use:
+    default: true
+    description: Allow basic player commands (help, list, info, locate).
+  mountlicense.register:
+    default: true
+    description: Allow registering eligible vehicles with a license.
+  mountlicense.park:
+    default: true
+    description: Park, lock, unlock, and release owned vehicles.
+  mountlicense.key.use:
+    default: true
+    description: Use the Key item (recall) and /ml recall command.
+  mountlicense.trust:
+    default: true
+    description: Add/remove trustees on your own registered vehicles.
+  mountlicense.admin:
+    default: op
+    description: Admin commands (inspect, give, reindex, reload, bypass).
+    children:
+      mountlicense.admin.inspect: true
+      mountlicense.admin.give: true
+      mountlicense.admin.reindex: true
+      mountlicense.admin.reload: true
+      mountlicense.admin.bypass: true
+  mountlicense.admin.inspect:
+    default: op
+    description: Inspect a vehicle's registration data.
+  mountlicense.admin.give:
+    default: op
+    description: Give MountLicense items to players.
+  mountlicense.admin.reindex:
+    default: op
+    description: Rebuild the vehicle index from loaded PDC.
+  mountlicense.admin.reload:
+    default: op
+    description: Reload configuration and profiles.
+  mountlicense.admin.bypass:
+    default: op
+    description: Bypass owner-only protections (mount / damage / inventory / leash).

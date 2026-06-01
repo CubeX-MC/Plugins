@@ -1,0 +1,38 @@
+# ==========================================================
+#                   FAWEReplace 动态规则配置
+# ==========================================================
+# 此文件用于存储可以通过游戏内命令 (setregion, addrule 等) 修改的数据。
+# 插件会优先读取此文件中的配置。
+
+# 目标世界名称
+world: "world"
+
+# 目标区域 (可通过 /fawereplace setregion 自动设置)
+target:
+  start:
+    x: 0
+    y: -64
+    z: 0
+  end:
+    x: 1000
+    y: 320
+    z: 1000
+
+# 替换规则
+# 格式:
+#   - origin: 原方块 (支持带属性，如 "CHEST[facing=north]")
+#     target: 目标方块
+blocks:
+  # 示例: 将石头替换为空气
+  #- origin: STONE
+  #  target: AIR
+  
+  # 示例: 将特定朝向的箱子替换为空气
+  #- origin: CHEST
+  #  target: AIR
+
+# 实体清理规则
+# 需要清除的实体类型列表 (仅支持作为原对象，目标必须是 AIR)
+entities:
+  #- ARMOR_STAND
+  #- ZOMBIE

@@ -1,0 +1,46 @@
+
+name: Railway
+version: '0.4.0'
+
+main: org.cubexmc.metro.Metro
+api-version: '1.18'
+folia-supported: true
+authors: [angushushu, wwwer]
+description: A simple railway management system / 一个简单的铁路管理系统
+website: https://cubexmc.org
+softdepend:
+  - ViaVersion
+  - Geyser-Spigot
+  - floodgate
+  - Vault
+  - BlueMap
+  - dynmap
+  - squaremap
+  - PlaceholderAPI
+
+
+permissions:
+  railway.admin:
+    description: Allow use of Railway plugin admin commands
+    default: op
+    children:
+      railway.tp: true
+  railway.use:
+    description: Allow players to use Railway plugin features (such as riding trains)
+    default: true
+  railway.gui:
+    description: Allow players to open the Railway GUI
+    default: true
+
+  railway.tp:
+    description: Allow players to teleport to stops via command and GUI
+    default: false
+  railway.line.create:
+    description: Allow players to create new railway lines
+    default: false
+  railway.stop.create:
+    description: Allow players to create new stops
+    default: false
+  railway.portal.create:
+    description: Allow players to create new minecart portals
+    default: false

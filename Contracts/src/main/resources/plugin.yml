@@ -1,0 +1,55 @@
+name: Contract
+version: ${project.version}
+main: org.cubexmc.contract.ContractPlugin
+api-version: '1.18'
+author: CubeX-MC
+description: Player-to-player contract board with Vault-backed escrow.
+depend: [Vault]
+
+commands:
+  contract:
+    description: Contract root command.
+    aliases: [ct]
+    usage: /contract help
+
+permissions:
+  contract.use:
+    default: true
+    description: Open and inspect the contract board.
+  contract.create:
+    default: true
+    description: Create service, wager, and partnership contracts.
+  contract.accept:
+    default: true
+    description: Accept open contracts.
+  contract.submit:
+    default: true
+    description: Submit accepted contracts for owner approval.
+  contract.approve:
+    default: true
+    description: Approve submitted contracts you own.
+  contract.cancel:
+    default: true
+    description: Cancel eligible contracts.
+  contract.dispute:
+    default: true
+    description: Open a dispute for eligible contracts.
+  contract.mediate:
+    default: true
+    description: Accept mediator duties and resolve contracts you mediate.
+  contract.admin:
+    default: op
+    description: Contract administration.
+    children:
+      contract.admin.reload: true
+      contract.admin.settle: true
+      contract.admin.view: true
+  contract.admin.reload:
+    default: op
+    description: Reload Contract.
+  contract.admin.settle:
+    default: op
+    description: Force pay, refund, or close contracts.
+  contract.admin.view:
+    default: op
+    description: View all contracts.

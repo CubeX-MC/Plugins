@@ -1,0 +1,12 @@
+name: FAWEReplace
+version: '1.0.3'
+main: org.cubexmc.fawereplace.FAWEReplace
+api-version: '1.20'
+authors: [ cong0707, angushushu ]
+dependencies:
+  server:
+    WorldEdit:
+      load: BEFORE
+      required: true
+# Paper plugins do not support YAML-based command declarations
+# Commands are registered programmatically in onEnable() using registerCommand()

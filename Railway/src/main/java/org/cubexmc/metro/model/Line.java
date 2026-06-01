@@ -1,0 +1,507 @@
+package org.cubexmc.metro.model;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+
+import org.cubexmc.metro.control.TrainControlMode;
+
+/**
+ * 代表地铁系统中的一条线路
+ */
+public class Line {
+    public static final int DEFAULT_HEADWAY_SECONDS = 120;
+    public static final int DEFAULT_DWELL_TICKS = 100;
+    public static final int DEFAULT_TRAIN_CARS = 3;
+
+    private String id;
+    private String name;
+    private final List<String> orderedStopIds;
+    private final List<String> portalIds;
+    private List<RoutePoint> routePoints;
+    private String color; // 线路颜色
+    private String terminusName; // 终点站方向名称
+    private Double maxSpeed; // 线路最大速度
+    private double ticketPrice; // 线路乘车价格
+    private boolean railProtected; // 是否保护已记录线路上的铁轨
+    private Long routeRecordedAtEpochMillis;
+    private UUID routeRecordedBy;
+    private UUID routeRecordedCartId;
+    private UUID owner; // 线路所有者 UUID，null 表示服务器所有
+    private final Set<UUID> admins; // 线路管理员 UUID 集合
+    private String worldName; // 线路所在世界名称，null 表示还未添加任何站点
+    private PriceRule priceRule;
+    private LineStatus lineStatus = LineStatus.NORMAL;
+    private final List<String> alternativeRouteIds;
+    private String suspensionMessage;
+    private int headwaySeconds = DEFAULT_HEADWAY_SECONDS;
+    private int dwellTicks = DEFAULT_DWELL_TICKS;
+    private int trainCars = DEFAULT_TRAIN_CARS;
+    private boolean serviceEnabled;
+    private TrainControlMode controlMode;
+    private String entityTypeOverride;
+    
+    /**
+     * 创建新线路
+     * 
+     * @param id 线路ID
+     * @param name 线路名称
+     */
+    public Line(String id, String name) {
+        this.id = id;
+        this.name = name;
+        this.orderedStopIds = new ArrayList<>();
+        this.portalIds = new ArrayList<>();
+        this.routePoints = new ArrayList<>();
+        this.color = "&f"; // 默认白色
+        this.terminusName = ""; // 默认空
+        this.maxSpeed = null; // 默认使用config.yml中的maxspeed
+        this.ticketPrice = 0.0; // 默认免费
+        this.railProtected = false;
+        this.admins = new HashSet<>();
+        this.alternativeRouteIds = new ArrayList<>();
+    }
+    
+    /**
+     * 获取线路ID
+     * 
+     * @return 线路ID
+     */
+    public String getId() {
+        return id;
+    }
+    
+    /**
+     * 获取线路名称
+     * 
+     * @return 线路名称
+     */
+    public String getName() {
+        return name;
+    }
+    
+    /**
+     * 设置线路名称
+     * 
+     * @param name 新名称
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+    /**
+     * 获取线路颜色
+     * 
+     * @return 线路颜色
+     */
+    public String getColor() {
+        return color;
+    }
+    
+    /**
+     * 设置线路颜色
+     * 
+     * @param color 新颜色
+     */
+    public void setColor(String color) {
+        this.color = color;
+    }
+    
+    /**
+     * 获取终点站方向名称
+     * 
+     * @return 终点站方向名称
+     */
+    public String getTerminusName() {
+        return terminusName;
+    }
+    
+    /**
+     * 设置终点站方向名称
+     * 
+     * @param terminusName 新终点站方向名称
+     */
+    public void setTerminusName(String terminusName) {
+        this.terminusName = terminusName;
+    }
+    
+    /**
+     * 获取线路最大速度
+     * 
+     * @return 线路最大速度，如果未设置则返回n-1.0
+     */
+    public Double getMaxSpeed() {
+        if (maxSpeed == null)
+            return -1.0;
+        return maxSpeed;
+    }
+    
+    /**
+     * 设置线路最大速度
+     * 
+     * @param maxSpeed 新的最大速度
+     */
+    public void setMaxSpeed(Double maxSpeed) {
+        this.maxSpeed = maxSpeed;
+    }
+    
+    /**
+     * 获取线路乘车价格
+     * 
+     * @return 乘车价格
+     */
+    public double getTicketPrice() {
+        return ticketPrice;
+    }
+    
+    /**
+     * 设置线路乘车价格
+     * 
+     * @param ticketPrice 新的价格
+     */
+    public void setTicketPrice(double ticketPrice) {
+        this.ticketPrice = Math.max(0.0, ticketPrice);
+    }
+
+    public boolean isRailProtected() {
+        return railProtected;
+    }
+
+    public void setRailProtected(boolean railProtected) {
+        this.railProtected = railProtected;
+    }
+    
+    public int getHeadwaySeconds() { return headwaySeconds; }
+    public void setHeadwaySeconds(int headwaySeconds) { this.headwaySeconds = Math.max(10, headwaySeconds); }
+    public int getDwellTicks() { return dwellTicks; }
+    public void setDwellTicks(int dwellTicks) { this.dwellTicks = Math.max(20, dwellTicks); }
+    public int getTrainCars() { return trainCars; }
+    public void setTrainCars(int trainCars) { this.trainCars = Math.max(1, trainCars); }
+    public boolean isServiceEnabled() { return serviceEnabled; }
+    public void setServiceEnabled(boolean enabled) { this.serviceEnabled = enabled; }
+    public TrainControlMode getControlMode() { return controlMode; }
+    public void setControlMode(TrainControlMode controlMode) { this.controlMode = controlMode; }
+    public String getEntityType() {
+        return entityTypeOverride != null ? entityTypeOverride : EntityModelController.MINECART_ENTITY_TYPE;
+    }
+    public String getEntityTypeOverride() { return entityTypeOverride; }
+    public boolean hasEntityTypeOverride() { return entityTypeOverride != null; }
+    public void setEntityType(String entityType) {
+        if (entityType == null || entityType.isBlank()) {
+            this.entityTypeOverride = null;
+            return;
+        }
+        String normalized = EntityModelController.normalizeLineEntityType(entityType);
+        this.entityTypeOverride = normalized != null ? normalized : entityType.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * 获取有序停靠区ID列表
+     * 
+     * @return 有序停靠区ID列表
+     */
+    public List<String> getOrderedStopIds() {
+        return new ArrayList<>(orderedStopIds);
+    }
+
+    public List<String> getPortalIds() {
+        return new ArrayList<>(portalIds);
+    }
+
+    public List<RoutePoint> getRoutePoints() {
+        return new ArrayList<>(routePoints);
+    }
+
+    public void setRoutePoints(Collection<RoutePoint> routePoints) {
+        this.routePoints = new ArrayList<>();
+        if (routePoints != null) {
+            for (RoutePoint point : routePoints) {
+                if (point != null) {
+                    this.routePoints.add(point);
+                }
+            }
+        }
+    }
+
+    public void clearRoutePoints() {
+        routePoints.clear();
+        clearRouteRecordingMetadata();
+    }
+
+    public Long getRouteRecordedAtEpochMillis() {
+        return routeRecordedAtEpochMillis;
+    }
+
+    public void setRouteRecordedAtEpochMillis(Long routeRecordedAtEpochMillis) {
+        this.routeRecordedAtEpochMillis = routeRecordedAtEpochMillis != null && routeRecordedAtEpochMillis > 0
+                ? routeRecordedAtEpochMillis
+                : null;
+    }
+
+    public UUID getRouteRecordedBy() {
+        return routeRecordedBy;
+    }
+
+    public void setRouteRecordedBy(UUID routeRecordedBy) {
+        this.routeRecordedBy = routeRecordedBy;
+    }
+
+    public UUID getRouteRecordedCartId() {
+        return routeRecordedCartId;
+    }
+
+    public void setRouteRecordedCartId(UUID routeRecordedCartId) {
+        this.routeRecordedCartId = routeRecordedCartId;
+    }
+
+    public void setRouteRecordingMetadata(Long recordedAtEpochMillis, UUID recordedBy, UUID recordedCartId) {
+        setRouteRecordedAtEpochMillis(recordedAtEpochMillis);
+        this.routeRecordedBy = recordedBy;
+        this.routeRecordedCartId = recordedCartId;
+    }
+
+    public void clearRouteRecordingMetadata() {
+        this.routeRecordedAtEpochMillis = null;
+        this.routeRecordedBy = null;
+        this.routeRecordedCartId = null;
+    }
+    
+    /**
+     * 检查线路是否为环线
+     *
+     * @return 是否为环线
+     */
+    public boolean isCircular() {
+        if (orderedStopIds.isEmpty() || orderedStopIds.size() < 2) {
+            return false;
+        }
+        return orderedStopIds.get(0).equals(orderedStopIds.get(orderedStopIds.size() - 1));
+    }
+    
+    /**
+     * 向线路添加停靠区
+     * 
+     * @param stopId 停靠区ID
+     * @param index 添加位置，-1表示添加到末尾
+     */
+    public void addStop(String stopId, int index) {
+        // 先移除，防止重复
+        boolean isMakingCircular = !isCircular() &&
+                !orderedStopIds.isEmpty() &&
+                orderedStopIds.get(0).equals(stopId) &&
+                (index == -1 || index == orderedStopIds.size());
+
+        if (orderedStopIds.contains(stopId) && !isMakingCircular) {
+            orderedStopIds.remove(stopId);
+        }
+        
+        // 添加到指定位置或末尾
+        if (isCircular() && index == -1) {
+            orderedStopIds.add(orderedStopIds.size() - 1, stopId);
+        } else if (index >= 0 && index < orderedStopIds.size()) {
+            orderedStopIds.add(index, stopId);
+        } else {
+            orderedStopIds.add(stopId);
+        }
+    }
+    
+    /**
+     * 从线路中移除停靠区
+     * 
+     * @param stopId 停靠区ID
+     */
+    public void delStop(String stopId) {
+        orderedStopIds.remove(stopId);
+    }
+    
+    /**
+     * 检查线路是否包含指定停靠区
+     * 
+     * @param stopId 停靠区ID
+     * @return 是否包含
+     */
+    public boolean containsStop(String stopId) {
+        return orderedStopIds.contains(stopId);
+    }
+
+    public boolean addPortal(String portalId) {
+        if (portalId == null || portalId.isBlank() || portalIds.contains(portalId)) {
+            return false;
+        }
+        return portalIds.add(portalId);
+    }
+
+    public boolean delPortal(String portalId) {
+        return portalIds.remove(portalId);
+    }
+
+    public boolean containsPortal(String portalId) {
+        return portalIds.contains(portalId);
+    }
+    
+    /**
+     * 获取指定停靠区的下一个停靠区ID
+     * 
+     * @param currentStopId 当前停靠区ID
+     * @return 下一个停靠区ID，如果当前是终点站或不存在，则返回null
+     */
+    public String getNextStopId(String currentStopId) {
+        int index = orderedStopIds.indexOf(currentStopId);
+        if (index == -1) {
+            return null;
+        }
+
+        if (index == orderedStopIds.size() - 1) {
+            if (isCircular()) {
+                if (orderedStopIds.size() > 1) {
+                    return orderedStopIds.get(1);
+                } else {
+                    return orderedStopIds.get(0);
+                }
+            } else {
+                return null;
+            }
+        }
+        return orderedStopIds.get(index + 1);
+    }
+
+    public UUID getOwner() {
+        return owner;
+    }
+
+    public void setOwner(UUID owner) {
+        this.owner = owner;
+        if (owner != null) {
+            admins.add(owner);
+        }
+        admins.remove(null);
+    }
+
+    public Set<UUID> getAdmins() {
+        return new HashSet<>(admins);
+    }
+
+    /**
+     * 获取线路所在世界名称
+     * 
+     * @return 世界名称，如果线路还没有站点则返回null
+     */
+    public String getWorldName() {
+        return worldName;
+    }
+
+    /**
+     * 设置线路所在世界名称
+     * 
+     * @param worldName 世界名称
+     */
+    public void setWorldName(String worldName) {
+        this.worldName = worldName;
+    }
+
+    public void setAdmins(Collection<UUID> adminIds) {
+        admins.clear();
+        if (adminIds != null) {
+            admins.addAll(adminIds);
+        }
+        if (owner != null) {
+            admins.add(owner);
+        }
+        admins.remove(null);
+    }
+
+    public boolean addAdmin(UUID adminId) {
+        if (adminId == null) {
+            return false;
+        }
+        admins.remove(null);
+        return admins.add(adminId);
+    }
+
+    public boolean removeAdmin(UUID adminId) {
+        if (adminId == null) {
+            return false;
+        }
+        if (owner != null && owner.equals(adminId)) {
+            return false;
+        }
+        boolean removed = admins.remove(adminId);
+        admins.remove(null);
+        return removed;
+    }
+    
+    /**
+     * 获取指定停靠区的上一个停靠区ID
+     * 
+     * @param currentStopId 当前停靠区ID
+     * @return 上一个停靠区ID，如果当前是起点站或不存在，则返回null
+     */
+    public String getPreviousStopId(String currentStopId) {
+        int index = orderedStopIds.indexOf(currentStopId);
+        if (index <= 0) {
+            if (isCircular()) {
+                if (orderedStopIds.size() > 2) {
+                    return orderedStopIds.get(orderedStopIds.size() - 2);
+                } else if (orderedStopIds.size() == 2) {
+                    return orderedStopIds.get(0);
+                }
+            }
+            return null;
+        }
+        return orderedStopIds.get(index - 1);
+    }
+
+    public PriceRule getPriceRule() {
+        return priceRule;
+    }
+
+    public void setPriceRule(PriceRule priceRule) {
+        this.priceRule = priceRule;
+    }
+
+    public LineStatus getLineStatus() {
+        return lineStatus != null ? lineStatus : LineStatus.NORMAL;
+    }
+
+    public void setLineStatus(LineStatus lineStatus) {
+        this.lineStatus = lineStatus != null ? lineStatus : LineStatus.NORMAL;
+    }
+
+    public List<String> getAlternativeRouteIds() {
+        return new ArrayList<>(alternativeRouteIds);
+    }
+
+    public void setAlternativeRouteIds(Collection<String> alternativeRouteIds) {
+        this.alternativeRouteIds.clear();
+        if (alternativeRouteIds != null) {
+            for (String id : alternativeRouteIds) {
+                if (id != null && !id.trim().isEmpty()) {
+                    this.alternativeRouteIds.add(id.trim());
+                }
+            }
+        }
+    }
+
+    public boolean addAlternativeRoute(String lineId) {
+        if (lineId == null || lineId.trim().isEmpty() || alternativeRouteIds.contains(lineId.trim())) {
+            return false;
+        }
+        return alternativeRouteIds.add(lineId.trim());
+    }
+
+    public boolean removeAlternativeRoute(String lineId) {
+        return alternativeRouteIds.remove(lineId);
+    }
+
+    public String getSuspensionMessage() {
+        return suspensionMessage;
+    }
+
+    public void setSuspensionMessage(String suspensionMessage) {
+        this.suspensionMessage = suspensionMessage;
+    }
+} 

@@ -1,0 +1,120 @@
+name: EcoBalancer
+version: '${project.version}'
+main: org.cubexmc.ecobalancer.EcoBalancer
+api-version: '1.16'
+description: This plugin deducts money from inactive players' accounts using Vault.
+author: angushushu
+website: angushushu.com
+depend: [Vault]
+softdepend:
+  - Essentials
+  - CMI
+  - CMIEconomy
+  - XConomy
+  - TheNewEconomy
+  - iConomy
+  - Gringotts
+  - PlaceholderAPI
+folia-supported: true
+commands:
+  ecobal:
+    description: Main command for EcoBalancer plugin.
+    usage: /ecobal <subcommand> [arguments]
+    aliases: [eb]
+    permission: ecobalancer.command.ecobal
+permissions:
+  ecobalancer.command.ecobal:
+    description: Allows use of all EcoBalancer commands
+    default: op
+    children:
+      ecobalancer.command.checkall: true
+      ecobalancer.command.checkplayer: true
+      ecobalancer.command.stats: true
+      ecobalancer.command.interval: true
+      ecobalancer.command.perc: true
+      ecobalancer.command.reload: true
+      ecobalancer.command.checkrecords: true
+      ecobalancer.command.checkrecord: true
+      ecobalancer.command.restore: true
+      ecobalancer.command.gini: true
+      ecobalancer.command.concentration: true
+      ecobalancer.command.report: true
+      ecobalancer.command.health: true
+      ecobalancer.command.impact: true
+      ecobalancer.command.trends: true
+      ecobalancer.command.tax: true
+      ecobalancer.command.migrate: true
+  ecobalancer.command.checkall:
+    description: Allows use of /ecobal checkall command
+    default: op
+  ecobalancer.command.checkplayer:
+    description: Allows use of /ecobal checkplayer command
+    default: op
+  ecobalancer.command.stats:
+    description: Allows use of /ecobal stats command
+    default: op
+  ecobalancer.command.interval:
+    description: Allows use of /ecobal interval command
+    default: op
+  ecobalancer.command.perc:
+    description: Allows use of /ecobal perc command
+    default: op
+  ecobalancer.command.reload:
+    description: Allows use of /ecobal reload command
+    default: op
+  ecobalancer.command.checkrecords:
+    description: Allows use of /ecobal checkrecords command
+    default: op
+  ecobalancer.command.checkrecord:
+    description: Allows use of /ecobal checkrecord command
+    default: op
+  ecobalancer.command.restore:
+    description: Allows use of /ecobal restore command
+    default: op
+  ecobalancer.command.gini:
+    description: Allows use of /ecobal gini command
+    default: op
+  ecobalancer.command.concentration:
+    description: Allows use of /ecobal concentration command
+    default: op
+  ecobalancer.command.report:
+    description: Allows use of /ecobal report command
+    default: op
+  ecobalancer.command.health:
+    description: Allows use of /ecobal health command
+    default: op
+  ecobalancer.command.impact:
+    description: Allows use of /ecobal impact command
+    default: op
+  ecobalancer.command.trends:
+    description: Allows use of /ecobal trends command
+    default: op
+  ecobalancer.command.tax:
+    description: Allows use of /ecobal tax command
+    default: op
+  ecobalancer.command.migrate:
+    description: Allows use of /ecobal migrate to manage config versions
+    default: op
+  ecobalancer.gui.admin:
+    description: Access to EcoBalancer GUI Tax Management
+    default: op
+  ecobalancer.gui.view:
+    description: Access to EcoBalancer GUI Dashboard
+    default: true
+  ecobalancer.*:
+    description: Grants all EcoBalancer permissions
+    default: op
+    children:
+      ecobalancer.command.ecobal: true
+  ecobalancer.admin:
+    description: Administrative access to EcoBalancer notifications and actions
+    default: op
+  ecobalancer.exempt:
+    description: Exempts a player from all EcoBalancer tax policies
+    default: false
+  ecobalancer.exempt.policy:
+    description: Prefix for policy-specific tax exemptions
+    default: false
+  ecobalancer.exempt.operation:
+    description: Prefix for operation-specific tax exemptions
+    default: false

@@ -1,0 +1,31 @@
+name: metro-ci
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Verify quality gates and build artifact
+        run: mvn -B clean verify package
+
+      - name: Upload metro jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: metro-jar
+          path: target/metro-*.jar
+

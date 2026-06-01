@@ -1,0 +1,63 @@
+name: BookLite
+version: ${project.version}
+main: org.cubexmc.booklite.BookLitePlugin
+api-version: '1.18'
+author: CubeX-MC
+description: Lightweight written-book storage with SQLite-backed content, dedupe, restore, and admin review.
+
+commands:
+  booklite:
+    description: BookLite root command.
+    aliases: [bl]
+    usage: /booklite help
+
+permissions:
+  booklite.use:
+    default: true
+    description: Allow reading BookLite virtual books.
+  booklite.convert:
+    default: true
+    description: Convert held vanilla written books to BookLite books.
+  booklite.restore:
+    default: true
+    description: Restore held BookLite books to vanilla written books.
+  booklite.admin:
+    default: op
+    description: BookLite administration.
+    children:
+      booklite.admin.status: true
+      booklite.admin.reload: true
+      booklite.admin.list: true
+      booklite.admin.info: true
+      booklite.admin.read: true
+      booklite.admin.get: true
+      booklite.admin.delete: true
+      booklite.admin.purge: true
+      booklite.admin.restorecontainer: true
+  booklite.admin.status:
+    default: op
+    description: View storage and cache status.
+  booklite.admin.reload:
+    default: op
+    description: Reload BookLite config and language.
+  booklite.admin.list:
+    default: op
+    description: List stored books.
+  booklite.admin.info:
+    default: op
+    description: Show stored book metadata.
+  booklite.admin.read:
+    default: op
+    description: Open any stored book by id.
+  booklite.admin.get:
+    default: op
+    description: Get a BookLite shell bound to a stored book id.
+  booklite.admin.delete:
+    default: op
+    description: Soft delete or undelete stored book content.
+  booklite.admin.purge:
+    default: op
+    description: Permanently purge soft-deleted book content.
+  booklite.admin.restorecontainer:
+    default: op
+    description: Restore BookLite books in a targeted container.

@@ -1,0 +1,112 @@
+# MountLicense default config
+# Restart or run /ml reload after editing.
+
+language: zh_CN  # zh_CN or en_US
+
+# Vault economy hook.
+# When Vault is present AND enabled here, registering a vehicle and using a key
+# may charge the player. Set 'enabled: false' to keep MVP free even if Vault is
+# loaded by another plugin.
+economy:
+  enabled: true
+  # Money taken when a player consumes a license to register a vehicle.
+  # Set to 0 to skip charging even when economy.enabled is true.
+  register_cost: 0.0
+  # Reserved for Phase 3 (key recall) and Phase 4 (station rental).
+  recall_cost: 0.0
+
+# License item appearance and stack rules.
+license_item:
+  material: PAPER
+  custom_model_data: 0       # 0 = unset
+  display_name: "license_item.display"   # language key
+  lore_key: "license_item.lore"          # language key (multi-line)
+
+# Key item appearance.
+key_item:
+  material: CARROT_ON_A_STICK
+  custom_model_data: 0
+  display_name: "key_item.display"
+  lore_key: "key_item.lore"
+
+# Recall behavior.
+# Recall searches loaded entities within radius. Unloaded mounts can only be
+# located (last-known position), not summoned, unless you enable chunk-load
+# recall in a future phase.
+recall:
+  # Maximum distance (blocks) the key will search for owned mounts.
+  search_radius: 100
+  # Cooldown per player (seconds). 0 disables the cooldown.
+  cooldown_seconds: 30
+  # Refuse teleport unless feet/head are passable and the block below is solid and safe.
+  require_safe_destination: true
+  # When true, recalled mounts have their state forced to ACTIVE and AI enabled.
+  wake_on_recall: true
+
+# Registration behavior.
+registration:
+  # When true, horse-like entities must already be tamed by the player.
+  require_tamed: true
+  # When true, registering boats / minecarts requires the vehicle to be empty.
+  require_empty_vehicle: true
+  # When true, a vehicle that already carries another player's PDC cannot be
+  # re-registered. Admins can force-register with the admin key (Phase 6).
+  reject_already_registered: true
+  # Distance from the entity at which interact is rejected. Sneak-right-click
+  # range is usually < 4. Block server-side reach exploits.
+  max_interact_distance: 6.0
+  # Default display-name format applied when registering. Use %plate%,
+  # %player%, and %profile%. Empty string keeps the entity's existing name.
+  display_name_format: "%plate%"
+  # Maximum vehicles a single player may own. -1 = unlimited. Counts all
+  # profiles together. Server ops bypass this limit when they hold
+  # mountlicense.admin.bypass.
+  max_vehicles_per_player: -1
+
+# Park mode controls when a registered vehicle flips between ACTIVE and PARKED.
+#   auto   - Dismounting an owned mount auto-parks (AI off, location saved).
+#            Mounting an owned parked mount auto-unparks (AI on).
+#            /ml park and /ml unpark still work for manual overrides.
+#   manual - Only /ml park and /ml unpark change state. Dismount does nothing.
+park_mode: auto
+
+# Trust list controls. Trusted players can mount, open inventory, leash, and
+# survive damage protection just like the owner — but cannot recall, release,
+# or modify the trust list themselves.
+trust:
+  # Maximum number of trustees per vehicle. -1 = unlimited.
+  max_trustees_per_vehicle: -1
+
+# Protection rules.
+# When a rule is true, non-owner players are blocked from that action against
+# a registered vehicle. Players with mountlicense.admin.bypass always pass.
+# Environmental damage (fall / fire / drown) and mob attacks are NOT blocked;
+# only direct player actions and player-shot projectiles.
+protection:
+  block_player_mount: true
+  block_player_damage: true
+  block_player_destroy: true
+  block_inventory_access: true
+  block_leash: true
+  # Drop a chat message when an action is blocked. Set false for silent block.
+  notify_blocked: true
+  # Per-player debounce on blocked-action messages (milliseconds).
+  notify_debounce_ms: 1500
+  # Remove the registration record when the entity dies or is destroyed.
+  cleanup_on_death: true
+
+# Cooldowns (seconds). 0 disables.
+cooldowns:
+  register: 2
+  key_use: 3
+  park: 1
+
+# Persistence behavior.
+persistence:
+  # Save interval (ticks). 20 = 1 second; 1200 = 1 minute.
+  autosave_interval_ticks: 1200
+  # When true, flush index synchronously on plugin disable.
+  flush_on_disable: true
+
+# Debug logging.
+debug: false

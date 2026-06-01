@@ -1,0 +1,21 @@
+# Maven build output
+target/
+
+# Gradle build output
+.gradle/
+build/
+**/build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Compiled / packaged
+*.class
+*.jar
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

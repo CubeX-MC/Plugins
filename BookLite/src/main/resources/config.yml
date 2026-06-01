@@ -1,0 +1,35 @@
+language: zh_CN
+
+storage:
+  sqlite_file: "books.db"
+  wal: true
+
+cache:
+  maximum_size: 2048
+  expire_after_access_minutes: 15
+
+limits:
+  max_pages: 100
+  max_page_json_bytes: 8192
+  max_total_json_bytes: 262144
+
+behavior:
+  auto_convert_signed_books: true
+  allow_crafting_copy: true
+  preserve_generation: true
+  # BookLite keeps shell items visually close to vanilla books: title and author
+  # remain the original values, while only hidden PDC tags point to stored content.
+
+lectern:
+  enabled: true
+
+uninstall:
+  mode: false
+  passive_on_player_join: true
+  passive_on_inventory_open: true
+  max_items_per_tick: 64
+
+logging:
+  log_conversions: true
+  log_restores: true
+  log_admin_reads: true

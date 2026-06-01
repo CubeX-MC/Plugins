@@ -1,0 +1,449 @@
+package org.cubexmc.metro.manager;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Minecart;
+import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.util.Vector;
+import org.cubexmc.metro.Metro;
+import org.cubexmc.metro.model.Portal;
+import org.cubexmc.metro.util.MetroConstants;
+import org.cubexmc.metro.util.MountAwareTeleportUtil;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
+
+/**
+ * 管理矿车传送门的加载、保存、查询和传送逻辑。
+ */
+public class PortalManager {
+
+    private final Metro plugin;
+    private final File portalFile;
+    private YamlConfiguration portalConfig;
+    private final Map<String, Portal> portals = new HashMap<>();
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private volatile boolean isDirty = false;
+
+    public PortalManager(Metro plugin) {
+        this.plugin = plugin;
+        this.portalFile = new File(plugin.getDataFolder(), "portals.yml");
+        load();
+    }
+
+    // =============== 加载 / 保存 ===============
+
+    public void load() {
+        lock.writeLock().lock();
+        try {
+            portals.clear();
+            if (!portalFile.exists()) {
+                portalConfig = new YamlConfiguration();
+                return;
+            }
+            portalConfig = YamlConfiguration.loadConfiguration(portalFile);
+            ConfigurationSection section = portalConfig.getConfigurationSection("portals");
+            if (section == null) return;
+
+            for (String id : section.getKeys(false)) {
+                ConfigurationSection portalSection = section.getConfigurationSection(id);
+                if (portalSection != null) {
+                    portals.put(id, Portal.fromConfig(id, portalSection));
+                }
+            }
+            plugin.getLogger().info("[Portal] Loaded " + portals.size() + " portals.");
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    public void save() {
+        this.isDirty = true;
+    }
+
+    public void processAsyncSave() {
+        if (!isDirty) {
+            return;
+        }
+
+        try {
+            String yamlDataFinal = buildSnapshot();
+            isDirty = false;
+            plugin.getSaveCoordinator().submitSnapshot(portalFile.toPath(), yamlDataFinal);
+        } catch (Exception e) {
+            isDirty = true;
+            plugin.getLogger().log(Level.SEVERE, "[Portal] Failed to process portals.yml save", e);
+        }
+    }
+
+    public void forceSaveSync() {
+        if (!isDirty) {
+            return;
+        }
+
+        try {
+            String yamlDataFinal = buildSnapshot();
+            isDirty = false;
+            plugin.getSaveCoordinator().saveNow(portalFile.toPath(), yamlDataFinal);
+        } catch (Exception e) {
+            isDirty = true;
+            plugin.getLogger().log(Level.SEVERE, "[Portal] Failed to save portals.yml", e);
+        }
+    }
+
+    // =============== CRUD ===============
+
+    public Portal createPortal(String id, Location entrance, UUID ownerId) {
+        Portal portal = new Portal(id);
+        portal.setEntrance(entrance);
+        portal.setOwner(ownerId);
+        lock.writeLock().lock();
+        try {
+            portals.put(id, portal);
+        } finally {
+            lock.writeLock().unlock();
+        }
+        save();
+        return portal;
+    }
+
+    public boolean setPortalOwner(String id, UUID ownerId) {
+        lock.writeLock().lock();
+        try {
+            Portal portal = portals.get(id);
+            if (portal == null) return false;
+            portal.setOwner(ownerId);
+        } finally {
+            lock.writeLock().unlock();
+        }
+        save();
+        return true;
+    }
+
+    public boolean addPortalAdmin(String id, UUID adminId) {
+        boolean changed;
+        lock.writeLock().lock();
+        try {
+            Portal portal = portals.get(id);
+            if (portal == null) return false;
+            changed = portal.addAdmin(adminId);
+        } finally {
+            lock.writeLock().unlock();
+        }
+        if (changed) {
+            save();
+        }
+        return changed;
+    }
+
+    public boolean removePortalAdmin(String id, UUID adminId) {
+        boolean changed;
+        lock.writeLock().lock();
+        try {
+            Portal portal = portals.get(id);
+            if (portal == null) return false;
+            changed = portal.removeAdmin(adminId);
+        } finally {
+            lock.writeLock().unlock();
+        }
+        if (changed) {
+            save();
+        }
+        return changed;
+    }
+
+    public boolean deletePortal(String id) {
+        boolean removedPortal;
+        lock.writeLock().lock();
+        try {
+            Portal removed = portals.remove(id);
+            removedPortal = removed != null;
+            if (removed != null && removed.getLinkedPortalId() != null) {
+                Portal linked = portals.get(removed.getLinkedPortalId());
+                if (linked != null) {
+                    linked.setLinkedPortalId(null);
+                }
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+        if (!removedPortal) {
+            return false;
+        }
+        if (plugin.getLineManager() != null) {
+            plugin.getLineManager().delPortalFromAllLines(id);
+        }
+        save();
+        return true;
+    }
+
+    public boolean setDestination(String id, Location destination) {
+        lock.writeLock().lock();
+        try {
+            Portal portal = portals.get(id);
+            if (portal == null) return false;
+            portal.setDestination(destination);
+        } finally {
+            lock.writeLock().unlock();
+        }
+        save();
+        return true;
+    }
+
+    public boolean linkPortals(String id1, String id2) {
+        lock.writeLock().lock();
+        try {
+            Portal p1 = portals.get(id1);
+            Portal p2 = portals.get(id2);
+            if (p1 == null || p2 == null) return false;
+            p1.setLinkedPortalId(id2);
+            p2.setLinkedPortalId(id1);
+        } finally {
+            lock.writeLock().unlock();
+        }
+        save();
+        return true;
+    }
+
+    public Portal getPortal(String id) {
+        lock.readLock().lock();
+        try {
+            return portals.get(id);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public List<Portal> getAllPortals() {
+        lock.readLock().lock();
+        try {
+            return new ArrayList<>(portals.values());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    // =============== 位置查询 ===============
+
+    /**
+     * 根据铁轨方块坐标查找传送门。
+     * 匹配的是铁轨所在位置的 blockX/Y/Z。
+     */
+    public Portal getPortalAt(Location railLocation) {
+        lock.readLock().lock();
+        try {
+            for (Portal portal : portals.values()) {
+                if (portal.matchesLocation(railLocation)) {
+                    return portal;
+                }
+            }
+            return null;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    // =============== 传送逻辑 ===============
+
+    /**
+     * 传送矿车和乘客到目标位置。
+     * 流程：
+     * 1. 获取乘客
+     * 2. 在目标世界创建新矿车
+     * 3. 复制 PDC 数据
+     * 4. 移除原矿车
+     * 5. 传送乘客并自动上车
+     * 6. 播放特效
+     */
+    public void teleportMinecart(Minecart sourceCart, Portal portal) {
+        Location destination = portal.getDestination();
+        if (destination == null || worldOf(destination) == null) {
+            plugin.getLogger().warning("[Portal] Invalid destination for portal: " + portal.getId());
+            return;
+        }
+
+        // 获取乘客
+        Player passenger = null;
+        if (!sourceCart.getPassengers().isEmpty()) {
+            Entity entity = sourceCart.getPassengers().get(0);
+            if (entity instanceof Player) {
+                passenger = (Player) entity;
+            }
+        }
+
+        // 入口特效
+        playEffects(sourceCart.getLocation());
+
+        final Player finalPassenger = passenger;
+
+        org.cubexmc.metro.train.TrainMovementTask oldTask = org.cubexmc.metro.train.TrainMovementTask.getTaskFor(sourceCart);
+        if (oldTask != null) {
+            oldTask.setTeleporting(true); // 通知任务即将传送，即使抛出乘客也不要自动 cancel
+        }
+
+        // 先弹出乘客再做传送
+        if (passenger != null) {
+            sourceCart.eject();
+            // 注意：弹出后 TrainMovementTask 会检查 isPassengerStillRiding() 然后调用 cancel()
+            // 如果不屏蔽该检查，整个任务在传送冷却 delay 期间就会被注销了
+        }
+
+        // 复制 PDC 数据
+        PersistentDataContainer sourcePdc = sourceCart.getPersistentDataContainer();
+        boolean isMetroCart = sourcePdc.has(MetroConstants.getMinecartKey(), PersistentDataType.BYTE);
+
+        int teleportDelay = plugin.getConfigFacade().getPortalTeleportDelay();
+
+        // 延迟移除原矿车
+        org.cubexmc.metro.util.SchedulerUtil.entityRun(plugin, sourceCart, () -> {
+            if (sourceCart.isValid()) {
+                sourceCart.remove();
+            }
+        }, teleportDelay, -1L);
+
+        // 延迟在目标位置生成新矿车并传送乘客
+        org.cubexmc.metro.util.SchedulerUtil.regionRun(plugin, destination, () -> {
+            World destWorld = worldOf(destination);
+            if (destWorld == null) return;
+            if (!destWorld.isChunkLoaded(destination.getBlockX() >> 4, destination.getBlockZ() >> 4)) {
+                plugin.getLogger().warning("[Portal] Destination chunk is not loaded for portal: " + portal.getId());
+                return;
+            }
+
+            Minecart newCart = destWorld.spawn(destination, Minecart.class);
+
+            // 复制 Metro 标记
+            if (isMetroCart) {
+                newCart.getPersistentDataContainer().set(
+                        MetroConstants.getMinecartKey(),
+                        PersistentDataType.BYTE,
+                        (byte) 1
+                );
+                newCart.setCustomName(MetroConstants.METRO_MINECART_NAME);
+                newCart.setCustomNameVisible(false);
+            }
+
+            // 传送乘客（如果有）
+            if (finalPassenger != null && finalPassenger.isOnline()) {
+                MountAwareTeleportUtil.teleportAndMountPassenger(plugin, finalPassenger, destination, newCart)
+                        .thenAccept(success -> {
+                    org.cubexmc.metro.util.SchedulerUtil.regionRun(plugin, destination, () -> {
+                        if (!success) {
+                            plugin.getLogger().warning("[Portal] Failed to teleport or remount passenger for portal: " + portal.getId());
+                            if (newCart.isValid()) {
+                                newCart.remove();
+                            }
+                            if (oldTask != null) {
+                                oldTask.setTeleporting(false);
+                            }
+                            return;
+                        }
+                        if (finalPassenger.isOnline() && newCart.isValid()) {
+                            // 转移 TrainMovementTask (接管新矿车)
+                            if (oldTask != null) {
+                                oldTask.transferMinecart(newCart);
+                            }
+
+                            // 给矿车一个初始速度
+                            float yaw = destination.getYaw();
+                            double rad = Math.toRadians(yaw);
+                            Vector direction = new Vector(-Math.sin(rad), 0, Math.cos(rad)).normalize();
+                            newCart.setVelocity(direction.multiply(plugin.getConfigFacade().getCartSpeed()));
+                        }
+                    }, 2L, -1L);
+                });
+            } else {
+                // 如果没有乘客，也要给空车一个初始速度
+                // 转移 TrainMovementTask (接管新矿车)
+                if (oldTask != null) {
+                    oldTask.transferMinecart(newCart);
+                }
+                float yaw = destination.getYaw();
+                double rad = Math.toRadians(yaw);
+                Vector direction = new Vector(-Math.sin(rad), 0, Math.cos(rad)).normalize();
+                newCart.setVelocity(direction.multiply(plugin.getConfigFacade().getCartSpeed()));
+            }
+
+            // 出口特效
+            playEffects(destination);
+
+        }, teleportDelay, -1L);
+
+        // 冻结乘客（如果有延迟且有乘客）
+        if (finalPassenger != null && teleportDelay > 0) {
+            Map<String, Object> args = org.cubexmc.metro.manager.LanguageManager.args();
+            org.cubexmc.metro.manager.LanguageManager.put(args, "portal_id", portal.getId());
+            finalPassenger.sendTitle(
+                    plugin.getLanguageManager().getMessage("portal.teleport_title", args),
+                    plugin.getLanguageManager().getMessage("portal.teleport_subtitle", args),
+                    5,
+                    teleportDelay,
+                    5);
+        }
+    }
+
+    /**
+     * 播放传送门特效（粒子 + 音效）
+     */
+    private void playEffects(Location loc) {
+        World world = worldOf(loc);
+        if (loc == null || world == null) return;
+
+        if (plugin.getConfigFacade().isPortalEffectParticles()) {
+            world.spawnParticle(Particle.PORTAL, loc.clone().add(0, 1, 0), 50, 0.5, 0.5, 0.5, 0.5);
+            world.spawnParticle(Particle.END_ROD, loc.clone().add(0, 1.5, 0), 20, 0.3, 0.3, 0.3, 0.05);
+        }
+
+        if (plugin.getConfigFacade().isPortalEffectSound()) {
+            world.playSound(loc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.2f);
+        }
+    }
+
+    private World worldOf(Location location) {
+        if (location == null) {
+            return null;
+        }
+        try {
+            return location.getWorld();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String buildSnapshot() {
+        YamlConfiguration snapshot = new YamlConfiguration();
+        lock.readLock().lock();
+        try {
+            List<String> portalIds = new ArrayList<>(portals.keySet());
+            Collections.sort(portalIds);
+            for (String portalId : portalIds) {
+                Portal portal = portals.get(portalId);
+                if (portal == null) {
+                    continue;
+                }
+                ConfigurationSection section = snapshot.createSection("portals." + portal.getId());
+                portal.toConfig(section);
+            }
+            return snapshot.saveToString();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+}

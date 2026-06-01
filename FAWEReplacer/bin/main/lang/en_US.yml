@@ -1,0 +1,155 @@
+# FAWEReplace English Language File
+# Language: English (en_US)
+
+# General Messages
+prefix: "§7[§6FAWEReplace§7]"
+no_permission: "§cYou don't have permission to execute this command."
+unknown_command: "§cUnknown subcommand. Use §e/{label} help §cfor help."
+console_only: "§cThis command can only be executed from the console."
+player_only: "§cThis command can only be executed by a player."
+
+# Command Help
+help:
+  header: "§7§m                                                    "
+  title: "§6§lFAWE Replace §7- Command Help"
+  footer: "§7§m                                                    "
+  start: "§e/{label} start §7- Start cleaning task"
+  start_desc: "  §8→ §7Will automatically resume if previous progress exists"
+  start_fresh: "§e/{label} start --fresh §7- Force restart"
+  start_fresh_desc: "  §8→ §7Ignore previous progress and start from scratch"
+  stop: "§e/{label} stop §7- Stop current task"
+  stop_desc: "  §8→ §7Will save current progress (if resume is enabled)"
+  status: "§e/{label} status §7- Check task status"
+  reload: "§e/{label} reload §7- Reload configuration"
+  help: "§e/{label} help §7- Show this help"
+  aliases: "§7Aliases: §e/fawerl, /frl"
+
+# Command Usage
+usage: "§eUsage: /{label} <start|stop|status|reload|help>"
+
+# Start Command
+start:
+  world_not_configured: "§cCannot start cleaning task: World '{world}' not found"
+  check_config: "§ePlease check the world name in config file, then use §a/fawereplace reload §eto reload."
+  already_running: "§eCleaning task is already running. Use /fawereplace status to check progress."
+  starting: "§aStarting cleaning task..."
+  starting_fresh: "§aStarting cleaning task (fresh start)..."
+  resume_found: "§eFound saved progress, will resume from {progress}."
+  resume_use_fresh: "§7Use §e/fawereplace start --fresh §7to ignore progress and restart."
+  started: "§aCleaning task started!"
+  task_info: "§7Task Information:"
+  world: "§7  World: §e{world}"
+  region: "§7  Region: §e({x1}, {y1}, {z1}) §7to §e({x2}, {y2}, {z2})"
+  parallel: "§7  Parallelism: §e{parallel} §7threads"
+  mode: "§7  Mode: §e{mode}"
+  resume_enabled: "§7  Resume: §aEnabled §7(save every {interval} tiles)"
+  resume_disabled: "§7  Resume: §cDisabled"
+  total_chunks: "§7  Total Tiles: §e{total}"
+
+# Stop Command
+stop:
+  not_running: "§eNo cleaning task is currently running."
+  stopping: "§cRequested to stop cleaning task, will complete shortly."
+  stopped: "§aCleaning task has been stopped."
+  progress_saved: "§aProgress saved to: §e{file}"
+  statistics: "§7Statistics:"
+  chunks_processed: "§7  Tiles Processed: §e{processed}§7/§e{total}"
+  blocks_replaced: "§7  Blocks Replaced: §e{blocks}"
+  entities_removed: "§7  Entities Removed: §e{entities}"
+  time_elapsed: "§7  Time Elapsed: §e{time}"
+
+# Status Command
+status:
+  world_status: "§c⚠ World Configuration Status: §4World '{world}' not found"
+  reload_suggestion: "§ePlease use §a/fawereplace reload §eto reload configuration."
+  not_running: "§eNo cleaning task is currently running."
+  running: "§aCleaning task is in progress..."
+  progress: "§7Progress: §e{processed}§7/§e{total} §7(§e{percent}%§7)"
+  chunks_per_second: "§7Speed: §e{speed} §7tiles/sec"
+  estimated_time: "§7Estimated Time Remaining: §e{time}"
+  blocks_replaced: "§7Blocks Replaced: §e{blocks}"
+  entities_removed: "§7Entities Removed: §e{entities}"
+  time_elapsed: "§7Time Elapsed: §e{time}"
+
+# Reload Command
+reload:
+  cannot_while_running: "§cCannot reload configuration while task is running. Please stop the task first."
+  reloading: "§eReloading configuration..."
+  success: "§aConfiguration successfully reloaded!"
+  world_found: "§7World: §a{world} §7(found)"
+  language_changed: "§7Language: §a{language}"
+  apply_next_start: "§7New configuration will take effect on next task start."
+  failed: "§cConfiguration reload failed!"
+  world_not_found: "§cReason: World '{world}' not found"
+  check_world_name: "§ePlease check if the world name in configuration is correct."
+  check_console: "§cPlease check console logs for details."
+
+# Task Messages
+task:
+  preparing: "Preparing cleaning task..."
+  loading_config: "Loading configuration..."
+  config_loaded: "Configuration loaded successfully"
+  initializing: "Initializing..."
+  checking_resume: "Checking for resume data..."
+  resume_found: "Found saved progress file: {file}"
+  resume_loading: "Loading progress..."
+  resume_loaded: "Progress loaded successfully, resuming from tile {index}/{total}"
+  resume_invalid: "Progress file is invalid or expired, starting from scratch"
+  starting_threads: "Starting {threads} worker threads..."
+  processing: "Processing tile {current}/{total}..."
+  chunk_progress: "Tile [{x}, {y}, {z}] - Replaced {blocks} blocks, removed {entities} entities"
+  saving_progress: "Saving progress..."
+  progress_saved: "Progress saved ({processed}/{total} tiles)"
+  completed: "Cleaning task completed!"
+  stopped: "Cleaning task stopped."
+  error: "Error processing tile: {error}"
+
+# Entity Cleanup
+entity:
+  enabled: "Entity cleanup enabled"
+  disabled: "Entity cleanup not enabled"
+  types: "Entity types to remove: {types}"
+  removing: "Removing entities..."
+  removed: "Removed {count} entities"
+
+# Block Replacement
+block:
+  rules_loaded: "Loaded {count} block replacement rules"
+  replacing: "Replacing blocks..."
+  replaced: "Replaced {count} blocks"
+  no_rules: "No block replacement rules configured"
+
+# Error Messages
+error:
+  config_load_failed: "Configuration load failed!"
+  world_not_found: "World not found: {world}"
+  world_load_failed: "Failed to load world: {world}"
+  invalid_coordinates: "Invalid coordinate configuration"
+  task_start_failed: "Failed to start cleaning task: {error}"
+  task_error: "Error during cleaning task execution: {error}"
+  resume_save_failed: "Failed to save progress: {error}"
+  resume_load_failed: "Failed to load progress: {error}"
+  file_error: "File operation error: {error}"
+
+# Plugin Start/Stop
+plugin:
+  enabled: "FAWEReplace enabled! Command: /fawereplace"
+  disabled: "FAWEReplace disabled."
+  config_invalid: "Configuration load failed! Please fix the configuration and use /fawereplace reload to reload."
+  command_unavailable: "The start command will not be available until configuration is properly loaded."
+  command_registered: "Successfully registered command '/fawereplace' (aliases: /fawerl, /frl)"
+  command_register_failed: "Error registering command:"
+
+# Time Format
+time:
+  days: "{days} days"
+  hours: "{hours} hours"
+  minutes: "{minutes} minutes"
+  seconds: "{seconds} seconds"
+  less_than_second: "less than 1 second"
+
+# Mode
+mode:
+  tiling: "Tiling Mode"
+  standard: "Standard Mode"
+  fast: "Fast Mode"

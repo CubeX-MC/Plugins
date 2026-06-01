@@ -1,0 +1,161 @@
+# MountLicense vehicle profiles
+# Each profile maps a set of entity types to a feature set.
+# When the player interacts with a license, the first profile whose
+# entityTypes list contains the target's EntityType wins.
+#
+# Features (Phase 1 honored: register, protect-flag, station-flag.
+# Other flags are reserved for later phases and stored on the index only.)
+#
+# Compatibility:
+# The plugin compiles against Spigot API 1.18.2. Newer entity names in this
+# file are skipped with a startup warning on older servers instead of breaking
+# the whole profile load. Newer boat variants, CAMEL/CAMEL_HUSK,
+# HAPPY_GHAST, NAUTILUS, and ZOMBIE_NAUTILUS only activate on server APIs
+# that expose those EntityType names.
+
+profiles:
+  horse:
+    entityTypes:
+      - HORSE
+      - DONKEY
+      - MULE
+      - SKELETON_HORSE
+      - ZOMBIE_HORSE
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: true
+      station: true
+    requiresTamedOwner: true
+    requiresSaddle: false
+
+  llama:
+    entityTypes:
+      - LLAMA
+      - TRADER_LLAMA
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: true
+      station: true
+    requiresTamedOwner: true
+    requiresSaddle: false
+
+  pig:
+    entityTypes:
+      - PIG
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: false
+      station: true
+    requiresTamedOwner: false
+    requiresSaddle: true
+
+  strider:
+    entityTypes:
+      - STRIDER
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: false
+      station: true
+    requiresTamedOwner: false
+    requiresSaddle: true
+
+  camel:
+    entityTypes:
+      - CAMEL
+      - CAMEL_HUSK
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: false
+      station: true
+    requiresTamedOwner: false
+    requiresSaddle: false
+
+  nautilus:
+    entityTypes:
+      - NAUTILUS
+      - ZOMBIE_NAUTILUS
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: true
+      station: true
+    requiresTamedOwner: true
+    requiresSaddle: false
+
+  happy_ghast:
+    entityTypes:
+      - HAPPY_GHAST
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: false
+      station: true
+    requiresTamedOwner: false
+    requiresSaddle: false
+
+  boat:
+    entityTypes:
+      - BOAT
+      - CHEST_BOAT
+      - OAK_BOAT
+      - OAK_CHEST_BOAT
+      - SPRUCE_BOAT
+      - SPRUCE_CHEST_BOAT
+      - BIRCH_BOAT
+      - BIRCH_CHEST_BOAT
+      - JUNGLE_BOAT
+      - JUNGLE_CHEST_BOAT
+      - ACACIA_BOAT
+      - ACACIA_CHEST_BOAT
+      - DARK_OAK_BOAT
+      - DARK_OAK_CHEST_BOAT
+      - MANGROVE_BOAT
+      - MANGROVE_CHEST_BOAT
+      - CHERRY_BOAT
+      - CHERRY_CHEST_BOAT
+      - BAMBOO_RAFT
+      - BAMBOO_CHEST_RAFT
+      - PALE_OAK_BOAT
+      - PALE_OAK_CHEST_BOAT
+    features:
+      register: true
+      protect: true
+      summon: true
+      park: true
+      inventoryAccess: true
+      station: true
+    requiresTamedOwner: false
+    requiresSaddle: false
+
+  minecart:
+    entityTypes:
+      - MINECART
+      - CHEST_MINECART
+    features:
+      register: true
+      protect: true
+      summon: false
+      park: true
+      inventoryAccess: true
+      station: true
+    requiresTamedOwner: false
+    requiresSaddle: false

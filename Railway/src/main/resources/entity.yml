@@ -1,0 +1,52 @@
+# Railway entity display configuration
+#
+# Lines choose the train entity with:
+#   /rail line setentity <line_id> <minecart|entity_type>
+#
+# This file controls how each visual entity is displayed. Entity names accept
+# Bukkit names such as pig, horse, strider, ghast, or namespaced names such as
+# minecraft:pig. Newer server entities can be configured here even if older
+# servers ignore them.
+
+defaults:
+  # Default spacing between train cars when no entity-specific spacing exists.
+  spacing: 1.6
+  # Default vertical offset applied to visual entity models.
+  height: 0.0
+
+entities:
+  minecart:
+    spacing: 1.6
+    height: 0.0
+
+  allay:
+    spacing: 1.6
+    height: 0.2
+
+  pig:
+    spacing: 2.0
+    height: 0.0
+    saddle: false
+
+  horse:
+    spacing: 2.6
+    height: 0.0
+    saddle: true
+
+  strider:
+    spacing: 2.6
+    height: 0.0
+    saddle: true
+
+  ghast:
+    spacing: 5.1
+    height: -1.0
+
+  # Happy Ghast / future entities are applied by reflection on newer servers.
+  # Unsupported properties are ignored on older APIs.
+  happy_ghast:
+    spacing: 5.1
+    height: -1.0
+    harness: true
+    goggles: true
+    saddle: true

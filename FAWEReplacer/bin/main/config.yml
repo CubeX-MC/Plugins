@@ -1,0 +1,428 @@
+# ===================================================================================================
+#  FAWEReplace 配置文件 / Configuration File
+# ===================================================================================================
+# 插件版本 / Plugin Version: 1.0.3
+# 更新日期 / Last Updated: 2025-10-07
+# 文档 / Documentation: 查看 README.md 和 PERFORMANCE_GUIDE.md
+# ===================================================================================================
+
+# ===================================================================================================
+# 语言设置 / Language Settings
+# ===================================================================================================
+# Supported languages / 支持的语言:
+#   - zh_CN (简体中文 / Simplified Chinese)
+#   - en_US (English / 英文)
+language: zh_CN
+
+# ===================================================================================================
+# 基础配置 / Basic Configuration
+# ===================================================================================================
+
+# 世界名称 / World name
+world: "world"
+
+# 目标区域坐标 / Target region coordinates
+target:
+  start:
+    x: -1000
+    z: -1000
+    # y: -64  # 可选：不设置则自动使用完整世界高度 / Optional: auto use full world height if not set
+  end:
+    x: 1000
+    z: 1000
+    # y: 320  # 可选：不设置则自动使用完整世界高度 / Optional: auto use full world height if not set
+
+# 自动启动 / Auto-start on plugin enable
+# !警告：建议保持 false，通过命令手动启动更安全
+# !Warning: Recommend keeping false, manual start is safer
+confirm: false
+
+# ===================================================================================================
+# 性能配置 / Performance Configuration
+# ===================================================================================================
+
+# 并行处理线程数 / Number of parallel processing threads
+# !重要：根据您的使用场景选择合适的值
+# !Important: Choose value based on your use case
+#
+# 在线服务器 / Server with players online:
+#   - 2GB RAM: 1-2 threads
+#   - 4GB RAM: 2-3 threads
+#   - 5GB RAM: 2-3 threads (推荐 2 / recommended: 2)
+#   - 8GB+ RAM: 3-5 threads
+#
+# 离线处理 / Offline processing (maximum performance):
+#   - 4GB RAM: 4-6 threads
+#   - 5GB RAM: 6-8 threads
+#   - 8GB RAM: 8-12 threads
+#   - 16GB+ RAM: 12-16 threads
+#
+parallel: 2
+
+# 分块大小 / Region/Tile size
+# 每个工作线程处理的区域大小 / Size of region each worker thread processes
+# 更大的值 = 更少的分块数量，但单个分块处理时间更长
+# Larger values = fewer tiles but longer processing time per tile
+region:
+  x: 512
+  z: 512
+  # y: 256  # 可选：不设置则自动计算 / Optional: auto-calculated if not set
+
+# ===================================================================================================
+# 处理模式 / Processing Modes
+# ===================================================================================================
+
+# 分块处理模式 / Tiling mode
+# 启用后将大区域分割成小块并行处理
+# When enabled, splits large regions into smaller tiles for parallel processing
+tiling:
+  enabled: true
+
+# 快速模式 / Fast mode
+# 使用 FAWE 的快速异步处理
+# Uses FAWE's fast asynchronous processing
+fast-mode: true
+
+# 日志输出频率 / Progress log frequency
+# 每处理 N 个分块输出一次进度日志
+# Output progress log every N tiles processed
+# 💡 提示 / Tip:
+#   - 在线服务器 / Online server: 50-100 (更详细的进度 / more detailed progress)
+#   - 离线处理 / Offline processing: 100-200 (减少日志开销 / reduce log overhead)
+progress-log-every: 100
+
+# ===================================================================================================
+# 安全选项 / Safety Options
+# ===================================================================================================
+
+# 跳过未生成的区块 / Skip ungenerated chunks
+# 强烈推荐保持启用 / Highly recommended to keep enabled
+# 
+# 功能 / Features:
+#   - 只处理玩家访问过的区块 / Only process chunks visited by players
+#   - 避免生成新的空区块 / Avoid generating new empty chunks
+#   - 防止 "Ignoring heightmap data" 警告 / Prevent heightmap warnings
+#   - 提升性能 / Improve performance
+#
+skip-ungenerated-chunks: true
+
+# 自动修复区块高度图 / Auto-repair chunk heightmaps
+# 推荐启用以防止黑色区块问题 / Recommended to prevent black chunks in MCA Selector
+#
+# 功能 / Features:
+#   - 在方块替换后自动刷新高度图数据 / Auto-refresh heightmap after block replacement
+#   - 防止在 MCA Selector 中出现黑色区块 / Prevent black chunks in MCA Selector
+#   - 性能影响极小（<1ms per chunk）/ Minimal performance impact
+#
+# 说明 / Notes:
+#   - 如果您看到黑色区块，请运行: scripts/fix_black_chunks.bat (或 .sh)
+#   - If you see black chunks, run: scripts/fix_black_chunks.bat (or .sh)
+#   - 详细信息见 BLACK_CHUNKS_SOLUTION.md / See BLACK_CHUNKS_SOLUTION.md for details
+#
+auto-fix-heightmap: true
+
+# ===================================================================================================
+# 内存保护 / Memory Protection
+# ===================================================================================================
+# 防止 OutOfMemoryError 崩溃 / Prevent OutOfMemoryError crashes
+
+memory-protection:
+  # 启用自动内存监控 / Enable automatic memory monitoring
+  # 推荐：在线服务器必须启用 / Recommended: Must enable for online servers
+  # 离线处理：可禁用以获得最大速度（有崩溃风险）
+  # Offline processing: Can disable for max speed (with crash risk)
+  enabled: true
+  
+  # 最小可用内存百分比 / Minimum free memory percentage (0.0-1.0)
+  # 当可用内存低于此值时暂停处理 / Pause processing when free memory falls below this
+  #
+  # !推荐值 / Recommended values:
+  #   在线服务器 / Online server: 0.20-0.25 (20-25%, 更安全 / safer)
+  #   离线处理 / Offline processing: 0.10-0.15 (10-15%, 更激进 / aggressive)
+  #
+  min-free-memory-percent: 0.20
+  
+  # 内存不足时的等待时间（毫秒）/ Wait time when memory is low (milliseconds)
+  #
+  # ! 推荐值 / Recommended values:
+  #   在线服务器 / Online server: 5000 (5 seconds)
+  #   离线处理 / Offline processing: 2000-3000 (2-3 seconds)
+  #
+  wait-on-low-memory-ms: 5000
+  
+  # 最大重试次数 / Maximum retries when memory is consistently low
+  # 设置为 -1 表示无限重试（不推荐）/ Set to -1 for unlimited retries (not recommended)
+  max-memory-retries: 10
+
+# ===================================================================================================
+# 性能限制 / Performance Throttling
+# ===================================================================================================
+# 在操作之间添加延迟以减少服务器负载 / Add delays between operations to reduce server load
+#
+# !重要提示 / IMPORTANT:
+#   在线服务器 / Server with players: 使用适度的延迟防止卡顿 / Use moderate delays
+#   离线处理 / Offline processing: 全部设为 0 以获得最大速度 (快 10-40%!)
+#                                     Set all to 0 for maximum speed (10-40% faster!)
+
+performance:
+  # 批次间延迟（毫秒）/ Delay between chunk processing batches (milliseconds)
+  #
+  # 推荐值 / Recommended values:
+  #   离线处理 / Offline: 0 (最大速度 / max speed)
+  #   在线-轻载 / Online-light: 50-100
+  #   在线-重载 / Online-heavy: 100-200
+  #
+  delay-between-batches-ms: 100
+  
+  # 区块间延迟（毫秒）/ Delay between individual chunk operations (milliseconds)
+  #
+  # 推荐值 / Recommended values:
+  #   离线处理 / Offline: 0 (最大速度 / max speed)
+  #   在线服务器 / Online: 10-20
+  #
+  delay-between-chunks-ms: 20
+  
+  # 强制垃圾回收频率 / Force garbage collection frequency
+  # 每处理 N 个区块执行一次 GC / Execute GC every N chunks processed
+  #
+  # 推荐值 / Recommended values:
+  #   离线处理 / Offline: 0 (让 JVM 自动管理 / let JVM auto-manage, 最快 / fastest)
+  #   内存问题 / Memory issues: 100-200
+  #
+  # !注意：设为 0 通常是最佳选择，JVM 的 GC 优化更高效
+  # !Note: 0 is usually best, JVM's GC optimization is more efficient
+  #
+  gc-every-chunks: 50
+
+# ===================================================================================================
+# 断点续传 / Resume/Checkpoint System
+# ===================================================================================================
+# 保存处理进度，意外中断后可以继续 / Save progress to resume after interruption
+
+resume:
+  # 启用断点续传 / Enable resume/checkpoint
+  # 推荐启用 / Recommended: keep enabled
+  enabled: true
+  
+  # 进度文件名 / Progress file name
+  # 保存在插件数据目录 / Saved in plugin data folder
+  file: "progress.yml"
+  
+  # 保存频率 / Save frequency
+  # 每处理 N 个分块保存一次进度 / Save progress every N tiles processed
+  #
+  # 💡 推荐值 / Recommended values:
+  #   - 在线服务器 / Online server: 25 (更频繁保存 / save more frequently)
+  #   - 离线处理 / Offline processing: 100 (减少 I/O 开销 / reduce I/O overhead)
+  #
+  save-every: 25
+
+# ===================================================================================================
+# 方块替换规则 / Block Replacement Rules
+# ===================================================================================================
+# 定义要替换的方块类型 / Define which block types to replace
+#
+# ⚠️ 重要警告 / IMPORTANT WARNING:
+#   X 不要替换常见建筑方块（如 STONE, DIRT, WOOD 等）
+#   X Do NOT replace common building blocks (like STONE, DIRT, WOOD, etc.)
+#   O 只替换要清理的方块（容器、机器等）
+#   O Only replace blocks you want to clean (containers, machines, etc.)
+#
+# 格式 / Format:
+#   - origin: <Bukkit Material 名称 / Bukkit Material name>
+#     target: <目标方块，通常是 AIR / Target block, usually AIR>
+#
+# 完整材料列表 / Full material list:
+#   https://hub.spigotmc.org/javadocs/bukkit/org/bukkit/Material.html
+#
+# 示例 / Examples:
+#   O 清理容器 / Clean containers: CHEST, FURNACE, HOPPER, BARREL
+#   O 清理机器 / Clean machines: DISPENSER, DROPPER, BREWING_STAND
+#   O 清理装饰 / Clean decorations: CAMPFIRE, BANNER, SIGN
+#   X 危险操作 / Dangerous: STONE, DIRT, GRASS_BLOCK (会删除地形!)
+
+blocks:
+  - origin: SHULKER_BOX
+    target: AIR
+  - origin: YELLOW_SHULKER_BOX
+    target: AIR
+  - origin: GREEN_SHULKER_BOX
+    target: AIR
+  - origin: PURPLE_SHULKER_BOX
+    target: AIR
+  - origin: DISPENSER
+    target: AIR
+  - origin: ORANGE_SHULKER_BOX
+    target: AIR
+  - origin: FURNACE
+    target: AIR
+  - origin: BLACK_SHULKER_BOX
+    target: AIR
+  - origin: LIME_SHULKER_BOX
+    target: AIR
+  - origin: HOPPER
+    target: AIR
+  - origin: GRAY_SHULKER_BOX
+    target: AIR
+  - origin: RED_SHULKER_BOX
+    target: AIR
+  - origin: LIGHT_BLUE_SHULKER_BOX
+    target: AIR
+  - origin: BREWING_STAND
+    target: AIR
+  - origin: BROWN_SHULKER_BOX
+    target: AIR
+  - origin: BARREL
+    target: AIR
+  - origin: CAMPFIRE
+    target: AIR
+  - origin: LIGHT_GRAY_SHULKER_BOX
+    target: AIR
+  - origin: TRAPPED_CHEST
+    target: AIR
+  - origin: DROPPER
+    target: AIR
+  - origin: WHITE_SHULKER_BOX
+    target: AIR
+  - origin: CHEST
+    target: AIR
+  - origin: SOUL_CAMPFIRE
+    target: AIR
+  - origin: BLUE_SHULKER_BOX
+    target: AIR
+  - origin: MAGENTA_SHULKER_BOX
+    target: AIR
+  - origin: PINK_SHULKER_BOX
+    target: AIR
+  - origin: CYAN_SHULKER_BOX
+    target: AIR
+  - origin: BLAST_FURNACE
+    target: AIR
+  - origin: SMOKER
+    target: AIR
+
+# ===================================================================================================
+# 实体清理 / Entity Cleanup
+# ===================================================================================================
+# 清除指定类型的实体 / Remove specified entity types
+#
+# !注意 / Note:
+#   - 慎重使用！可能删除玩家的物品、生物等
+#   - Use carefully! May remove players' items, mobs, etc.
+#   - 建议先在测试服务器验证
+#   - Recommend testing on a test server first
+
+entities:
+  # 启用实体清理 / Enable entity cleanup
+  enabled: false
+  
+  # 要清理的实体类型列表 / List of entity types to remove
+  # 使用 Bukkit EntityType 名称（不区分大小写，允许空格和破折号）
+  # Use Bukkit EntityType names (case-insensitive, spaces/dashes allowed)
+  #
+  # 常见实体类型 / Common entity types:
+  #   - ITEM (掉落物 / dropped items)
+  #   - ARROW (箭 / arrows)
+  #   - ARMOR_STAND (盔甲架 / armor stands)
+  #   - ITEM_FRAME (物品展示框 / item frames)
+  #   - ZOMBIE (僵尸 / zombies)
+  #   - SKELETON (骷髅 / skeletons)
+  #   - CREEPER (苦力怕 / creepers)
+  #
+  # 完整列表 / Full list:
+  #   https://hub.spigotmc.org/javadocs/bukkit/org/bukkit/entity/EntityType.html
+  #
+  types: []
+    # 示例 / Examples:
+    # - ITEM          # 清除掉落物 / Remove dropped items
+    # - ZOMBIE        # 清除僵尸 / Remove zombies
+    # - ARMOR_STAND   # 清除盔甲架 / Remove armor stands
+
+# ===================================================================================================
+# 配置预设建议 / Configuration Presets
+# ===================================================================================================
+#
+# 在线服务器配置 / Online Server Setup (Safe & Stable):
+#   parallel: 2-3
+#   delay-between-batches-ms: 100
+#   delay-between-chunks-ms: 20
+#   gc-every-chunks: 50
+#   min-free-memory-percent: 0.20
+#   auto-fix-heightmap: true
+#   skip-ungenerated-chunks: true
+#
+# 离线高性能配置 / Offline High-Performance Setup (Maximum Speed):
+#   parallel: 6-12 (根据 RAM / based on RAM)
+#   delay-between-batches-ms: 0
+#   delay-between-chunks-ms: 0
+#   gc-every-chunks: 0
+#   min-free-memory-percent: 0.12
+#   auto-fix-heightmap: true
+#   skip-ungenerated-chunks: true
+#
+# 平衡配置 / Balanced Setup (Good Performance & Safety):
+#   parallel: 4
+#   delay-between-batches-ms: 50
+#   delay-between-chunks-ms: 10
+#   gc-every-chunks: 0
+#   min-free-memory-percent: 0.15
+#   auto-fix-heightmap: true
+#   skip-ungenerated-chunks: true
+#
+# ===================================================================================================
+# 性能提升建议 / Performance Optimization Tips
+# ===================================================================================================
+#
+# 1. JVM 参数优化 / JVM Parameter Optimization:
+#    在服务器启动脚本中添加 / Add to server startup script:
+#
+#    -XX:+UseG1GC
+#    -XX:+ParallelRefProcEnabled
+#    -XX:MaxGCPauseMillis=200
+#    -XX:+UnlockExperimentalVMOptions
+#    -XX:+DisableExplicitGC
+#    -XX:G1NewSizePercent=30
+#    -XX:G1MaxNewSizePercent=40
+#    -XX:G1HeapRegionSize=8M
+#    -XX:G1ReservePercent=20
+#
+# 2. 示例启动命令 / Example Startup Command (5GB RAM):
+#
+#    java -Xms5G -Xmx5G -XX:+UseG1GC -XX:+ParallelRefProcEnabled \
+#         -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions \
+#         -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 \
+#         -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M \
+#         -XX:G1ReservePercent=20 -jar paper.jar nogui
+#
+# 3. 预期性能 / Expected Performance:
+#    - 使用默认配置 / Default config: ~1000-2000 区块/秒 chunks/sec
+#    - 使用高性能配置 / High-performance config: ~2000-4000 区块/秒 chunks/sec
+#    - 提升幅度 / Improvement: 20-40% faster
+#
+# 4. 监控和调整 / Monitoring & Adjustment:
+#    - 使用 /fawereplace status 查看进度 / Check progress
+#    - 观察内存使用 / Monitor memory usage
+#    - 如果内存不足，增加 min-free-memory-percent / If OOM, increase min-free-memory-percent
+#    - 如果想要更快，增加 parallel（需要更多内存）/ For faster, increase parallel (needs more RAM)
+#
+# ===================================================================================================
+# 更多帮助 / More Help
+# ===================================================================================================
+#
+# 文档 / Documentation:
+#   - README.md - 基本使用说明 / Basic usage
+#   - PERFORMANCE_GUIDE.md - 详细性能优化指南 / Detailed performance guide
+#   - BLACK_CHUNKS_SOLUTION.md - 黑色区块问题解决方案 / Black chunks solution
+#   - LANGUAGE_SUPPORT.md - 多语言支持说明 / Multi-language support
+#   - SAFETY_QUICK_REFERENCE.md - 安全性参考 / Safety reference
+#
+# 工具脚本 / Utility Scripts:
+#   - scripts/fix_black_chunks.bat (.sh) - 修复黑色区块 / Fix black chunks
+#   - scripts/split_world.bat (.sh) - 分割世界 / Split world
+#   - scripts/merge_worlds.bat (.sh) - 合并世界 / Merge worlds
+#
+# 支持 / Support:
+#   - GitHub Issues: https://github.com/CubeX-MC/FAWEReplacer/issues
+#   - 查看日志文件 / Check log file: plugins/FAWEReplacer/clean-log.txt
+#
+# ===================================================================================================

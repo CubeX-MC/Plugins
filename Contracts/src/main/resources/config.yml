@@ -1,0 +1,34 @@
+language: zh_CN
+
+economy:
+  min-reward: 100.0
+  max-reward: 100000.0
+  creation-fee: 20.0
+  completion-commission-percent: 5.0
+  # 公开合同被雇主取消时,是否退回创建费(默认不退,避免来回创建薅羊毛)
+  refund-creation-fee-on-cancel: false
+
+disputes:
+  # 是否允许雇主主动发起争议
+  allow-owner-dispute: true
+  # 是否允许接单者主动发起争议
+  allow-contractor-dispute: true
+
+limits:
+  max-open-contracts: 3
+  max-active-accepted-contracts: 3
+  max-title-length: 80
+  max-description-length: 500
+  min-deadline-hours: 1
+  max-deadline-hours: 168
+
+expiry:
+  cleanup-interval-minutes: 10
+  submitted-auto-approve-hours: 72
+
+storage:
+  flush-interval-seconds: 30
+
+display:
+  page-size: 8
+  currency-prefix: "$"

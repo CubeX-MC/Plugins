@@ -1,0 +1,152 @@
+prefix: "&8[&6ML&8] &r"
+
+license_item:
+  display: "&6Vehicle License"
+  hint_actionbar: "&eVehicle License: &fSneak-right-click a mount or vehicle to register."
+  lore:
+    - "&7Sneak-right-click your mount or vehicle"
+    - "&7to register it as a private transport asset."
+    - ""
+    - "&8Supports: horse / donkey / mule / pig / strider / camel / happy ghast / nautilus / boat / minecart and more"
+
+key_item:
+  display: "&eVehicle Key"
+  lore:
+    - "&7Right-click the sky -> recall nearest owned mount"
+    - "&7Sneak-right-click your mount -> bind key to it"
+    - "&7Command /ml key unbind -> remove binding"
+  bound_display: "&eVehicle Key &7(#%short_id%)"
+  bound_lore: "&8Bound to: &7#%short_id%"
+
+registration:
+  success: "{prefix}&aRegistered as &f%profile%&a. Plate: &7%vehicle_id%"
+  fail_no_profile: "{prefix}&cThis entity type cannot be registered."
+  fail_already_registered: "{prefix}&cThis vehicle is already registered."
+  fail_not_tamed: "{prefix}&cTame it before registering."
+  fail_not_owner: "{prefix}&cYou are not the owner of this mount."
+  fail_requires_saddle: "{prefix}&cThis vehicle needs a saddle before it can be registered."
+  fail_not_empty: "{prefix}&cAsk passengers to leave first."
+  fail_no_license: "{prefix}&cHold a Vehicle License in your main hand."
+  fail_no_permission: "{prefix}&cYou lack the permission to register vehicles."
+  fail_cooldown: "{prefix}&cToo fast. Try again in &e%seconds%s&c."
+  fail_economy: "{prefix}&cInsufficient funds: need &e%amount%&c."
+  fail_internal: "{prefix}&cRegistration failed and the license was not consumed. If charged, an automatic refund was attempted; ask an admin to check the logs."
+  fail_max_vehicles: "{prefix}&cYou already own &e%current%&c vehicle(s); cap is &e%max%&c. Release one with /ml release first."
+  charged: "{prefix}&7Charged &e%amount% &7as registration fee."
+
+commands:
+  header: "&6&l===== MountLicense Commands ====="
+  help:
+    line_list: "&e/ml list &7- List your vehicles"
+    line_info: "&e/ml info <plate> &7- Show vehicle details"
+    line_park: "&e/ml park &7- Park: disable AI and mark parked (look at target)"
+    line_unpark: "&e/ml unpark &7- Cancel parked state"
+    line_lock: "&e/ml lock &7- Lock (mark state)"
+    line_unlock: "&e/ml unlock &7- Unlock"
+    line_release: "&e/ml release &7- Unregister (run twice within 30s to confirm)"
+    line_recall: "&e/ml recall [plate] &7- Recall vehicle (no plate = nearest)"
+    line_locate: "&e/ml locate <plate> &7- Show last known position"
+    line_key_unbind: "&e/ml key unbind &7- Clear binding on the key in main hand"
+    line_trust: "&e/ml trust <player> &7- Add player to the trust list of the vehicle you're looking at"
+    line_untrust: "&e/ml untrust <player> &7- Remove player from the vehicle's trust list"
+    line_admin_inspect: "&e/ml admin inspect &7- Inspect held item or targeted entity (admin)"
+    line_admin_give: "&e/ml admin give <player> license [n] &7- Give licenses (admin)"
+    line_admin_reindex: "&e/ml admin reindex &7- Rebuild index (admin)"
+    line_admin_reload: "&e/ml admin reload &7- Reload config (admin)"
+  unknown_subcommand: "{prefix}&cUnknown subcommand: &f%input%"
+  player_only: "{prefix}&cPlayers only."
+  no_permission: "{prefix}&cYou lack the permission."
+  player_not_found: "{prefix}&cPlayer not found: &f%player%"
+
+park:
+  no_target: "{prefix}&cLook at a target vehicle."
+  not_registered: "{prefix}&cThis vehicle is not registered."
+  not_owner: "{prefix}&cYou are not the owner of this vehicle."
+  already_in_target_state: "{prefix}&7Vehicle already in the requested state."
+  park_success: "{prefix}&aParked %entity_type%, AI disabled."
+  unpark_success: "{prefix}&aRestored %entity_type% to active."
+  lock_success: "{prefix}&aLocked %entity_type%."
+  unlock_success: "{prefix}&aUnlocked %entity_type%."
+  release_confirm: "{prefix}&eWarning: run /ml release again within 30s to release this %entity_type%."
+  release_done: "{prefix}&7Released %entity_type%; PDC and index cleared."
+
+protection:
+  mount_blocked: "{prefix}&cThis %entity_type% belongs to &f%owner%&c."
+  damage_blocked: "{prefix}&cThis %entity_type% is protected."
+  destroy_blocked: "{prefix}&cThis %entity_type% is protected from destruction."
+  inventory_blocked: "{prefix}&cThis %entity_type%'s cargo belongs to &f%owner%&c."
+  leash_blocked: "{prefix}&cThis %entity_type% is registered; leashing is blocked."
+
+key:
+  target_not_registered: "{prefix}&cTarget entity is not registered."
+  target_not_owner: "{prefix}&cYou are not the owner; cannot bind."
+  bound: "{prefix}&aKey bound to %entity_type% &7(#%short_id%)&a."
+  unbind_no_key: "{prefix}&cHold a Vehicle Key in your main hand first."
+  unbind_success: "{prefix}&aKey unbound."
+  unbind_already_unbound: "{prefix}&7That key has no binding."
+
+recall:
+  success: "{prefix}&aVehicle recalled."
+  fail_not_found: "{prefix}&cNo vehicle with that plate."
+  fail_not_owner: "{prefix}&cYou are not the owner."
+  fail_not_loaded: "{prefix}&7Vehicle is not in a loaded chunk; cannot recall."
+  fail_not_loaded_with_pos: "{prefix}&7Vehicle is not loaded. Last seen: &f%world% %x%, %y%, %z%"
+  fail_no_nearby: "{prefix}&cNo recallable owned vehicle within %radius% blocks. Bind a key or move closer."
+  fail_profile_no_summon: "{prefix}&cThis vehicle profile does not support recall (e.g. minecart)."
+  fail_unsafe: "{prefix}&cDestination is unsafe. Stand on a solid block with air above."
+  fail_cooldown: "{prefix}&cRecall on cooldown: &e%seconds%s&c."
+  fail_no_permission: "{prefix}&cYou lack the recall permission."
+
+locate:
+  loaded: "{prefix}&a%profile% &7#%short_id%&a is loaded: &f%world% %x%, %y%, %z%"
+  unloaded: "{prefix}&7%profile% &f#%short_id%&7 is unloaded. Last seen: &f%world% %x%, %y%, %z%"
+
+trust:
+  no_target: "{prefix}&cLook at the vehicle you want to modify."
+  target_not_registered: "{prefix}&cThis vehicle is not registered."
+  not_owner: "{prefix}&cYou are not the owner of this vehicle."
+  cannot_trust_self: "{prefix}&cYou are already the owner."
+  already_trusted: "{prefix}&7%player% is already on the trust list of #%short_id%."
+  not_a_trustee: "{prefix}&7%player% is not on the trust list of #%short_id%."
+  added: "{prefix}&aAdded &f%player% &ato the trust list of #%short_id% (%entity_type%)."
+  removed: "{prefix}&7Removed &f%player% &7from the trust list of #%short_id% (%entity_type%)."
+  notify_added: "{prefix}&aYou were added to the trust list of a %entity_type% (#%short_id%) — you can mount, open inventory, and leash it."
+  notify_removed: "{prefix}&7You were removed from the trust list of %entity_type% (#%short_id%)."
+  fail_max: "{prefix}&cThis vehicle's trust list is full (cap %max%)."
+
+list:
+  empty: "{prefix}&7You have no registered vehicles."
+  header: "{prefix}&7Your vehicles (&f%count%&7):"
+  line: "&8 - &f%profile% &7| &fPlate:&7 %short_id% &7| state:&f %state% &7| world:&f %world%"
+
+info:
+  not_found: "{prefix}&cNo vehicle with that plate."
+  not_owner: "{prefix}&cThat is not your vehicle."
+  header: "&6&l===== Vehicle Info ====="
+  line_id: "&7Plate: &f%vehicle_id%"
+  line_profile: "&7Profile: &f%profile%"
+  line_entity: "&7Entity: &f%entity_type%"
+  line_owner: "&7Owner: &f%owner%"
+  line_state: "&7State: &f%state%"
+  line_location: "&7Location: &f%world% %x%, %y%, %z%"
+  line_last_seen: "&7Last seen: &f%last_seen%"
+  line_trustees: "&7Trustees: &f%trustees%"
+  trustees_none: "&8none"
+
+admin:
+  inspect:
+    no_target: "{prefix}&cNo targeted entity or held registered item."
+    target_unregistered: "{prefix}&7Target is not registered. Type: &f%entity_type%"
+    target_registered: "{prefix}&aTarget is registered. Plate: &f%vehicle_id%"
+  give:
+    success: "{prefix}&aGave &e%amount% &alicense(s) to &f%player%&a."
+    received: "{prefix}&aYou received &e%amount% &alicense(s)."
+  reindex:
+    started: "{prefix}&7Scanning loaded entities and rebuilding index..."
+    finished: "{prefix}&aReindex done: scanned &f%scanned%&a, recovered &f%recovered%&a."
+  reload:
+    success: "{prefix}&aConfiguration reloaded."
+
+general:
+  unknown_player: "&7unknown"
+  never: "&7never"

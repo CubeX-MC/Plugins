@@ -1,0 +1,187 @@
+# ===================================
+# HIGH PERFORMANCE CONFIG
+# 高性能配置 - 适用于离线/专用处理
+# ===================================
+# 这个配置文件针对大规模离线世界清理进行了优化
+# 可以提升 20-40% 的处理速度
+# 
+# 使用场景：
+#   ✓ 服务器离线状态下处理
+#   ✓ 专用机器进行世界清理
+#   ✓ 有充足的内存（4GB+）
+# 
+# 不适用场景：
+#   ✗ 服务器有玩家在线
+#   ✗ 内存不足（< 3GB）
+#   ✗ 需要同时运行其他任务
+# ===================================
+
+# 并行处理线程数
+# 根据可用内存调整：
+#   - 4GB RAM: 4-6
+#   - 5GB RAM: 6-8
+#   - 8GB RAM: 8-12
+#   - 16GB+ RAM: 12-16
+parallel: 6
+
+world: "world"
+
+region:
+  x: 512
+  z: 512
+
+target:
+  start:
+    x: -80000
+    z: -80000
+  end:
+    x: 80000
+    z: 80000
+
+confirm: false
+
+tiling:
+  enabled: true
+
+# 启用快速模式（推荐）
+fast-mode: true
+
+# 日志输出频率（更高的值 = 更少的日志 = 稍微更快）
+progress-log-every: 200
+
+# 跳过未生成区块（推荐保持启用）
+skip-ungenerated-chunks: true
+
+# 内存保护设置
+memory-protection:
+  # 可以禁用以获得最大性能，但有崩溃风险
+  # 推荐：保持启用，但使用更激进的参数
+  enabled: true
+  
+  # 更低的阈值允许使用更多内存
+  # 离线处理可以设置为 0.10-0.12
+  min-free-memory-percent: 0.12
+  
+  # 内存不足时的等待时间（减少以更快恢复）
+  wait-on-low-memory-ms: 2000
+  
+  # 重试次数
+  max-memory-retries: 15
+
+# 性能优化设置（关键！）
+performance:
+  # ⚡ 设置为 0 以获得最大速度
+  # 这是最重要的性能优化！
+  delay-between-batches-ms: 0
+  
+  # ⚡ 设置为 0 以获得最大速度
+  delay-between-chunks-ms: 0
+  
+  # ⚡ 设置为 0 让 JVM 自动管理垃圾回收
+  # JVM 的 GC 优化通常比强制 GC 更高效
+  gc-every-chunks: 0
+
+# 进度恢复（推荐启用）
+resume:
+  enabled: true
+  file: "progress.yml"
+  # 减少保存频率以提升性能
+  save-every: 100
+
+# 方块替换规则
+blocks:
+  - origin: SHULKER_BOX
+    target: AIR
+  - origin: YELLOW_SHULKER_BOX
+    target: AIR
+  - origin: GREEN_SHULKER_BOX
+    target: AIR
+  - origin: PURPLE_SHULKER_BOX
+    target: AIR
+  - origin: DISPENSER
+    target: AIR
+  - origin: ORANGE_SHULKER_BOX
+    target: AIR
+  - origin: FURNACE
+    target: AIR
+  - origin: BLACK_SHULKER_BOX
+    target: AIR
+  - origin: LIME_SHULKER_BOX
+    target: AIR
+  - origin: HOPPER
+    target: AIR
+  - origin: GRAY_SHULKER_BOX
+    target: AIR
+  - origin: RED_SHULKER_BOX
+    target: AIR
+  - origin: LIGHT_BLUE_SHULKER_BOX
+    target: AIR
+  - origin: BREWING_STAND
+    target: AIR
+  - origin: BROWN_SHULKER_BOX
+    target: AIR
+  - origin: BARREL
+    target: AIR
+  - origin: CAMPFIRE
+    target: AIR
+  - origin: LIGHT_GRAY_SHULKER_BOX
+    target: AIR
+  - origin: TRAPPED_CHEST
+    target: AIR
+  - origin: DROPPER
+    target: AIR
+  - origin: WHITE_SHULKER_BOX
+    target: AIR
+  - origin: CHEST
+    target: AIR
+  - origin: SOUL_CAMPFIRE
+    target: AIR
+  - origin: BLUE_SHULKER_BOX
+    target: AIR
+  - origin: MAGENTA_SHULKER_BOX
+    target: AIR
+  - origin: PINK_SHULKER_BOX
+    target: AIR
+  - origin: CYAN_SHULKER_BOX
+    target: AIR
+  - origin: BLAST_FURNACE
+    target: AIR
+  - origin: SMOKER
+    target: AIR
+
+# 实体清理（如果不需要可以禁用以提升性能）
+entities:
+  enabled: false
+  types: []
+
+# ===================================
+# 额外的性能提示：
+# ===================================
+# 1. JVM 参数优化（在启动脚本中添加）：
+#    -XX:+UseG1GC
+#    -XX:+ParallelRefProcEnabled
+#    -XX:MaxGCPauseMillis=200
+#    -XX:+UnlockExperimentalVMOptions
+#    -XX:+DisableExplicitGC (如果 gc-every-chunks=0)
+#    -XX:G1NewSizePercent=30
+#    -XX:G1MaxNewSizePercent=40
+#    -XX:G1HeapRegionSize=8M
+#    -XX:G1ReservePercent=20
+#
+# 2. 服务器启动命令示例（5GB 内存）：
+#    java -Xms5G -Xmx5G -XX:+UseG1GC -XX:+ParallelRefProcEnabled \
+#         -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions \
+#         -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 \
+#         -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M \
+#         -XX:G1ReservePercent=20 -jar paper.jar nogui
+#
+# 3. 预期性能提升：
+#    - 相比默认配置：20-40% 更快
+#    - 你的情况：30 小时 → 约 18-24 小时
+#
+# 4. 监控和调整：
+#    - 使用 /fawereplace status 检查进度
+#    - 观察内存使用情况
+#    - 如果出现内存错误，增加 min-free-memory-percent
+#    - 如果想要更快，增加 parallel 值（需要更多内存）
+# ===================================

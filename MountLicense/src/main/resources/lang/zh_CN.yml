@@ -1,0 +1,152 @@
+prefix: "&8[&6牌照&8] &r"
+
+license_item:
+  display: "&6载具牌照"
+  hint_actionbar: "&e载具牌照：&f下蹲右键坐骑或载具即可注册"
+  lore:
+    - "&7蹲下右键你的坐骑或载具"
+    - "&7将其注册为你的私有交通资产。"
+    - ""
+    - "&8支持：马 / 驴 / 骡 / 猪 / 炽足兽 / 骆驼 / 乐魂 / 鹦鹉螺 / 船 / 矿车等"
+
+key_item:
+  display: "&e载具钥匙"
+  lore:
+    - "&7右键朝向天空 → 召回最近的载具"
+    - "&7蹲下右键你的载具 → 把这把钥匙绑定到它"
+    - "&7命令 /ml key unbind → 解除绑定"
+  bound_display: "&e载具钥匙 &7(#%short_id%)"
+  bound_lore: "&8已绑定: &7#%short_id%"
+
+registration:
+  success: "{prefix}&a已注册为 &f%profile% &a交通资产。牌照: &7%vehicle_id%"
+  fail_no_profile: "{prefix}&c这种实体无法注册为载具。"
+  fail_already_registered: "{prefix}&c这件载具已经被注册过了。"
+  fail_not_tamed: "{prefix}&c请先驯服它再注册。"
+  fail_not_owner: "{prefix}&c你不是这只坐骑的主人。"
+  fail_requires_saddle: "{prefix}&c这种载具需要先装上鞍才能注册。"
+  fail_not_empty: "{prefix}&c请先让乘客离开。"
+  fail_no_license: "{prefix}&c你的主手必须拿着一张载具牌照。"
+  fail_no_permission: "{prefix}&c你没有注册载具的权限。"
+  fail_cooldown: "{prefix}&c操作过快，请稍候 &e%seconds%s &c再试。"
+  fail_economy: "{prefix}&c金额不足：需要 &e%amount%&c。"
+  fail_internal: "{prefix}&c注册失败，未消耗牌照；如已扣费，系统已尝试自动退款。请联系管理员查看日志。"
+  fail_max_vehicles: "{prefix}&c你名下已注册 &e%current%&c 辆载具，达到上限 &e%max%&c。请先 /ml release 一辆。"
+  charged: "{prefix}&7已扣除 &e%amount% &7作为注册费。"
+
+commands:
+  header: "&6&l===== MountLicense 命令 ====="
+  help:
+    line_list: "&e/ml list &7- 查看你的载具"
+    line_info: "&e/ml info <牌照> &7- 查看载具详情"
+    line_park: "&e/ml park &7- 停车：关闭 AI 并标记停泊（看着目标）"
+    line_unpark: "&e/ml unpark &7- 取消停车"
+    line_lock: "&e/ml lock &7- 锁定（保留状态记号）"
+    line_unlock: "&e/ml unlock &7- 解锁"
+    line_release: "&e/ml release &7- 解除注册（30 秒内重复一次确认）"
+    line_recall: "&e/ml recall [牌照] &7- 召回载具（无牌照召回最近）"
+    line_locate: "&e/ml locate <牌照> &7- 查询载具最近坐标"
+    line_key_unbind: "&e/ml key unbind &7- 解除手中钥匙的绑定"
+    line_trust: "&e/ml trust <玩家> &7- 看着自己的载具，把该玩家加入信任列表"
+    line_untrust: "&e/ml untrust <玩家> &7- 从该载具的信任列表移除玩家"
+    line_admin_inspect: "&e/ml admin inspect &7- 检查手持物或视线实体 (管理)"
+    line_admin_give: "&e/ml admin give <player> license [n] &7- 发放牌照 (管理)"
+    line_admin_reindex: "&e/ml admin reindex &7- 重建索引 (管理)"
+    line_admin_reload: "&e/ml admin reload &7- 重新加载配置 (管理)"
+  unknown_subcommand: "{prefix}&c未知子命令：&f%input%"
+  player_only: "{prefix}&c该命令只能由玩家执行。"
+  no_permission: "{prefix}&c你没有权限执行该命令。"
+  player_not_found: "{prefix}&c找不到玩家：&f%player%"
+
+park:
+  no_target: "{prefix}&c请看向目标载具。"
+  not_registered: "{prefix}&c该载具尚未注册。"
+  not_owner: "{prefix}&c你不是这辆载具的主人。"
+  already_in_target_state: "{prefix}&7该载具已经处于目标状态。"
+  park_success: "{prefix}&a已停泊 %entity_type%，AI 已关闭。"
+  unpark_success: "{prefix}&a已恢复 %entity_type% 的活动状态。"
+  lock_success: "{prefix}&a已锁定 %entity_type%。"
+  unlock_success: "{prefix}&a已解锁 %entity_type%。"
+  release_confirm: "{prefix}&e警告：再次执行 /ml release 将解除该 %entity_type% 的注册（30 秒内有效）。"
+  release_done: "{prefix}&7已解除 %entity_type% 的注册，所有 PDC 与索引已清除。"
+
+protection:
+  mount_blocked: "{prefix}&c该 %entity_type% 属于 &f%owner%&c，无法骑乘。"
+  damage_blocked: "{prefix}&c该 %entity_type% 受保护，无法伤害。"
+  destroy_blocked: "{prefix}&c该 %entity_type% 受保护，无法破坏。"
+  inventory_blocked: "{prefix}&c该 %entity_type% 的容器属于 &f%owner%&c。"
+  leash_blocked: "{prefix}&c该 %entity_type% 已被注册，禁止牵绳。"
+
+key:
+  target_not_registered: "{prefix}&c目标实体未注册。"
+  target_not_owner: "{prefix}&c你不是这辆载具的主人，无法绑定。"
+  bound: "{prefix}&a钥匙已绑定到 %entity_type% &7(#%short_id%)&a。"
+  unbind_no_key: "{prefix}&c请先在主手拿着一把载具钥匙。"
+  unbind_success: "{prefix}&a已解除钥匙绑定。"
+  unbind_already_unbound: "{prefix}&7这把钥匙本来就没有绑定。"
+
+recall:
+  success: "{prefix}&a已召回载具。"
+  fail_not_found: "{prefix}&c找不到该牌照对应的载具。"
+  fail_not_owner: "{prefix}&c你不是这辆载具的主人。"
+  fail_not_loaded: "{prefix}&7该载具不在已加载区块内，无法召回。"
+  fail_not_loaded_with_pos: "{prefix}&7该载具不在已加载区块内。最近位置: &f%world% %x%, %y%, %z%"
+  fail_no_nearby: "{prefix}&c附近 %radius% 格内没有你拥有的可召回载具。请先绑定钥匙或靠近你的载具。"
+  fail_profile_no_summon: "{prefix}&c该载具不支持召回（如矿车）。"
+  fail_unsafe: "{prefix}&c当前位置不安全，无法召回。请站在固体方块上、头顶开阔。"
+  fail_cooldown: "{prefix}&c召回冷却中：&e%seconds%s&c。"
+  fail_no_permission: "{prefix}&c你没有使用钥匙的权限。"
+
+locate:
+  loaded: "{prefix}&a%profile% &7#%short_id%&a 当前已加载：&f%world% %x%, %y%, %z%"
+  unloaded: "{prefix}&7%profile% &f#%short_id%&7 当前未加载。最近位置：&f%world% %x%, %y%, %z%"
+
+trust:
+  no_target: "{prefix}&c请看向你要操作的载具。"
+  target_not_registered: "{prefix}&c该载具尚未注册。"
+  not_owner: "{prefix}&c你不是这辆载具的主人。"
+  cannot_trust_self: "{prefix}&c你本来就是这辆载具的主人。"
+  already_trusted: "{prefix}&7%player% 已经在 #%short_id% 的信任名单中。"
+  not_a_trustee: "{prefix}&7%player% 不在 #%short_id% 的信任名单中。"
+  added: "{prefix}&a已把 &f%player% &a加入 #%short_id% (%entity_type%) 的信任名单。"
+  removed: "{prefix}&7已把 &f%player% &7从 #%short_id% (%entity_type%) 的信任名单移除。"
+  notify_added: "{prefix}&a你被加入了一辆 %entity_type% (#%short_id%) 的信任名单，可以骑乘、开容器、牵绳。"
+  notify_removed: "{prefix}&7你已被移出 %entity_type% (#%short_id%) 的信任名单。"
+  fail_max: "{prefix}&c该载具的信任名单已满 (上限 %max%)。"
+
+list:
+  empty: "{prefix}&7你目前没有注册任何载具。"
+  header: "{prefix}&7你的载具 (&f%count%&7):"
+  line: "&8 - &f%profile% &7| &f牌照:&7 %short_id% &7| 状态:&f %state% &7| 世界:&f %world%"
+
+info:
+  not_found: "{prefix}&c找不到该牌照对应的载具。"
+  not_owner: "{prefix}&c这不是你的载具。"
+  header: "&6&l===== 载具详情 ====="
+  line_id: "&7牌照: &f%vehicle_id%"
+  line_profile: "&7类型: &f%profile%"
+  line_entity: "&7实体: &f%entity_type%"
+  line_owner: "&7所有者: &f%owner%"
+  line_state: "&7状态: &f%state%"
+  line_location: "&7位置: &f%world% %x%, %y%, %z%"
+  line_last_seen: "&7最近可见: &f%last_seen%"
+  line_trustees: "&7信任名单: &f%trustees%"
+  trustees_none: "&8无"
+
+admin:
+  inspect:
+    no_target: "{prefix}&c未检测到视线实体或手持注册物。"
+    target_unregistered: "{prefix}&7目标实体尚未注册。类型: &f%entity_type%"
+    target_registered: "{prefix}&a目标已注册。牌照: &f%vehicle_id%"
+  give:
+    success: "{prefix}&a已向 &f%player% &a发放 &e%amount% &a张牌照。"
+    received: "{prefix}&a你收到了 &e%amount% &a张载具牌照。"
+  reindex:
+    started: "{prefix}&7开始扫描已加载实体并重建索引……"
+    finished: "{prefix}&a索引重建完成：扫描 &f%scanned%&a，恢复 &f%recovered%&a。"
+  reload:
+    success: "{prefix}&a配置已重新加载。"
+
+general:
+  unknown_player: "&7未知"
+  never: "&7从未"
