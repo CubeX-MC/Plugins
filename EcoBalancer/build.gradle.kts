@@ -7,6 +7,7 @@ dependencies {
     compileOnly(CubexDeps.spigotApi("1.21.1-R0.1-SNAPSHOT"))
     compileOnly("dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT")
     compileOnly("net.milkbowl.vault:VaultAPI:1.7")
+    implementation(project(":modules:cubex-core"))
     implementation("org.xerial:sqlite-jdbc:3.49.1.0")
     compileOnly(CubexDeps.placeholderApi)
     testImplementation(CubexDeps.junitJupiter)

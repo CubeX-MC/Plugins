@@ -10,7 +10,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.RegisteredServiceProvider;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.cubexmc.core.CubexPlugin;
 import org.cubexmc.ecobalancer.commands.*;
 
 import java.io.FileOutputStream;
@@ -46,7 +46,7 @@ import org.cubexmc.ecobalancer.tax.TaxOperationType;
 import org.cubexmc.ecobalancer.tax.TaxRunService;
 
 @SuppressWarnings("deprecation")
-public final class EcoBalancer extends JavaPlugin {
+public final class EcoBalancer extends CubexPlugin {
     private static Economy econ = null;
     private static Permission perms = null;
     private FileHandler fileHandler;
@@ -117,29 +117,14 @@ public final class EcoBalancer extends JavaPlugin {
                 initFileLogger(false);
             }
         } else {
-            if (fileHandler != null) {
-                try {
-                    fileLogger.removeHandler(fileHandler);
-                } catch (Throwable t) {
-                    getLogger().log(Level.FINE, "Failed to detach file handler during reload", t);
-                }
-                try {
-                    fileHandler.close();
-                } catch (Throwable t) {
-                    getLogger().log(Level.FINE, "Failed to close file handler during reload", t);
-                }
-                fileHandler = null;
-            }
+            closeFileHandlerDuringReload();
         }
     }
 
     @Override
-    public void onEnable() {
+    protected void enablePlugin() {
         if (!setupEconomy()) {
-            getLogger().severe(
-                    String.format("[%s] - Disabled due to no Vault dependency found!", getDescription().getName()));
-            getServer().getPluginManager().disablePlugin(this);
-            return;
+            abortEnable(String.format("[%s] - Disabled due to no Vault dependency found!", getDescription().getName()));
         }
 
         // Initialize GUI Manager
@@ -198,6 +183,8 @@ public final class EcoBalancer extends JavaPlugin {
         if (getConfig().getBoolean("file-logging", true)) {
             initFileLogger(true);
         }
+        Runnable closeFileLogger = this::closeFileLoggerOnShutdown;
+        bind(closeFileLogger);
 
         // metrics
         int pluginId = 20269; // <-- Replace with the id of your plugin!
@@ -362,12 +349,32 @@ public final class EcoBalancer extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {
+    protected void disablePlugin() {
+    }
+
+    private void closeFileHandlerDuringReload() {
+        if (fileHandler != null) {
+            try {
+                fileLogger.removeHandler(fileHandler);
+            } catch (Throwable t) {
+                getLogger().log(Level.FINE, "Failed to detach file handler during reload", t);
+            }
+            try {
+                fileHandler.close();
+            } catch (Throwable t) {
+                getLogger().log(Level.FINE, "Failed to close file handler during reload", t);
+            }
+            fileHandler = null;
+        }
+    }
+
+    private void closeFileLoggerOnShutdown() {
         // Ensure all pending logs are flushed and the handler is closed
         if (fileHandler != null) {
             fileHandler.flush();
             fileLogger.removeHandler(fileHandler);
             fileHandler.close();
+            fileHandler = null;
         }
 
         // Now attempt to compress the log file
