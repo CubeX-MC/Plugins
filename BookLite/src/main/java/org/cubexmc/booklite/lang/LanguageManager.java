@@ -22,10 +22,10 @@ public class LanguageManager extends org.cubexmc.i18n.BookLiteLanguageAdapter {
                 .fallbackLocales(List.of("zh_CN"))
                 .bundledLocales(List.of("zh_CN", "en_US"))
                 .prefixKey("prefix")
-                .prefixToken("{prefix}")
+                .prefixToken("<prefix>")
                 .missingKeyMode(MissingKeyMode.RETURN_KEY)
-                .placeholderStyles(List.of(PlaceholderStyle.PERCENT_NAME))
-                .colorMode(ColorMode.LEGACY_AND_HEX)));
+                .placeholderStyles(List.of(PlaceholderStyle.MINIMESSAGE_TAG))
+                .colorMode(ColorMode.MINIMESSAGE)));
         this.plugin = plugin;
         this.locale = locale;
     }

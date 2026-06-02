@@ -18,6 +18,10 @@ java {
 
 dependencies {
     api(project(":modules:cubex-core"))
+    implementation(platform("net.kyori:adventure-bom:4.25.0"))
+    implementation("net.kyori:adventure-api")
+    implementation("net.kyori:adventure-text-minimessage")
+    implementation("net.kyori:adventure-text-serializer-legacy")
     compileOnly(CubexDeps.spigotApi("1.18.2-R0.1-SNAPSHOT"))
     testImplementation(CubexDeps.junitJupiter)
     testImplementation(CubexDeps.mockitoCore)

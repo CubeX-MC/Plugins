@@ -1,7 +1,6 @@
 package org.cubexmc.i18n;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -11,7 +10,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.cubexmc.core.CubexPlugin;
+import org.cubexmc.core.CubexText;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -92,18 +95,52 @@ class I18nServiceTest {
     }
 
     @Test
-    void minimessageModeIsReservedForPhaseB() throws Exception {
+    void rendersMiniMessageToLegacySectionString() throws Exception {
         // Arrange
-        writeLang("zh_CN", "hello: '<green>Hello'\n");
-        CubexPlugin plugin = mock(CubexPlugin.class);
-        when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
-        when(plugin.getLogger()).thenReturn(Logger.getLogger("I18nServiceTest"));
-        I18nService service = I18nServices.create(plugin, I18nOptions.create()
+        writeLang("zh_CN", """
+                prefix: "<dark_gray>[<aqua>Test<dark_gray>] <reset>"
+                hello: "<prefix><green>Hello <name>"
+                ignored: "<red><InvalidName>"
+                """);
+        I18nService service = service(I18nOptions.create()
                 .currentLocale("zh_CN")
+                .prefixToken("<prefix>")
+                .placeholderStyles(List.of(PlaceholderStyle.MINIMESSAGE_TAG))
                 .colorMode(ColorMode.MINIMESSAGE));
 
-        // Act / Assert
-        assertThrows(UnsupportedOperationException.class, service::reload);
+        // Act
+        String message = service.message("hello", Map.of("name", "Ada<admin>"));
+
+        // Assert
+        assertEquals("§8[§bTest§8] §aHello Ada<admin>", message);
+    }
+
+    @Test
+    void minimessageRenderingMatchesLegacyVisualOutput() {
+        // Arrange
+        String legacyTemplate = "{prefix}&cRed &lBold &rReset &f%name%";
+        String miniTemplate = "<prefix><red>Red <bold>Bold <reset>Reset <white><name>";
+        String legacyPrefix = "&8[&bBookLite&8] &r";
+        String miniPrefix = "<dark_gray>[<aqua>BookLite<dark_gray>] <reset>";
+        CubexText text = new CubexText();
+        String legacy = text.color(legacyTemplate
+                .replace("{prefix}", text.color(legacyPrefix))
+                .replace("%name%", "Ada"));
+
+        // Act
+        String modern = LegacyComponentSerializer.legacySection().serialize(MiniMessage.miniMessage().deserialize(
+                miniTemplate.replace("<prefix>", miniPrefix),
+                Placeholder.unparsed("name", "Ada")));
+
+        // Assert
+        assertEquals(removeRedundantResetBeforeColor(legacy), modern);
+    }
+
+    private String removeRedundantResetBeforeColor(String input) {
+        return input.replace("§r§a", "§a")
+                .replace("§r§b", "§b")
+                .replace("§r§c", "§c")
+                .replace("§r§f", "§f");
     }
 
     private I18nService service(I18nOptions options) {

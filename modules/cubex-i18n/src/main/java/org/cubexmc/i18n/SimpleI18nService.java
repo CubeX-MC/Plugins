@@ -7,6 +7,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.cubexmc.core.CubexPlugin;
@@ -14,13 +19,18 @@ import org.cubexmc.core.CubexText;
 
 final class SimpleI18nService implements I18nService {
 
+    private static final Pattern MINIMESSAGE_PLACEHOLDER_NAME = Pattern.compile("[a-z0-9_:-]+");
+
     private final CubexPlugin plugin;
     private final I18nOptions options;
     private final CubexText text = new CubexText();
+    private final MiniMessage miniMessage = MiniMessage.miniMessage();
+    private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.legacySection();
     private final Map<String, YamlConfiguration> languages = new HashMap<>();
     private String currentLocale;
     private String activeLocale;
     private String prefix = "";
+    private String prefixTemplate = "";
 
     SimpleI18nService(CubexPlugin plugin, I18nOptions options) {
         this.plugin = plugin;
@@ -46,7 +56,8 @@ final class SimpleI18nService implements I18nService {
         }
         activeLocale = firstAvailableLocale(currentLocale);
         YamlConfiguration active = configuration(activeLocale);
-        prefix = color(active.getString(options.prefixKey(), ""));
+        prefixTemplate = active.getString(options.prefixKey(), "");
+        prefix = color(prefixTemplate);
     }
 
     @Override
@@ -214,6 +225,9 @@ final class SimpleI18nService implements I18nService {
         if (raw == null) {
             return "";
         }
+        if (options.colorMode() == ColorMode.MINIMESSAGE) {
+            return renderMiniMessage(raw, placeholders);
+        }
         String formatted = raw;
         if (!options.prefixToken().isEmpty()) {
             formatted = formatted.replace(options.prefixToken(), prefix == null ? "" : prefix);
@@ -239,9 +253,32 @@ final class SimpleI18nService implements I18nService {
             return input == null ? "" : input;
         }
         if (colorMode == ColorMode.MINIMESSAGE) {
-            throw new UnsupportedOperationException("MiniMessage color mode is reserved for phase B.");
+            return renderMiniMessage(input, Map.of());
         }
         return text.color(input);
+    }
+
+    private String renderMiniMessage(String template, Map<String, ?> placeholders) {
+        String resolvedTemplate = template == null ? "" : template;
+        if (!options.prefixToken().isEmpty()) {
+            resolvedTemplate = resolvedTemplate.replace(options.prefixToken(), prefixTemplate == null ? "" : prefixTemplate);
+        }
+        TagResolver resolver = buildResolver(placeholders);
+        var component = miniMessage.deserialize(resolvedTemplate, resolver);
+        return legacySerializer.serialize(component);
+    }
+
+    private TagResolver buildResolver(Map<String, ?> placeholders) {
+        TagResolver.Builder builder = TagResolver.builder();
+        if (placeholders != null && options.placeholderStyles().contains(PlaceholderStyle.MINIMESSAGE_TAG)) {
+            for (Map.Entry<String, ?> entry : placeholders.entrySet()) {
+                String name = entry.getKey();
+                if (name != null && MINIMESSAGE_PLACEHOLDER_NAME.matcher(name).matches()) {
+                    builder.resolver(Placeholder.unparsed(name, value(entry.getValue())));
+                }
+            }
+        }
+        return builder.build();
     }
 
     private String value(Object value) {

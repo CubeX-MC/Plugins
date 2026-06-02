@@ -18,6 +18,7 @@ dependencies {
 tasks.shadowJar {
     archiveBaseName.set("booklite")
     relocate("com.google.gson", "org.cubexmc.booklite.libs.gson")
+    relocate("net.kyori", "org.cubexmc.booklite.libs.kyori")
 }
 
 tasks.processResources {

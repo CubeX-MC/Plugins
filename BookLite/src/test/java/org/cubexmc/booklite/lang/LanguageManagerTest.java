@@ -24,9 +24,11 @@ class LanguageManagerTest {
         Path langDir = tempDir.resolve("lang");
         Files.createDirectories(langDir);
         Files.writeString(langDir.resolve("zh_CN.yml"), """
-                prefix: "&7[&6BookLite&7]&r "
-                message: "{prefix}&aHello %name%"
-                hex: "&#FF0000Red"
+                lang-version: 2
+                prefix: "<gray>[<gold>BookLite<gray>]<reset> "
+                message: "<prefix><green>Hello <name>"
+                hex: "<#FF0000>Red"
+                usage: "<yellow>/booklite info \\\\<id>"
                 """);
         BookLitePlugin plugin = mock(BookLitePlugin.class);
         when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
@@ -39,6 +41,7 @@ class LanguageManagerTest {
         // Assert
         assertEquals("missing.key", languageManager.raw("missing.key"));
         assertTrue(languageManager.msg("message", Map.of("name", "Ada")).contains("§aHello Ada"));
-        assertTrue(languageManager.msg("hex").contains("§x§F§F§0§0§0§0Red"));
+        assertTrue(languageManager.msg("hex").contains("Red"));
+        assertTrue(languageManager.msg("usage").contains("<id>"));
     }
 }

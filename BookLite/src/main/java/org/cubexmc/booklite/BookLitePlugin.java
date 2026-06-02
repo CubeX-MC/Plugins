@@ -11,6 +11,11 @@ import org.cubexmc.booklite.service.BookRestorer;
 import org.cubexmc.booklite.service.BookService;
 import org.cubexmc.booklite.service.PdcKeys;
 import org.cubexmc.booklite.storage.BookRepository;
+import org.cubexmc.config.LegacyTextToMiniMessageStep;
+import org.cubexmc.config.MigrationException;
+import org.cubexmc.config.MigrationPlan;
+import org.cubexmc.config.MigrationRunner;
+import org.cubexmc.config.NoOpMigrationStep;
 import org.cubexmc.config.ResourceFiles;
 import org.cubexmc.core.CubexPlugin;
 
@@ -30,6 +35,12 @@ public class BookLitePlugin extends CubexPlugin {
     protected void enablePlugin() {
         this.resourceFiles = new ResourceFiles(this);
         saveDefaultResources();
+        try {
+            migrateConfigAndLang();
+        } catch (MigrationException ex) {
+            getLogger().severe("BookLite enable aborted: migration failed. " + ex.getMessage());
+            abortEnable("BookLite migration failed. See logs for details.");
+        }
 
         this.configManager = new ConfigManager(this);
         this.configManager.load();
@@ -73,6 +84,12 @@ public class BookLitePlugin extends CubexPlugin {
         String oldSqliteFile = configManager.getSqliteFile();
         boolean oldWal = configManager.isWal();
         saveDefaultResources();
+        try {
+            migrateConfigAndLang();
+        } catch (MigrationException ex) {
+            getLogger().severe("BookLite reload aborted: migration failed. " + ex.getMessage());
+            return;
+        }
         reloadConfig();
         configManager.load();
         languageManager.setLocale(configManager.getLanguage());
@@ -87,6 +104,23 @@ public class BookLitePlugin extends CubexPlugin {
 
     private void saveDefaultResources() {
         resourceFiles.saveIfMissing(java.util.List.of("config.yml", "lang/zh_CN.yml", "lang/en_US.yml"));
+    }
+
+    private void migrateConfigAndLang() throws MigrationException {
+        MigrationRunner migrations = new MigrationRunner(this);
+        migrations.run(MigrationPlan.yaml("BookLite config", "config.yml")
+                .versionKey("config-version")
+                .targetVersion(2)
+                .addStep(new NoOpMigrationStep(1, 2, "Add BookLite config-version.")));
+        migrateLang(migrations, "zh_CN");
+        migrateLang(migrations, "en_US");
+    }
+
+    private void migrateLang(MigrationRunner migrations, String locale) throws MigrationException {
+        migrations.run(MigrationPlan.yaml("BookLite lang " + locale, "lang/" + locale + ".yml")
+                .versionKey("lang-version")
+                .targetVersion(2)
+                .addStep(new LegacyTextToMiniMessageStep(1, 2)));
     }
 
     public ConfigManager configManager() {
