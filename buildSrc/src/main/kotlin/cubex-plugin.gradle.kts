@@ -22,6 +22,7 @@ repositories {
     maven("https://repo.megavex.net/snapshots/")
     maven("https://repo.bluecolored.de/releases/")
     maven("https://repo.mikeprimm.com/")
+    maven("https://repo.tcoded.com/releases")
 }
 
 configurations {
