@@ -1,6 +1,7 @@
 # MountLicense default config
 # Restart or run /ml reload after editing.
 
+config-version: 2
 language: zh_CN  # zh_CN or en_US
 
 # Vault economy hook.

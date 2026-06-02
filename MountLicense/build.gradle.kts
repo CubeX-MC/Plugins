@@ -9,6 +9,8 @@ dependencies {
         exclude(group = "org.bukkit", module = "bukkit")
     }
     implementation(project(":modules:cubex-core"))
+    implementation(project(":modules:cubex-config"))
+    implementation(project(":modules:cubex-i18n"))
     testImplementation(CubexDeps.junitJupiter)
     testImplementation("org.mockito:mockito-core:5.18.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.18.0")
@@ -16,6 +18,7 @@ dependencies {
 
 tasks.shadowJar {
     archiveBaseName.set("mountlicense")
+    relocate("net.kyori", "org.cubexmc.mountlicense.libs.kyori")
 }
 
 tasks.processResources {
