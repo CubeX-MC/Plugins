@@ -25,6 +25,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # 不持久化 GITHUB_TOKEN 到 git config,否则 push 会用 github-actions[bot]
+          # 覆盖掉 URL 里嵌的 MIRROR_TOKEN,导致推送其它 repo 被 403 拒绝。
+          persist-credentials: false
 
       - name: Split and push to monorepo-sync
         env:
