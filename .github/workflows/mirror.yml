@@ -1,0 +1,67 @@
+name: Mirror to plugin repos
+
+# 把 monorepo 各插件子目录 subtree-split 后推送到对应独立 repo 的 monorepo-sync 分支。
+# 仅写各 repo 的 monorepo-sync,绝不触碰其默认分支。
+# 需要仓库 secret MIRROR_TOKEN(对 8 个目标 repo 有 push 权限的 PAT);未配置时优雅跳过。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-sync
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Subtree-split mirror
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Split and push to monorepo-sync
+        env:
+          MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${MIRROR_TOKEN:-}" ]; then
+            echo "::notice::MIRROR_TOKEN 未配置,跳过镜像同步(在仓库 Settings → Secrets 添加后自动生效)。"
+            exit 0
+          fi
+
+          git config user.name "cubex-mirror-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+          # prefix(本地目录) 与 owner/repo 映射(注意:Contracts→Contract、EcoBalancer 在个人账号)
+          prefixes=(BookLite FAWEReplacer MountLicense Contracts EcoBalancer RuleGems Metro Railway)
+          repos=(CubeX-MC/BookLite CubeX-MC/FAWEReplacer CubeX-MC/MountLicense CubeX-MC/Contract angushushu/EcoBalancer CubeX-MC/RuleGems CubeX-MC/Metro CubeX-MC/Railway)
+
+          failed=0
+          for i in "${!prefixes[@]}"; do
+            p="${prefixes[$i]}"
+            repo="${repos[$i]}"
+            echo "::group::$p -> $repo (monorepo-sync)"
+            sha="$(git subtree split --prefix="$p")"
+            url="https://x-access-token:${MIRROR_TOKEN}@github.com/${repo}.git"
+            # 仅 fast-forward 推送到 monorepo-sync;失败(如非 FF)记录但继续其余,绝不 force
+            if git push "$url" "${sha}:refs/heads/monorepo-sync"; then
+              echo "ok: $p -> $repo @ ${sha}"
+            else
+              echo "::error::push 失败(可能非 fast-forward 或权限不足):$p -> $repo"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::部分镜像同步失败,见上方日志。未做任何 force 推送。"
+            exit 1
+          fi
