@@ -8,6 +8,11 @@ import org.cubexmc.fawereplace.commands.FaweReplaceCommand;
 import org.cubexmc.fawereplace.commands.FaweReplaceTabCompleter;
 import org.cubexmc.fawereplace.metrics.Metrics;
 import org.cubexmc.fawereplace.tasks.CleaningTask;
+import org.cubexmc.config.MigrationException;
+import org.cubexmc.config.MigrationPlan;
+import org.cubexmc.config.MigrationRunner;
+import org.cubexmc.config.NoOpMigrationStep;
+import org.cubexmc.config.ResourceFiles;
 import org.cubexmc.core.CubexPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -30,20 +35,29 @@ public final class FAWEReplace extends CubexPlugin {
     private LanguageManager languageManager;
     private org.bukkit.configuration.file.YamlConfiguration rulesConfig;
     private File rulesFile;
+    private ResourceFiles resourceFiles;
 
     @Override
     protected void enablePlugin() {
+        this.resourceFiles = new ResourceFiles(this);
 
         // 初始化统计
         Metrics metrics = new Metrics(this, 28977);
 
         // 保存默认配置
-        saveResourcesIfMissing("config.yml");
+        saveDefaultResources();
+        try {
+            migrateConfigAndLang();
+        } catch (MigrationException ex) {
+            getLogger().severe("FAWEReplace enable aborted: migration failed. " + ex.getMessage());
+            abortEnable("FAWEReplace migration failed. See logs for details.");
+        }
+        reloadConfig();
 
         // 加载/创建 rules.yml
         rulesFile = new File(getDataFolder(), "rules.yml");
         if (!rulesFile.exists()) {
-            saveResource("rules.yml", false);
+            resourceFiles.saveIfMissing("rules.yml");
             // 首次创建时，尝试从 config.yml 迁移旧数据
             rulesConfig = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rulesFile);
             migrateDataToRules();
@@ -130,6 +144,13 @@ public final class FAWEReplace extends CubexPlugin {
      * 重新加载配置（公开方法，供命令调用）
      */
     public boolean reloadConfiguration() {
+        saveDefaultResources();
+        try {
+            migrateConfigAndLang();
+        } catch (MigrationException ex) {
+            getLogger().severe("FAWEReplace reload aborted: migration failed. " + ex.getMessage());
+            return false;
+        }
         reloadConfig();
 
         // 重新加载语言
@@ -170,6 +191,27 @@ public final class FAWEReplace extends CubexPlugin {
             getLogger().severe(languageManager.getMessage("log.rules_save_failed"));
             e.printStackTrace();
         }
+    }
+
+    private void saveDefaultResources() {
+        resourceFiles.saveIfMissing(java.util.List.of("config.yml", "lang/zh_CN.yml", "lang/en_US.yml"));
+    }
+
+    private void migrateConfigAndLang() throws MigrationException {
+        MigrationRunner migrations = new MigrationRunner(this);
+        migrations.run(MigrationPlan.yaml("FAWEReplace config", "config.yml")
+                .versionKey("config-version")
+                .targetVersion(2)
+                .addStep(new NoOpMigrationStep(1, 2, "Add FAWEReplace config-version.")));
+        migrateLang(migrations, "zh_CN");
+        migrateLang(migrations, "en_US");
+    }
+
+    private void migrateLang(MigrationRunner migrations, String locale) throws MigrationException {
+        migrations.run(MigrationPlan.yaml("FAWEReplace lang " + locale, "lang/" + locale + ".yml")
+                .versionKey("lang-version")
+                .targetVersion(2)
+                .addStep(new FaweReplaceTextToMiniMessageStep(1, 2)));
     }
 
     /**

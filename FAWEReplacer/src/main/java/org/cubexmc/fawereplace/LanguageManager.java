@@ -1,15 +1,16 @@
 package org.cubexmc.fawereplace;
 
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
-
 import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.logging.Logger;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.cubexmc.core.CubexPlugin;
+import org.cubexmc.i18n.ColorMode;
+import org.cubexmc.i18n.I18nOptions;
+import org.cubexmc.i18n.I18nService;
+import org.cubexmc.i18n.I18nServices;
+import org.cubexmc.i18n.MissingKeyMode;
+import org.cubexmc.i18n.PlaceholderStyle;
 
 /**
  * 多语言管理器
@@ -17,9 +18,9 @@ import java.util.logging.Logger;
  */
 public class LanguageManager {
 
-    private final JavaPlugin plugin;
+    private final CubexPlugin plugin;
     private final Logger logger;
-    private final Map<String, String> messages = new HashMap<>();
+    private final I18nService i18n;
     private String currentLanguage;
 
     /**
@@ -28,10 +29,21 @@ public class LanguageManager {
      * @param plugin   插件实例
      * @param language 语言代码 (如 zh_CN, en_US)
      */
-    public LanguageManager(JavaPlugin plugin, String language) {
+    public LanguageManager(CubexPlugin plugin, String language) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
         this.currentLanguage = language;
+        this.i18n = I18nServices.create(plugin, I18nOptions.create()
+                .languageDirectory("lang")
+                .currentLocale(language)
+                .defaultLocale("zh_CN")
+                .fallbackLocales(List.of("zh_CN"))
+                .bundledLocales(List.of("zh_CN", "en_US"))
+                .prefixKey("prefix")
+                .prefixToken("<prefix>")
+                .missingKeyMode(MissingKeyMode.RETURN_KEY)
+                .placeholderStyles(List.of(PlaceholderStyle.MINIMESSAGE_TAG))
+                .colorMode(ColorMode.MINIMESSAGE));
         loadLanguage(language);
     }
 
@@ -41,46 +53,20 @@ public class LanguageManager {
      * @param language 语言代码
      */
     public void loadLanguage(String language) {
-        messages.clear();
         this.currentLanguage = language;
+        i18n.setCurrentLocale(language);
 
         File langFile = new File(plugin.getDataFolder(), "lang/" + language + ".yml");
 
-        // 如果外部文件不存在，从资源中复制
-        if (!langFile.exists()) {
-            plugin.saveResource("lang/" + language + ".yml", false);
-        }
-
         // 加载语言文件
         try {
-            YamlConfiguration config;
-            if (langFile.exists()) {
-                config = YamlConfiguration.loadConfiguration(langFile);
-            } else {
-                // 如果外部文件和资源文件都不存在，尝试从内部资源加载
-                InputStream stream = plugin.getResource("lang/" + language + ".yml");
-                if (stream != null) {
-                    config = YamlConfiguration.loadConfiguration(new InputStreamReader(stream, StandardCharsets.UTF_8));
-                } else {
-                    logger.warning("Language file not found: " + language + ".yml, falling back to zh_CN");
-                    // 回退到中文
-                    if (!language.equals("zh_CN")) {
-                        loadLanguage("zh_CN");
-                        return;
-                    }
-                    return;
-                }
+            if (!langFile.exists() && !"zh_CN".equals(language)) {
+                logger.warning(getMessage("log.language_fallback", "file", language + ".yml"));
             }
-
-            // 加载所有消息
-            for (String key : config.getKeys(true)) {
-                if (config.isString(key)) {
-                    messages.put(key, config.getString(key));
-                }
-            }
-
+            i18n.reload();
+            int count = countMessages(language);
             logger.info(
-                    getMessage("log.language_loaded", "language", language, "count", String.valueOf(messages.size())));
+                    getMessage("log.language_loaded", "language", language, "count", String.valueOf(count)));
         } catch (Exception e) {
             logger.severe("Failed to load language file: " + language + ".yml");
             e.printStackTrace();
@@ -94,7 +80,7 @@ public class LanguageManager {
      * @return 翻译后的文本，如果键不存在则返回键本身
      */
     public String getMessage(String key) {
-        return messages.getOrDefault(key, key);
+        return i18n.message(key);
     }
 
     /**
@@ -106,20 +92,16 @@ public class LanguageManager {
      * @return 翻译并替换后的文本
      */
     public String getMessage(String key, Object... replacements) {
-        String message = getMessage(key);
-
         if (replacements.length % 2 != 0) {
             logger.warning(getMessage("log.invalid_replacements", "key", key));
-            return message;
+            return getMessage(key);
         }
-
+        java.util.Map<String, Object> placeholders = new java.util.HashMap<>();
         for (int i = 0; i < replacements.length; i += 2) {
             String placeholder = String.valueOf(replacements[i]);
-            String value = String.valueOf(replacements[i + 1]);
-            message = message.replace("{" + placeholder + "}", value);
+            placeholders.put(placeholder, replacements[i + 1]);
         }
-
-        return message;
+        return i18n.message(key, placeholders);
     }
 
     /**
@@ -145,5 +127,23 @@ public class LanguageManager {
      */
     public String getCurrentLanguage() {
         return currentLanguage;
+    }
+
+    private int countMessages(String language) {
+        File langFile = new File(plugin.getDataFolder(), "lang/" + language + ".yml");
+        if (!langFile.exists() && !"zh_CN".equals(language)) {
+            langFile = new File(plugin.getDataFolder(), "lang/zh_CN.yml");
+        }
+        if (!langFile.exists()) {
+            return 0;
+        }
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(langFile);
+        int count = 0;
+        for (String key : config.getKeys(true)) {
+            if (config.isString(key)) {
+                count++;
+            }
+        }
+        return count;
     }
 }
