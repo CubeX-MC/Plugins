@@ -11,6 +11,7 @@ import org.cubexmc.booklite.service.BookRestorer;
 import org.cubexmc.booklite.service.BookService;
 import org.cubexmc.booklite.service.PdcKeys;
 import org.cubexmc.booklite.storage.BookRepository;
+import org.cubexmc.config.ResourceFiles;
 import org.cubexmc.core.CubexPlugin;
 
 public class BookLitePlugin extends CubexPlugin {
@@ -23,9 +24,11 @@ public class BookLitePlugin extends CubexPlugin {
     private BookCodec codec;
     private BookService bookService;
     private BookRestorer bookRestorer;
+    private ResourceFiles resourceFiles;
 
     @Override
     protected void enablePlugin() {
+        this.resourceFiles = new ResourceFiles(this);
         saveDefaultResources();
 
         this.configManager = new ConfigManager(this);
@@ -83,7 +86,7 @@ public class BookLitePlugin extends CubexPlugin {
     }
 
     private void saveDefaultResources() {
-        saveResourcesIfMissing("config.yml", "lang/zh_CN.yml", "lang/en_US.yml");
+        resourceFiles.saveIfMissing(java.util.List.of("config.yml", "lang/zh_CN.yml", "lang/en_US.yml"));
     }
 
     public ConfigManager configManager() {
