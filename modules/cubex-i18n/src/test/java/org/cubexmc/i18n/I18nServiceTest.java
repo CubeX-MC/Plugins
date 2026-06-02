@@ -116,6 +116,24 @@ class I18nServiceTest {
     }
 
     @Test
+    void rendersMiniMessageHexColorsToLegacySectionHexString() throws Exception {
+        // Arrange
+        writeLang("zh_CN", """
+                hex: "<#F4D03F>Gold"
+                """);
+        I18nService service = service(I18nOptions.create()
+                .currentLocale("zh_CN")
+                .placeholderStyles(List.of(PlaceholderStyle.MINIMESSAGE_TAG))
+                .colorMode(ColorMode.MINIMESSAGE));
+
+        // Act
+        String message = service.message("hex");
+
+        // Assert
+        assertTrue(message.startsWith("§x§f§4§d§0§3§fGold"));
+    }
+
+    @Test
     void minimessageRenderingMatchesLegacyVisualOutput() {
         // Arrange
         String legacyTemplate = "{prefix}&cRed &lBold &rReset &f%name%";

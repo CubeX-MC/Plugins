@@ -1,4 +1,5 @@
-prefix: "&#F4D03F[Contract]&#F1F5F9 "
+lang-version: 2
+prefix: "<#F4D03F>[Contract]<#F1F5F9> "
 
 status:
   open: "Open"
@@ -51,69 +52,69 @@ terms:
   mediator-accepted: "Mediator accepted"
 
 messages:
-  player-only: "%prefix%&#E63946Only players can use this command."
-  no-permission: "%prefix%&#E63946You do not have permission."
-  vault-missing: "%prefix%&#E63946No Vault economy provider is available."
-  reloaded: "%prefix%&#69DB7CConfiguration reloaded and old GUI sessions closed."
-  not-found: "%prefix%&#E63946Contract not found, or the ID prefix is ambiguous."
-  invalid-number: "%prefix%&#E63946Invalid number."
-  invalid-usage: "%prefix%&#FFE066Usage: %usage%"
-  create-success: "%prefix%&#69DB7CContract posted: &#FFE066#%id% &#F1F5F9escrowed &#69DB7C%amount%&#F1F5F9."
-  wager-create-success: "%prefix%&#69DB7CWager opened for &#FFE066%opponent%&#69DB7C: &#FFE066#%id% &#F1F5F9stake &#69DB7C%stake%&#F1F5F9."
-  partner-create-success: "%prefix%&#69DB7CPartnership invite sent to &#FFE066%partner%&#69DB7C: &#FFE066#%id% &#F1F5F9your stake &#69DB7C%stake%&#F1F5F9."
-  resolve-success: "%prefix%&#69DB7CContract &#FFE066#%id% &#69DB7Cresolved for side &#FFE066%winner%&#69DB7C."
-  mediate-accept-success: "%prefix%&#69DB7CYou accepted mediator duties for contract &#FFE066#%id%&#69DB7C."
-  mediate-success: "%prefix%&#69DB7CContract &#FFE066#%id% &#69DB7Cwas handled by mediator decision: &#FFE066%decision%&#69DB7C."
-  accept-success: "%prefix%&#69DB7CYou accepted contract/invite &#FFE066#%id%&#69DB7C."
-  submit-success: "%prefix%&#69DB7CSubmitted for owner approval."
-  approve-success: "%prefix%&#69DB7CContract approved. Paid &#FFE066%player% &#FFE066%amount%&#69DB7C."
-  cancel-success: "%prefix%&#69DB7CContract cancelled; funds were handled by rule."
-  dispute-success: "%prefix%&#FFE066Contract is disputed and awaits admin handling."
-  admin-pay-success: "%prefix%&#69DB7CForced payment for contract &#FFE066#%id%&#69DB7C."
-  admin-refund-success: "%prefix%&#69DB7CForced refund for contract &#FFE066#%id%&#69DB7C."
-  admin-close-success: "%prefix%&#69DB7CClosed contract &#FFE066#%id%&#69DB7C without moving funds."
-  cannot-create: "%prefix%&#E63946Cannot create contract: %reason%"
-  operation-failed: "%prefix%&#E63946Operation failed: %reason%"
-  description-input-start: "%prefix%&#FFE066Type the contract description in chat; use &#E63946cancel &#FFE066to cancel or &#E63946clear &#FFE066to clear it."
-  description-input-timeout: "%prefix%&#E63946Description input timed out without saving."
-  description-input-cancelled: "%prefix%&#FFE066Description input cancelled."
-  description-input-cleared: "%prefix%&#69DB7CDescription cleared."
-  description-input-too-long: "%prefix%&#E63946Description cannot exceed %max% characters; not saved."
-  description-input-saved: "%prefix%&#69DB7CDescription saved."
-  empty-list: "%prefix%&#CFD8DCNo matching contracts."
-  list-header: "&#F4D03F==== Contracts page %page%/%pages% ===="
-  list-line: "&#FFE066#%id% &#FFFFFF%title% &#CFD8DC[%type%/%status%] &#69DB7C%reward% &#CFD8DCby %owner%"
-  list-footer: "&#CFD8DCUse &#FFE066/contract info <id> &#CFD8DCfor details."
-  my-header: "&#F4D03F==== My contracts ===="
+  player-only: "<prefix><#E63946>Only players can use this command."
+  no-permission: "<prefix><#E63946>You do not have permission."
+  vault-missing: "<prefix><#E63946>No Vault economy provider is available."
+  reloaded: "<prefix><#69DB7C>Configuration reloaded and old GUI sessions closed."
+  not-found: "<prefix><#E63946>Contract not found, or the ID prefix is ambiguous."
+  invalid-number: "<prefix><#E63946>Invalid number."
+  invalid-usage: "<prefix><#FFE066>Usage: <usage>"
+  create-success: "<prefix><#69DB7C>Contract posted: <#FFE066>#<id> <#F1F5F9>escrowed <#69DB7C><amount><#F1F5F9>."
+  wager-create-success: "<prefix><#69DB7C>Wager opened for <#FFE066><opponent><#69DB7C>: <#FFE066>#<id> <#F1F5F9>stake <#69DB7C><stake><#F1F5F9>."
+  partner-create-success: "<prefix><#69DB7C>Partnership invite sent to <#FFE066><partner><#69DB7C>: <#FFE066>#<id> <#F1F5F9>your stake <#69DB7C><stake><#F1F5F9>."
+  resolve-success: "<prefix><#69DB7C>Contract <#FFE066>#<id> <#69DB7C>resolved for side <#FFE066><winner><#69DB7C>."
+  mediate-accept-success: "<prefix><#69DB7C>You accepted mediator duties for contract <#FFE066>#<id><#69DB7C>."
+  mediate-success: "<prefix><#69DB7C>Contract <#FFE066>#<id> <#69DB7C>was handled by mediator decision: <#FFE066><decision><#69DB7C>."
+  accept-success: "<prefix><#69DB7C>You accepted contract/invite <#FFE066>#<id><#69DB7C>."
+  submit-success: "<prefix><#69DB7C>Submitted for owner approval."
+  approve-success: "<prefix><#69DB7C>Contract approved. Paid <#FFE066><player> <#FFE066><amount><#69DB7C>."
+  cancel-success: "<prefix><#69DB7C>Contract cancelled; funds were handled by rule."
+  dispute-success: "<prefix><#FFE066>Contract is disputed and awaits admin handling."
+  admin-pay-success: "<prefix><#69DB7C>Forced payment for contract <#FFE066>#<id><#69DB7C>."
+  admin-refund-success: "<prefix><#69DB7C>Forced refund for contract <#FFE066>#<id><#69DB7C>."
+  admin-close-success: "<prefix><#69DB7C>Closed contract <#FFE066>#<id><#69DB7C> without moving funds."
+  cannot-create: "<prefix><#E63946>Cannot create contract: <reason>"
+  operation-failed: "<prefix><#E63946>Operation failed: <reason>"
+  description-input-start: "<prefix><#FFE066>Type the contract description in chat; use <#E63946>cancel <#FFE066>to cancel or <#E63946>clear <#FFE066>to clear it."
+  description-input-timeout: "<prefix><#E63946>Description input timed out without saving."
+  description-input-cancelled: "<prefix><#FFE066>Description input cancelled."
+  description-input-cleared: "<prefix><#69DB7C>Description cleared."
+  description-input-too-long: "<prefix><#E63946>Description cannot exceed <max> characters; not saved."
+  description-input-saved: "<prefix><#69DB7C>Description saved."
+  empty-list: "<prefix><#CFD8DC>No matching contracts."
+  list-header: "<#F4D03F>==== Contracts page <page>/<pages> ===="
+  list-line: "<#FFE066>#<id> <#FFFFFF><title> <#CFD8DC>[<type>/<status>] <#69DB7C><reward> <#CFD8DC>by <owner>"
+  list-footer: "<#CFD8DC>Use <#FFE066>/contract info \\<id> <#CFD8DC>for details."
+  my-header: "<#F4D03F>==== My contracts ===="
   info: |
-    &#F4D03F==== Contract #%id% ====
-    &#FFE066Title: &#FFFFFF%title%
-    &#FFE066Type: &#FFFFFF%type%
-    &#FFE066Status: &#FFFFFF%status%
-    &#FFE066Participants:
-    %participants%
-    %arbiter%
-    &#FFE066Escrow/stakes: &#69DB7C%reward%
-    &#FFE066Settlement preview:
-    %payouts%
-    %approval%
-    &#FFE066Deadline: &#FFFFFF%deadline%
-    &#FFE066Description: &#F1F5F9%description%
+    <#F4D03F>==== Contract #<id> ====
+    <#FFE066>Title: <#FFFFFF><title>
+    <#FFE066>Type: <#FFFFFF><type>
+    <#FFE066>Status: <#FFFFFF><status>
+    <#FFE066>Participants:
+    <participants>
+    <arbiter>
+    <#FFE066>Escrow/stakes: <#69DB7C><reward>
+    <#FFE066>Settlement preview:
+    <payouts>
+    <approval>
+    <#FFE066>Deadline: <#FFFFFF><deadline>
+    <#FFE066>Description: <#F1F5F9><description>
   help: |
-    &#F4D03F==== Contract ====
-    &#FFE066/contract &#F1F5F9- Open the board
-    &#FFE066/contract service <reward> <hours> <title>|<description> &#F1F5F9- Post a service contract
-    &#CFD8DCOptional: &#FFE066/contract service <reward> <hours> --mediator <player> <title>|<description>
-    &#FFE066/contract wager <opponent> <stake> <hours> <arbiter> <title>|<description> &#F1F5F9- Open a wager
-    &#FFE066/contract partner <partner> <my stake> <their stake> <hours> <title>|<description> &#F1F5F9- Invite a partner
-    &#CFD8DCOptional: &#FFE066/contract partner <partner> <my stake> <their stake> <hours> --mediator <player> <title>|<description>
-    &#FFE066/contract resolve <id> <a|b> &#F1F5F9- Arbiter resolves a wager
-    &#FFE066/contract mediate <id> <accept|pay|refund|owner|contractor> &#F1F5F9- Mediator accepts duties or resolves
-    &#FFE066/contract list [page] &#F1F5F9- List open service contracts
-    &#FFE066/contract my &#F1F5F9- List contracts related to you
-    &#FFE066/contract info <id> &#F1F5F9- Show details
-    &#FFE066/contract accept <id> &#F1F5F9- Accept a contract or invite
-    &#FFE066/contract submit <id> &#F1F5F9- Submit service completion
-    &#FFE066/contract approve <id> &#F1F5F9- Approve payment or partnership completion
-    &#FFE066/contract cancel <id> &#F1F5F9- Cancel when allowed
-    &#FFE066/contract dispute <id> <reason> &#F1F5F9- Open a dispute
+    <#F4D03F>==== Contract ====
+    <#FFE066>/contract <#F1F5F9>- Open the board
+    <#FFE066>/contract service \<reward> \<hours> \<title>|\<description> <#F1F5F9>- Post a service contract
+    <#CFD8DC>Optional: <#FFE066>/contract service \<reward> \<hours> --mediator \<player> \<title>|\<description>
+    <#FFE066>/contract wager \<opponent> \<stake> \<hours> \<arbiter> \<title>|\<description> <#F1F5F9>- Open a wager
+    <#FFE066>/contract partner \<partner> \<my stake> \<their stake> \<hours> \<title>|\<description> <#F1F5F9>- Invite a partner
+    <#CFD8DC>Optional: <#FFE066>/contract partner \<partner> \<my stake> \<their stake> \<hours> --mediator \<player> \<title>|\<description>
+    <#FFE066>/contract resolve \<id> \<a|b> <#F1F5F9>- Arbiter resolves a wager
+    <#FFE066>/contract mediate \<id> \<accept|pay|refund|owner|contractor> <#F1F5F9>- Mediator accepts duties or resolves
+    <#FFE066>/contract list [page] <#F1F5F9>- List open service contracts
+    <#FFE066>/contract my <#F1F5F9>- List contracts related to you
+    <#FFE066>/contract info \<id> <#F1F5F9>- Show details
+    <#FFE066>/contract accept \<id> <#F1F5F9>- Accept a contract or invite
+    <#FFE066>/contract submit \<id> <#F1F5F9>- Submit service completion
+    <#FFE066>/contract approve \<id> <#F1F5F9>- Approve payment or partnership completion
+    <#FFE066>/contract cancel \<id> <#F1F5F9>- Cancel when allowed
+    <#FFE066>/contract dispute \<id> \<reason> <#F1F5F9>- Open a dispute

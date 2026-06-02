@@ -25,7 +25,11 @@ final class SimpleI18nService implements I18nService {
     private final I18nOptions options;
     private final CubexText text = new CubexText();
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
-    private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.legacySection();
+    private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.builder()
+            .character(LegacyComponentSerializer.SECTION_CHAR)
+            .hexColors()
+            .useUnusualXRepeatedCharacterHexFormat()
+            .build();
     private final Map<String, YamlConfiguration> languages = new HashMap<>();
     private String currentLocale;
     private String activeLocale;

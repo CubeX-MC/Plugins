@@ -1,4 +1,5 @@
-prefix: "&#F4D03F[Contract]&#F1F5F9 "
+lang-version: 2
+prefix: "<#F4D03F>[Contract]<#F1F5F9> "
 
 status:
   open: "公开中"
@@ -51,69 +52,69 @@ terms:
   mediator-accepted: "中间人已接受"
 
 messages:
-  player-only: "%prefix%&#E63946这个命令只能由玩家执行。"
-  no-permission: "%prefix%&#E63946你没有权限执行这个操作。"
-  vault-missing: "%prefix%&#E63946没有可用的 Vault 经济服务，插件无法处理合同资金。"
-  reloaded: "%prefix%&#69DB7C配置已重新加载，旧 GUI 会话已关闭。"
-  not-found: "%prefix%&#E63946找不到这个合同，或 ID 前缀不唯一。"
-  invalid-number: "%prefix%&#E63946数字格式不正确。"
-  invalid-usage: "%prefix%&#FFE066用法: %usage%"
-  create-success: "%prefix%&#69DB7C合同已发布: &#FFE066#%id% &#F1F5F9已托管 &#69DB7C%amount%&#F1F5F9。"
-  wager-create-success: "%prefix%&#69DB7C对赌已开,等待 &#FFE066%opponent%&#69DB7C 接受: &#FFE066#%id% &#F1F5F9押注 &#69DB7C%stake%&#F1F5F9。"
-  partner-create-success: "%prefix%&#69DB7C合作邀请已发,等待 &#FFE066%partner%&#69DB7C 接受: &#FFE066#%id% &#F1F5F9你押 &#69DB7C%stake%&#F1F5F9。"
-  resolve-success: "%prefix%&#69DB7C合同 &#FFE066#%id% &#69DB7C已裁决,胜方 &#FFE066%winner%&#69DB7C。"
-  mediate-accept-success: "%prefix%&#69DB7C你已接受合同 &#FFE066#%id% &#69DB7C的中间人职责。"
-  mediate-success: "%prefix%&#69DB7C合同 &#FFE066#%id% &#69DB7C已按中间人裁决处理: &#FFE066%decision%&#69DB7C。"
-  accept-success: "%prefix%&#69DB7C你已接受合同/邀请 &#FFE066#%id%&#69DB7C。"
-  submit-success: "%prefix%&#69DB7C已提交完成，等待雇主确认。"
-  approve-success: "%prefix%&#69DB7C合同已确认，已向 &#FFE066%player% &#69DB7C支付 &#FFE066%amount%&#69DB7C。"
-  cancel-success: "%prefix%&#69DB7C合同已取消，资金已按规则处理。"
-  dispute-success: "%prefix%&#FFE066合同已进入争议状态，等待管理员处理。"
-  admin-pay-success: "%prefix%&#69DB7C已强制支付合同 &#FFE066#%id%&#69DB7C。"
-  admin-refund-success: "%prefix%&#69DB7C已强制退款合同 &#FFE066#%id%&#69DB7C。"
-  admin-close-success: "%prefix%&#69DB7C已关闭合同 &#FFE066#%id%&#69DB7C，未移动任何资金。"
-  cannot-create: "%prefix%&#E63946无法创建合同: %reason%"
-  operation-failed: "%prefix%&#E63946操作失败: %reason%"
-  description-input-start: "%prefix%&#FFE066请在聊天输入合同描述；输入 &#E63946cancel &#FFE066取消，输入 &#E63946clear &#FFE066清空。"
-  description-input-timeout: "%prefix%&#E63946描述输入超时，未保存。"
-  description-input-cancelled: "%prefix%&#FFE066已取消描述输入。"
-  description-input-cleared: "%prefix%&#69DB7C描述已清空。"
-  description-input-too-long: "%prefix%&#E63946描述不能超过 %max% 个字符，未保存。"
-  description-input-saved: "%prefix%&#69DB7C描述已保存。"
-  empty-list: "%prefix%&#CFD8DC当前没有符合条件的合同。"
-  list-header: "&#F4D03F==== 合同大厅 第 %page%/%pages% 页 ===="
-  list-line: "&#FFE066#%id% &#FFFFFF%title% &#CFD8DC[%type%/%status%] &#69DB7C%reward% &#CFD8DC发起: %owner%"
-  list-footer: "&#CFD8DC使用 &#FFE066/contract info <id> &#CFD8DC查看详情。"
-  my-header: "&#F4D03F==== 我的合同 ===="
+  player-only: "<prefix><#E63946>这个命令只能由玩家执行。"
+  no-permission: "<prefix><#E63946>你没有权限执行这个操作。"
+  vault-missing: "<prefix><#E63946>没有可用的 Vault 经济服务，插件无法处理合同资金。"
+  reloaded: "<prefix><#69DB7C>配置已重新加载，旧 GUI 会话已关闭。"
+  not-found: "<prefix><#E63946>找不到这个合同，或 ID 前缀不唯一。"
+  invalid-number: "<prefix><#E63946>数字格式不正确。"
+  invalid-usage: "<prefix><#FFE066>用法: <usage>"
+  create-success: "<prefix><#69DB7C>合同已发布: <#FFE066>#<id> <#F1F5F9>已托管 <#69DB7C><amount><#F1F5F9>。"
+  wager-create-success: "<prefix><#69DB7C>对赌已开,等待 <#FFE066><opponent><#69DB7C> 接受: <#FFE066>#<id> <#F1F5F9>押注 <#69DB7C><stake><#F1F5F9>。"
+  partner-create-success: "<prefix><#69DB7C>合作邀请已发,等待 <#FFE066><partner><#69DB7C> 接受: <#FFE066>#<id> <#F1F5F9>你押 <#69DB7C><stake><#F1F5F9>。"
+  resolve-success: "<prefix><#69DB7C>合同 <#FFE066>#<id> <#69DB7C>已裁决,胜方 <#FFE066><winner><#69DB7C>。"
+  mediate-accept-success: "<prefix><#69DB7C>你已接受合同 <#FFE066>#<id> <#69DB7C>的中间人职责。"
+  mediate-success: "<prefix><#69DB7C>合同 <#FFE066>#<id> <#69DB7C>已按中间人裁决处理: <#FFE066><decision><#69DB7C>。"
+  accept-success: "<prefix><#69DB7C>你已接受合同/邀请 <#FFE066>#<id><#69DB7C>。"
+  submit-success: "<prefix><#69DB7C>已提交完成，等待雇主确认。"
+  approve-success: "<prefix><#69DB7C>合同已确认，已向 <#FFE066><player> <#69DB7C>支付 <#FFE066><amount><#69DB7C>。"
+  cancel-success: "<prefix><#69DB7C>合同已取消，资金已按规则处理。"
+  dispute-success: "<prefix><#FFE066>合同已进入争议状态，等待管理员处理。"
+  admin-pay-success: "<prefix><#69DB7C>已强制支付合同 <#FFE066>#<id><#69DB7C>。"
+  admin-refund-success: "<prefix><#69DB7C>已强制退款合同 <#FFE066>#<id><#69DB7C>。"
+  admin-close-success: "<prefix><#69DB7C>已关闭合同 <#FFE066>#<id><#69DB7C>，未移动任何资金。"
+  cannot-create: "<prefix><#E63946>无法创建合同: <reason>"
+  operation-failed: "<prefix><#E63946>操作失败: <reason>"
+  description-input-start: "<prefix><#FFE066>请在聊天输入合同描述；输入 <#E63946>cancel <#FFE066>取消，输入 <#E63946>clear <#FFE066>清空。"
+  description-input-timeout: "<prefix><#E63946>描述输入超时，未保存。"
+  description-input-cancelled: "<prefix><#FFE066>已取消描述输入。"
+  description-input-cleared: "<prefix><#69DB7C>描述已清空。"
+  description-input-too-long: "<prefix><#E63946>描述不能超过 <max> 个字符，未保存。"
+  description-input-saved: "<prefix><#69DB7C>描述已保存。"
+  empty-list: "<prefix><#CFD8DC>当前没有符合条件的合同。"
+  list-header: "<#F4D03F>==== 合同大厅 第 <page>/<pages> 页 ===="
+  list-line: "<#FFE066>#<id> <#FFFFFF><title> <#CFD8DC>[<type>/<status>] <#69DB7C><reward> <#CFD8DC>发起: <owner>"
+  list-footer: "<#CFD8DC>使用 <#FFE066>/contract info \\<id> <#CFD8DC>查看详情。"
+  my-header: "<#F4D03F>==== 我的合同 ===="
   info: |
-    &#F4D03F==== 合同 #%id% ====
-    &#FFE066标题: &#FFFFFF%title%
-    &#FFE066类型: &#FFFFFF%type%
-    &#FFE066状态: &#FFFFFF%status%
-    &#FFE066参与者:
-    %participants%
-    %arbiter%
-    &#FFE066托管/押注: &#69DB7C%reward%
-    &#FFE066结算预览:
-    %payouts%
-    %approval%
-    &#FFE066截止: &#FFFFFF%deadline%
-    &#FFE066描述: &#F1F5F9%description%
+    <#F4D03F>==== 合同 #<id> ====
+    <#FFE066>标题: <#FFFFFF><title>
+    <#FFE066>类型: <#FFFFFF><type>
+    <#FFE066>状态: <#FFFFFF><status>
+    <#FFE066>参与者:
+    <participants>
+    <arbiter>
+    <#FFE066>托管/押注: <#69DB7C><reward>
+    <#FFE066>结算预览:
+    <payouts>
+    <approval>
+    <#FFE066>截止: <#FFFFFF><deadline>
+    <#FFE066>描述: <#F1F5F9><description>
   help: |
-    &#F4D03F==== Contract ====
-    &#FFE066/contract &#F1F5F9- 打开合同大厅
-    &#FFE066/contract service <奖金> <小时> <标题>|<描述> &#F1F5F9- 发布雇佣合同
-    &#CFD8DC可选: &#FFE066/contract service <奖金> <小时> --mediator <中间人> <标题>|<描述>
-    &#FFE066/contract wager <对方> <押注> <小时> <仲裁> <标题>|<描述> &#F1F5F9- 发起对赌
-    &#FFE066/contract partner <对方> <我押注> <对方押注> <小时> <标题>|<描述> &#F1F5F9- 发起合作
-    &#CFD8DC可选: &#FFE066/contract partner <对方> <我押注> <对方押注> <小时> --mediator <中间人> <标题>|<描述>
-    &#FFE066/contract resolve <id> <a|b> &#F1F5F9- 仲裁者裁决对赌
-    &#FFE066/contract mediate <id> <accept|pay|refund|owner|contractor> &#F1F5F9- 中间人接受职责或裁决
-    &#FFE066/contract list [页码] &#F1F5F9- 查看公开合同
-    &#FFE066/contract my &#F1F5F9- 查看我的合同
-    &#FFE066/contract info <id> &#F1F5F9- 查看详情
-    &#FFE066/contract accept <id> &#F1F5F9- 接单
-    &#FFE066/contract submit <id> &#F1F5F9- 提交完成
-    &#FFE066/contract approve <id> &#F1F5F9- 雇主确认并付款
-    &#FFE066/contract cancel <id> &#F1F5F9- 取消可取消的合同
-    &#FFE066/contract dispute <id> <原因> &#F1F5F9- 发起争议
+    <#F4D03F>==== Contract ====
+    <#FFE066>/contract <#F1F5F9>- 打开合同大厅
+    <#FFE066>/contract service \<奖金> \<小时> \<标题>|\<描述> <#F1F5F9>- 发布雇佣合同
+    <#CFD8DC>可选: <#FFE066>/contract service \<奖金> \<小时> --mediator \<中间人> \<标题>|\<描述>
+    <#FFE066>/contract wager \<对方> \<押注> \<小时> \<仲裁> \<标题>|\<描述> <#F1F5F9>- 发起对赌
+    <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<小时> \<标题>|\<描述> <#F1F5F9>- 发起合作
+    <#CFD8DC>可选: <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<小时> --mediator \<中间人> \<标题>|\<描述>
+    <#FFE066>/contract resolve \<id> \<a|b> <#F1F5F9>- 仲裁者裁决对赌
+    <#FFE066>/contract mediate \<id> \<accept|pay|refund|owner|contractor> <#F1F5F9>- 中间人接受职责或裁决
+    <#FFE066>/contract list [页码] <#F1F5F9>- 查看公开合同
+    <#FFE066>/contract my <#F1F5F9>- 查看我的合同
+    <#FFE066>/contract info \<id> <#F1F5F9>- 查看详情
+    <#FFE066>/contract accept \<id> <#F1F5F9>- 接单
+    <#FFE066>/contract submit \<id> <#F1F5F9>- 提交完成
+    <#FFE066>/contract approve \<id> <#F1F5F9>- 雇主确认并付款
+    <#FFE066>/contract cancel \<id> <#F1F5F9>- 取消可取消的合同
+    <#FFE066>/contract dispute \<id> \<原因> <#F1F5F9>- 发起争议

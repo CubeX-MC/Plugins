@@ -2,6 +2,12 @@ package org.cubexmc.contract;
 
 import org.bukkit.command.PluginCommand;
 import org.bukkit.scheduler.BukkitTask;
+import org.cubexmc.config.LegacyTextToMiniMessageStep;
+import org.cubexmc.config.MigrationException;
+import org.cubexmc.config.MigrationPlan;
+import org.cubexmc.config.MigrationRunner;
+import org.cubexmc.config.NoOpMigrationStep;
+import org.cubexmc.config.ResourceFiles;
 import org.cubexmc.contract.command.ContractCommand;
 import org.cubexmc.contract.config.LanguageManager;
 import org.cubexmc.contract.economy.EconomyService;
@@ -23,10 +29,19 @@ public final class ContractPlugin extends CubexPlugin {
     private EventLog eventLog;
     private ContractService contractService;
     private ContractGui contractGui;
+    private ResourceFiles resourceFiles;
 
     @Override
     protected void enablePlugin() {
+        this.resourceFiles = new ResourceFiles(this);
         saveDefaultFiles();
+        try {
+            migrateConfigAndLang();
+        } catch (MigrationException ex) {
+            getLogger().severe("Contracts enable aborted: migration failed. " + ex.getMessage());
+            abortEnable("Contracts migration failed. See logs for details.");
+        }
+        reloadConfig();
 
         languageManager = new LanguageManager(this);
         languageManager.load();
@@ -83,6 +98,12 @@ public final class ContractPlugin extends CubexPlugin {
             contractGui.closeSessions();
         }
         saveDefaultFiles();
+        try {
+            migrateConfigAndLang();
+        } catch (MigrationException ex) {
+            getLogger().severe("Contracts reload aborted: migration failed. " + ex.getMessage());
+            return;
+        }
         reloadConfig();
         languageManager.load();
         contractStorage.load();
@@ -109,7 +130,24 @@ public final class ContractPlugin extends CubexPlugin {
     }
 
     private void saveDefaultFiles() {
-        saveResourcesIfMissing("config.yml", "lang/zh_CN.yml", "lang/en_US.yml");
+        resourceFiles.saveIfMissing(java.util.List.of("config.yml", "lang/zh_CN.yml", "lang/en_US.yml"));
+    }
+
+    private void migrateConfigAndLang() throws MigrationException {
+        MigrationRunner migrations = new MigrationRunner(this);
+        migrations.run(MigrationPlan.yaml("Contracts config", "config.yml")
+                .versionKey("config-version")
+                .targetVersion(2)
+                .addStep(new NoOpMigrationStep(1, 2, "Add Contracts config-version.")));
+        migrateLang(migrations, "zh_CN");
+        migrateLang(migrations, "en_US");
+    }
+
+    private void migrateLang(MigrationRunner migrations, String locale) throws MigrationException {
+        migrations.run(MigrationPlan.yaml("Contracts lang " + locale, "lang/" + locale + ".yml")
+                .versionKey("lang-version")
+                .targetVersion(2)
+                .addStep(new LegacyTextToMiniMessageStep(1, 2)));
     }
 
     private void scheduleFlush() {
