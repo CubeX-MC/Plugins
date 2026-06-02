@@ -42,6 +42,7 @@ dependencies {
         version { strictly("2.0.0-beta.10") }
     }
     implementation(project(":modules:cubex-core"))
+    implementation(project(":modules:cubex-scheduler"))
 
     compileOnly("de.bluecolored.bluemap:BlueMapAPI:2.7.2")
     compileOnly("us.dynmap:DynmapCoreAPI:3.7-beta-6")
@@ -51,6 +52,7 @@ dependencies {
 tasks.shadowJar {
     archiveBaseName.set("railway")
     transformers.removeIf { it is ServiceFileTransformer }
+    relocate("com.tcoded.folialib", "org.cubexmc.railway.libs.folialib")
     relocate("net.megavex.scoreboardlibrary", "org.cubexmc.metro.lib.scoreboardlibrary")
     relocate("org.incendo.cloud", "org.cubexmc.metro.lib.cloud")
     relocate("io.leangen.geantyref", "org.cubexmc.metro.lib.geantyref")

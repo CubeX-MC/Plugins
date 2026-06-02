@@ -1,12 +1,15 @@
 package org.cubexmc.scheduler;
 
+import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.cubexmc.core.CubexPlugin;
 
 /**
  * Temporary bridge for migrating existing SchedulerUtil classes without changing
@@ -18,6 +21,10 @@ public final class LegacySchedulerAdapter {
     private final BukkitImmediateMode immediateMode;
     private final boolean trackTasksForCancelAll;
     private final boolean tickAccessEnabled;
+    private final AtomicLong tickCounter = new AtomicLong();
+    private volatile boolean tickCounterStarted;
+    private volatile boolean currentTickMethodChecked;
+    private volatile Method currentTickMethod;
 
     private LegacySchedulerAdapter(Builder builder) {
         this.scheduler = builder.scheduler;
@@ -133,18 +140,66 @@ public final class LegacySchedulerAdapter {
         if (!tickAccessEnabled) {
             throw new UnsupportedOperationException("Tick access is not enabled for this adapter.");
         }
-        throw new UnsupportedOperationException("Tick access is outside the RuleGems trial scope.");
+        Long reflectedTick = reflectedCurrentTick();
+        if (reflectedTick != null) {
+            return reflectedTick;
+        }
+        return tickCounter.get();
     }
 
     public void ensureTickCounter() {
         if (!tickAccessEnabled) {
             throw new UnsupportedOperationException("Tick access is not enabled for this adapter.");
         }
-        throw new UnsupportedOperationException("Tick counter is outside the RuleGems trial scope.");
+        if (tickCounterStarted) {
+            return;
+        }
+        synchronized (this) {
+            if (tickCounterStarted) {
+                return;
+            }
+            tickCounterStarted = true;
+            if (reflectedCurrentTick() != null) {
+                return;
+            }
+            Object handle = globalRun(() -> tickCounter.incrementAndGet(), 0L, 1L);
+            if (!(handle instanceof CubexTask) && scheduler.plugin() instanceof CubexPlugin) {
+                ((CubexPlugin) scheduler.plugin()).bind((Runnable) () -> cancelTask(handle));
+            }
+        }
     }
 
     private Object scheduleFoliaGlobal(Runnable task, long delay) {
         return delay == 0L ? scheduler.runGlobal(task) : scheduler.runGlobalLater(task, delay);
+    }
+
+    private Method currentTickMethod() {
+        if (currentTickMethodChecked) {
+            return currentTickMethod;
+        }
+        synchronized (this) {
+            if (!currentTickMethodChecked) {
+                try {
+                    currentTickMethod = Bukkit.class.getMethod("getCurrentTick");
+                } catch (NoSuchMethodException ignored) {
+                    currentTickMethod = null;
+                }
+                currentTickMethodChecked = true;
+            }
+            return currentTickMethod;
+        }
+    }
+
+    private Long reflectedCurrentTick() {
+        Method method = currentTickMethod();
+        if (method == null) {
+            return null;
+        }
+        try {
+            return (long) method.invoke(null);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private Object scheduleBukkitOneShot(Runnable task, long delay) {
