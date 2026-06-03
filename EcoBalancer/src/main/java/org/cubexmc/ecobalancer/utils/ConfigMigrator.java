@@ -3,13 +3,28 @@ package org.cubexmc.ecobalancer.utils;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.cubexmc.config.LegacyTextToMiniMessageStep;
+import org.cubexmc.config.MigrationException;
+import org.cubexmc.config.MigrationPlan;
+import org.cubexmc.config.MigrationReport;
+import org.cubexmc.config.MigrationRunner;
+import org.cubexmc.config.MigrationStep;
+import org.cubexmc.config.NoOpMigrationStep;
 import org.cubexmc.ecobalancer.EcoBalancer;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 /**
@@ -17,12 +32,15 @@ import java.util.logging.Logger;
  * when the plugin is updated to a new version.
  */
 public class ConfigMigrator {
+    private static final int LEGACY_CONFIG_VERSION = 4;
+    private static final int LEGACY_LANG_VERSION = 3;
+
     private final EcoBalancer plugin;
     private final Logger logger;
 
     // Increment these when config structure changes
-    public static final int CURRENT_CONFIG_VERSION = 4;
-    public static final int CURRENT_LANG_VERSION = 3;
+    public static final int CURRENT_CONFIG_VERSION = 5;
+    public static final int CURRENT_LANG_VERSION = 4;
 
     public ConfigMigrator(EcoBalancer plugin) {
         this.plugin = plugin;
@@ -30,39 +48,198 @@ public class ConfigMigrator {
     }
 
     /**
-     * Check and migrate config.yml if needed
-     * 
+     * Check and migrate config.yml if needed.
+     *
      * @return true if migration occurred
      */
     public boolean migrateConfig() {
-        File configFile = new File(plugin.getDataFolder(), "config.yml");
+        try {
+            return migrateConfigOrThrow();
+        } catch (MigrationException e) {
+            logger.severe("Config migration failed: " + e.getMessage());
+            return false;
+        }
+    }
 
-        // If config doesn't exist, let Bukkit create it fresh
+    public boolean migrateConfigOrThrow() throws MigrationException {
+        File configFile = new File(plugin.getDataFolder(), "config.yml");
         if (!configFile.exists()) {
             return false;
         }
+        MigrationReport report = new MigrationRunner(plugin).run(configPlan());
+        return report.migrated();
+    }
 
-        FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-        int currentVersion = config.getInt("config-version", 1);
-
-        if (currentVersion >= CURRENT_CONFIG_VERSION) {
-            return false; // Already up to date
-        }
-
-        logger.info("Migrating config.yml from version " + currentVersion + " to " + CURRENT_CONFIG_VERSION);
-
-        // Create backup before migration
-        createBackup(configFile, "config");
-
-        // Load default config from jar
-        FileConfiguration defaultConfig = loadDefaultConfig();
-        if (defaultConfig == null) {
-            logger.warning("Could not load default config for migration");
+    /**
+     * Check and migrate language file if needed.
+     *
+     * @param langCode e.g., "en_US" or "zh_CN"
+     * @return true if migration occurred
+     */
+    public boolean migrateLanguageFile(String langCode) {
+        try {
+            return migrateLanguageFileOrThrow(langCode);
+        } catch (MigrationException e) {
+            logger.severe("Language migration failed for " + langCode + ": " + e.getMessage());
             return false;
         }
+    }
 
-        // Perform migration steps
-        // Apply version-specific migrations
+    public boolean migrateLanguageFileOrThrow(String langCode) throws MigrationException {
+        File langFile = new File(plugin.getDataFolder(), "lang" + File.separator + langCode + ".yml");
+        if (!langFile.exists()) {
+            return false;
+        }
+        MigrationReport report = new MigrationRunner(plugin).run(languagePlan(langCode));
+        return report.migrated();
+    }
+
+    public void migrateStartupFilesOrThrow(String langCode) throws MigrationException {
+        if (migrateConfigOrThrow()) {
+            logger.info("Configuration migrated to version " + CURRENT_CONFIG_VERSION);
+        }
+        if (migrateLanguageFileOrThrow(langCode)) {
+            logger.info("Language file '" + langCode + "' migrated to version " + CURRENT_LANG_VERSION);
+        }
+    }
+
+    /**
+     * Create a timestamped backup of a file before manual migration backup commands.
+     */
+    public void createBackup(File file, String prefix) {
+        if (!file.exists()) {
+            return;
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HHmmss");
+        String timestamp = sdf.format(new Date());
+        File backupFile = new File(file.getParent(), prefix + ".bak." + timestamp);
+
+        try {
+            Files.copy(file.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            logger.info("Created backup: " + backupFile.getName());
+        } catch (IOException e) {
+            logger.warning("Failed to create backup: " + e.getMessage());
+        }
+    }
+
+    private MigrationPlan configPlan() {
+        return MigrationPlan.yaml("EcoBalancer config", "config.yml")
+                .versionKey("config-version")
+                .missingVersion(1)
+                .targetVersion(CURRENT_CONFIG_VERSION)
+                .addStep(new LegacyConfigMigrationStep(1))
+                .addStep(new LegacyConfigMigrationStep(2))
+                .addStep(new LegacyConfigMigrationStep(3))
+                .addStep(new NoOpMigrationStep(LEGACY_CONFIG_VERSION, CURRENT_CONFIG_VERSION,
+                        "Reserve v5 for MiniMessage-era config without changing command DSL values."));
+    }
+
+    private MigrationPlan languagePlan(String langCode) {
+        String resourcePath = "lang/" + langCode + ".yml";
+        return MigrationPlan.yaml("EcoBalancer language " + langCode, resourcePath)
+                .versionKey("lang-version")
+                .missingVersion(1)
+                .targetVersion(CURRENT_LANG_VERSION)
+                .addStep(new ModernizeLanguageStep(1, resourcePath))
+                .addStep(new ModernizeLanguageStep(2, resourcePath))
+                .addStep(new ModernizeLanguageStep(3, resourcePath));
+    }
+
+    private final class LegacyConfigMigrationStep implements MigrationStep {
+        private final int fromVersion;
+
+        private LegacyConfigMigrationStep(int fromVersion) {
+            this.fromVersion = fromVersion;
+        }
+
+        @Override
+        public int fromVersion() {
+            return fromVersion;
+        }
+
+        @Override
+        public int toVersion() {
+            return LEGACY_CONFIG_VERSION;
+        }
+
+        @Override
+        public String description() {
+            return "Reuse EcoBalancer legacy config migration v" + fromVersion + " -> v" + LEGACY_CONFIG_VERSION + ".";
+        }
+
+        @Override
+        public void migrate(org.cubexmc.config.MigrationContext context) {
+            FileConfiguration defaults = loadDefaultConfig();
+            if (defaults == null) {
+                context.fail("config.yml", "Could not load default config for migration.");
+                return;
+            }
+            applyLegacyConfigMigration(context.yaml(), defaults, fromVersion);
+        }
+    }
+
+    private final class ModernizeLanguageStep implements MigrationStep {
+        private final int fromVersion;
+        private final String resourcePath;
+        private final LegacyTextToMiniMessageStep converter;
+
+        private ModernizeLanguageStep(int fromVersion, String resourcePath) {
+            this.fromVersion = fromVersion;
+            this.resourcePath = resourcePath;
+            this.converter = new LegacyTextToMiniMessageStep(fromVersion, CURRENT_LANG_VERSION);
+        }
+
+        @Override
+        public int fromVersion() {
+            return fromVersion;
+        }
+
+        @Override
+        public int toVersion() {
+            return CURRENT_LANG_VERSION;
+        }
+
+        @Override
+        public String description() {
+            return "Convert existing legacy language strings first, then merge current MiniMessage defaults.";
+        }
+
+        @Override
+        public void migrate(org.cubexmc.config.MigrationContext context) {
+            convertExistingStrings(context.yaml(), "");
+            FileConfiguration defaults = loadDefaultResource(resourcePath);
+            if (defaults == null) {
+                context.fail(resourcePath, "Could not load bundled MiniMessage defaults.");
+                return;
+            }
+            mergeNewKeys(context.yaml(), defaults, "");
+        }
+
+        private void convertExistingStrings(ConfigurationSection section, String basePath) {
+            for (String key : section.getKeys(false)) {
+                String path = basePath.isEmpty() ? key : basePath + "." + key;
+                if (section.isConfigurationSection(key)) {
+                    convertExistingStrings(section.getConfigurationSection(key), path);
+                } else if (section.isString(key)) {
+                    section.set(key, convertLegacy(section.getString(key, "")));
+                } else if (section.isList(key)) {
+                    List<?> values = section.getList(key);
+                    if (values != null && values.stream().allMatch(value -> value instanceof String)) {
+                        section.set(key, values.stream()
+                                .map(value -> convertLegacy((String) value))
+                                .toList());
+                    }
+                }
+            }
+        }
+
+        private String convertLegacy(String value) {
+            return converter.convert(value == null ? "" : value.replace('§', '&'));
+        }
+    }
+
+    void applyLegacyConfigMigration(FileConfiguration config, FileConfiguration defaultConfig, int currentVersion) {
         if (currentVersion < 2) {
             if (migrateConfigV1ToV2(config, defaultConfig)) {
                 logger.info("Applied V1 -> V2 migration");
@@ -78,22 +255,7 @@ public class ConfigMigrator {
                 logger.info("Applied V3 -> V4 migration (Tax safety and ledger defaults)");
             }
         }
-
-        // Merge any new keys from default config
         mergeNewKeys(config, defaultConfig, "");
-
-        // Update version number
-        config.set("config-version", CURRENT_CONFIG_VERSION);
-
-        // Save migrated config
-        try {
-            config.save(configFile);
-            logger.info("Config migration completed successfully");
-            return true;
-        } catch (IOException e) {
-            logger.severe("Failed to save migrated config: " + e.getMessage());
-            return false;
-        }
     }
 
     private boolean migrateConfigV3ToV4(FileConfiguration config, FileConfiguration defaults) {
@@ -116,7 +278,7 @@ public class ConfigMigrator {
     }
 
     /**
-     * Migrate config from v1 to v2
+     * Migrate config from v1 to v2.
      */
     private boolean migrateConfigV1ToV2(FileConfiguration config, FileConfiguration defaults) {
         boolean changed = false;
@@ -141,7 +303,7 @@ public class ConfigMigrator {
     }
 
     /**
-     * Migrate config from v2 to v3: Extract tax settings to policies/default.yml
+     * Migrate config from v2 to v3: Extract tax settings to policies/default.yml.
      */
     private boolean migrateConfigV2ToV3(FileConfiguration config) {
         File policiesDir = new File(plugin.getDataFolder(), "policies");
@@ -152,24 +314,15 @@ public class ConfigMigrator {
         File defaultPolicyFile = new File(policiesDir, "default.yml");
         if (defaultPolicyFile.exists()) {
             logger.info("Policy file already exists, skipping default policy creation.");
-            // We still proceed to clean up legacy config if strictly following migration,
-            // but safer to assume if policy exists we might have migrated before or user
-            // did.
-            // However, to ensure cleanup, we should continue.
         }
 
-        // Create TaxPolicy config object
-        // Create "policies" map structure
         YamlConfiguration policyConfig = new YamlConfiguration();
         ConfigurationSection policiesSection = policyConfig.createSection("policies");
 
-        // --- Policy 1: Default (Migrated) ---
-        // Routine = true
         ConfigurationSection defaultPolicy = policiesSection.createSection("default");
         defaultPolicy.set("description", "Migrated from legacy config");
         defaultPolicy.set("routine", true);
-        // Schedule section
-        // Legacy format used a 'check-schedule' section
+
         String type = "monthly";
         List<Integer> daysOfWeek = new ArrayList<>();
         List<Integer> datesOfMonth = new ArrayList<>();
@@ -180,7 +333,6 @@ public class ConfigMigrator {
             daysOfWeek = scheduleSec.getIntegerList("days-of-week");
             datesOfMonth = scheduleSec.getIntegerList("dates-of-month");
         } else {
-            // Fallback for very old configs or unexpected structure
             type = config.getString("schedule-type", "monthly");
             daysOfWeek = config.getIntegerList("schedule-days-of-week");
             datesOfMonth = config.getIntegerList("schedule-dates-of-month");
@@ -191,59 +343,30 @@ public class ConfigMigrator {
         defaultPolicy.set("schedule.days-of-week", daysOfWeek);
         defaultPolicy.set("schedule.dates-of-month", datesOfMonth);
 
-        // Settings section
-        // These keys seem to be flat in the user's provided config excerpt
-        // except possibly 'inactive-days-to-*' being conditioned on
-        // 'deduct-based-on-time'
-        // for now we migrate values if present.
-
         defaultPolicy.set("settings.max-deduction", config.getDouble("max-deduction-per-player", 0.0));
-        // Legacy config might not have min-balance-protection or it might be new
         defaultPolicy.set("settings.min-balance-protection", config.getDouble("min-balance-protection", 0.0));
 
         boolean onlyOffline = config.getBoolean("only-offline-players", false);
-        // User config shows 'deduct-based-on-time' which might be related, but let's
-        // stick to keys we see
         defaultPolicy.set("settings.only-offline", onlyOffline);
 
         defaultPolicy.set("settings.inactive-days-deduct", config.getInt("inactive-days-to-deduct", 0));
         defaultPolicy.set("settings.inactive-days-clear", config.getInt("inactive-days-to-clear", 0));
-        defaultPolicy.set("settings.percentile", config.getBoolean("percentile-thresholds", false)); // If exists
+        defaultPolicy.set("settings.percentile", config.getBoolean("percentile-thresholds", false));
         defaultPolicy.set("settings.exempt-permission", "");
         defaultPolicy.set("settings.debt-mode", "inherit");
 
-        // Brackets
         List<Map<String, Object>> brackets = new ArrayList<>();
         if (config.contains("tax-brackets")) {
             List<Map<?, ?>> rawBrackets = config.getMapList("tax-brackets");
             for (Map<?, ?> raw : rawBrackets) {
                 Map<String, Object> bracket = new HashMap<>();
 
-                // Handle threshold: null cases which map to "no limit"
-                // Our TaxPolicy logic handles MAX_VALUE as effectively no limit for upper
-                // bounds if sorted
-                // But let's check what TaxPolicy expects. Usually threshold is the upper bound
-                // of a bracket?
-                // Or the start?
-                // "threshold: 100000 rate: 0.001" likely means up to 100k? Or starting at 100k?
-                // The provided config shows progressive steps: 100k, 1m, null.
-                // This implies:
-                // 0 -> 100k : 0.001? Or >100k?
-                // A common progressive tax pattern is:
-                // [0, 100k) -> rate 1
-                // [100k, 1m) -> rate 2
-                // [1m, inf) -> rate 3
-                // We will preserve the 'threshold' value directly. If it is null in YAML,
-                // get("threshold") returns null.
-
                 Object th = raw.get("threshold");
                 if (th == null) {
-                    // Treat null as unlimited -> Max Value
                     bracket.put("threshold", Integer.MAX_VALUE);
                 } else if (th instanceof Number) {
                     bracket.put("threshold", ((Number) th).intValue());
                 } else {
-                    // Try parsing string "null" or others
                     String thStr = String.valueOf(th);
                     if ("null".equalsIgnoreCase(thStr)) {
                         bracket.put("threshold", Integer.MAX_VALUE);
@@ -271,7 +394,6 @@ public class ConfigMigrator {
         }
         defaultPolicy.set("brackets", brackets);
 
-        // --- Policy 2: Manual Check Example ---
         ConfigurationSection manualPolicy = policiesSection.createSection("manual_check");
         manualPolicy.set("description", "A Manual execution policy example");
         manualPolicy.set("routine", false);
@@ -283,7 +405,6 @@ public class ConfigMigrator {
         manBrackets.add(mb);
         manualPolicy.set("brackets", manBrackets);
 
-        // Save default policy
         try {
             if (!defaultPolicyFile.exists()) {
                 policyConfig.save(defaultPolicyFile);
@@ -294,10 +415,8 @@ public class ConfigMigrator {
             return false;
         }
 
-        // Remove legacy keys from main config
         String[] keysToRemove = {
                 "schedule-type",
-                // "check-time", // KEEP for snapshot!
                 "schedule-days-of-week",
                 "schedule-dates-of-month",
                 "inactive-days-to-deduct",
@@ -307,8 +426,7 @@ public class ConfigMigrator {
                 "only-offline-players",
                 "percentile-thresholds",
                 "tax-brackets",
-                "tax-exempt-permission" // Removed feature or moved to per-policy (not implemented yet, just remove
-                                        // legacy global)
+                "tax-exempt-permission"
         };
 
         for (String key : keysToRemove) {
@@ -319,79 +437,8 @@ public class ConfigMigrator {
     }
 
     /**
-     * Check and migrate language file if needed
-     * 
-     * @param langCode e.g., "en_US" or "zh_CN"
-     * @return true if migration occurred
-     */
-    public boolean migrateLanguageFile(String langCode) {
-        File langFile = new File(plugin.getDataFolder(), "lang" + File.separator + langCode + ".yml");
-
-        // If language file doesn't exist, let the plugin create it fresh
-        if (!langFile.exists()) {
-            return false;
-        }
-
-        FileConfiguration langConfig = YamlConfiguration.loadConfiguration(langFile);
-        int currentVersion = langConfig.getInt("lang-version", 1);
-
-        if (currentVersion >= CURRENT_LANG_VERSION) {
-            return false; // Already up to date
-        }
-
-        logger.info("Migrating language file '" + langCode + "' from version " + currentVersion + " to "
-                + CURRENT_LANG_VERSION);
-
-        // Create backup before migration
-        createBackup(langFile, "lang_" + langCode);
-
-        // Load default language file from jar
-        FileConfiguration defaultLang = loadDefaultLanguageFile(langCode);
-        if (defaultLang == null) {
-            logger.warning("Could not load default language file for migration: " + langCode);
-            return false;
-        }
-
-        // Merge new keys from default
-        mergeNewKeys(langConfig, defaultLang, "");
-
-        // Update version number
-        langConfig.set("lang-version", CURRENT_LANG_VERSION);
-
-        // Save migrated language file
-        try {
-            langConfig.save(langFile);
-            logger.info("Language file migration completed successfully: " + langCode);
-            return true;
-        } catch (IOException e) {
-            logger.severe("Failed to save migrated language file: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Create a timestamped backup of a file before migration
-     */
-    public void createBackup(File file, String prefix) {
-        if (!file.exists()) {
-            return;
-        }
-
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HHmmss");
-        String timestamp = sdf.format(new Date());
-        File backupFile = new File(file.getParent(), prefix + ".bak." + timestamp);
-
-        try {
-            Files.copy(file.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            logger.info("Created backup: " + backupFile.getName());
-        } catch (IOException e) {
-            logger.warning("Failed to create backup: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Recursively merge new keys from default config into existing config
-     * 
+     * Recursively merge new keys from default config into existing config.
+     *
      * @return true if any keys were added
      */
     private boolean mergeNewKeys(FileConfiguration existing, FileConfiguration defaults, String path) {
@@ -405,7 +452,6 @@ public class ConfigMigrator {
         for (String key : defaultSection.getKeys(false)) {
             String fullKey = path.isEmpty() ? key : path + "." + key;
 
-            // Skip version keys - they're handled separately
             if (key.equals("config-version") || key.equals("lang-version")) {
                 continue;
             }
@@ -413,57 +459,47 @@ public class ConfigMigrator {
             Object defaultValue = defaults.get(fullKey);
 
             if (!existing.contains(fullKey)) {
-                // Key doesn't exist in current config, add it
                 existing.set(fullKey, defaultValue);
                 logger.info("Added missing key: " + fullKey);
                 added = true;
             } else if (defaultValue instanceof ConfigurationSection) {
-                // Recursively check nested sections
                 added |= mergeNewKeys(existing, defaults, fullKey);
             }
-            // If key exists and is not a section, preserve the user's value
         }
 
         return added;
     }
 
     /**
-     * Load the default config.yml from the jar
+     * Load the default config.yml from the jar.
      */
     private FileConfiguration loadDefaultConfig() {
-        try (InputStream is = plugin.getResource("config.yml")) {
-            if (is == null) {
-                return null;
-            }
-            try (InputStreamReader reader = new InputStreamReader(is)) {
-                return YamlConfiguration.loadConfiguration(reader);
-            }
-        } catch (IOException e) {
-            logger.warning("Error loading default config: " + e.getMessage());
-            return null;
-        }
+        return loadDefaultResource("config.yml");
     }
 
     /**
-     * Load a default language file from the jar
+     * Load a default language file from the jar.
      */
     private FileConfiguration loadDefaultLanguageFile(String langCode) {
-        String resourcePath = "lang/" + langCode + ".yml";
+        return loadDefaultResource("lang/" + langCode + ".yml");
+    }
+
+    private FileConfiguration loadDefaultResource(String resourcePath) {
         try (InputStream is = plugin.getResource(resourcePath)) {
             if (is == null) {
                 return null;
             }
-            try (InputStreamReader reader = new InputStreamReader(is)) {
+            try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
                 return YamlConfiguration.loadConfiguration(reader);
             }
         } catch (IOException e) {
-            logger.warning("Error loading default language file: " + e.getMessage());
+            logger.warning("Error loading default resource " + resourcePath + ": " + e.getMessage());
             return null;
         }
     }
 
     /**
-     * Check if config migration is needed
+     * Check if config migration is needed.
      */
     public boolean isConfigMigrationNeeded() {
         File configFile = new File(plugin.getDataFolder(), "config.yml");
@@ -476,7 +512,7 @@ public class ConfigMigrator {
     }
 
     /**
-     * Check if language file migration is needed
+     * Check if language file migration is needed.
      */
     public boolean isLangMigrationNeeded(String langCode) {
         File langFile = new File(plugin.getDataFolder(), "lang" + File.separator + langCode + ".yml");
@@ -489,7 +525,7 @@ public class ConfigMigrator {
     }
 
     /**
-     * Get the current config version from file
+     * Get the current config version from file.
      */
     public int getCurrentConfigVersion() {
         File configFile = new File(plugin.getDataFolder(), "config.yml");
@@ -501,7 +537,7 @@ public class ConfigMigrator {
     }
 
     /**
-     * Get the current language file version
+     * Get the current language file version.
      */
     public int getCurrentLangVersion(String langCode) {
         File langFile = new File(plugin.getDataFolder(), "lang" + File.separator + langCode + ".yml");

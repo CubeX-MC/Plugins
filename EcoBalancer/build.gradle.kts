@@ -8,7 +8,13 @@ dependencies {
     compileOnly("dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT")
     compileOnly("net.milkbowl.vault:VaultAPI:1.7")
     implementation(project(":modules:cubex-core"))
+    implementation(project(":modules:cubex-config"))
+    implementation(project(":modules:cubex-i18n"))
     implementation(project(":modules:cubex-scheduler"))
+    implementation(platform("net.kyori:adventure-bom:4.25.0"))
+    implementation("net.kyori:adventure-api")
+    implementation("net.kyori:adventure-text-minimessage")
+    implementation("net.kyori:adventure-text-serializer-legacy")
     implementation("org.xerial:sqlite-jdbc:3.49.1.0")
     compileOnly(CubexDeps.placeholderApi)
     testImplementation(CubexDeps.junitJupiter)
@@ -17,6 +23,7 @@ dependencies {
 
 tasks.shadowJar {
     archiveBaseName.set("EcoBalancer")
+    relocate("net.kyori", "org.cubexmc.ecobalancer.libs.kyori")
     relocate("com.tcoded.folialib", "org.cubexmc.ecobalancer.libs.folialib")
 }
 

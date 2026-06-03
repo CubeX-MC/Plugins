@@ -1,4 +1,4 @@
-config-version: 4
+config-version: 5
 language: 'en_US' # 语言 # Language en_US, zh_CN
 info-on-login: true # 登录时显示用户信息 # Show user info on login
 file-logging: true # 是否将日志写入插件日志文件（最新日志位于 plugins/EcoBalancer/logs/latest.log）# Whether to write messages to plugin log file

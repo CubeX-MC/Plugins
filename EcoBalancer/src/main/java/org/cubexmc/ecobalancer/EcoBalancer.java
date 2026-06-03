@@ -11,7 +11,15 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.cubexmc.core.CubexPlugin;
+import org.cubexmc.config.MigrationException;
+import org.cubexmc.config.ResourceFiles;
 import org.cubexmc.ecobalancer.commands.*;
+import org.cubexmc.i18n.ColorMode;
+import org.cubexmc.i18n.I18nOptions;
+import org.cubexmc.i18n.I18nService;
+import org.cubexmc.i18n.I18nServices;
+import org.cubexmc.i18n.MissingKeyMode;
+import org.cubexmc.i18n.PlaceholderStyle;
 
 import java.io.FileOutputStream;
 import java.nio.file.Files;
@@ -53,9 +61,11 @@ public final class EcoBalancer extends CubexPlugin {
     private Logger fileLogger = Logger.getLogger("EcoBalancerFileLogger");
     private int recordRetentionDays;
     private FileConfiguration langConfig;
+    private I18nService i18n;
     private boolean taxAccount;
     private String taxAccountName;
     private String messagePrefix;
+    private String messagePrefixTemplate;
     private org.cubexmc.ecobalancer.gui.GuiManager guiManager;
     private org.cubexmc.ecobalancer.policies.PolicyManager policyManager;
     private TaxRunService taxRunService;
@@ -140,24 +150,27 @@ public final class EcoBalancer extends CubexPlugin {
             getLogger().log(Level.WARNING, "VaultUtils setup failed; continuing with core economy provider", t);
         }
 
-        // Run config migration before loading configuration
+        ResourceFiles resources = new ResourceFiles(this);
+        resources.saveIfMissing(Arrays.asList("config.yml", "lang/zh_CN.yml", "lang/en_US.yml"));
+        reloadConfig();
+
+        // Run config and language migrations before loading runtime configuration
         ConfigMigrator migrator = new ConfigMigrator(this);
-        if (migrator.migrateConfig()) {
-            getLogger().info("Configuration migrated to version " + ConfigMigrator.CURRENT_CONFIG_VERSION);
+        String lang = getConfig().getString("language", "en_US");
+        resources.saveIfMissing("lang/" + lang + ".yml");
+        try {
+            migrator.migrateStartupFilesOrThrow(lang);
+        } catch (MigrationException e) {
+            getLogger().log(Level.SEVERE, "EcoBalancer migration failed.", e);
+            abortEnable("EcoBalancer migration failed; refusing to start to protect existing data.");
         }
+        reloadConfig();
 
         // Initialize Policy Manager (Loads policies or creates default)
         policyManager = new org.cubexmc.ecobalancer.policies.PolicyManager(this);
         policyManager.initialize();
 
-        saveDefaultConfig(); // 保存默认配置
         loadConfiguration(); // 加载配置
-
-        // Migrate language files after config is loaded
-        String lang = getConfig().getString("language", "en_US");
-        if (migrator.migrateLanguageFile(lang)) {
-            getLogger().info("Language file '" + lang + "' migrated to version " + ConfigMigrator.CURRENT_LANG_VERSION);
-        }
 
         // 检查db，如果不存在则创建
         File dataFolder = getDataFolder();
@@ -295,7 +308,6 @@ public final class EcoBalancer extends CubexPlugin {
         SchedulerUtils.cancelAllTasks(this);
         // load language config
         loadLangFile();
-        messagePrefix = langConfig.getString("prefix", "&7[&6EcoBalancer&7]&r");
         // Update file logger state on reload
         updateFileLoggerFromConfig();
         recordRetentionDays = getConfig().getInt("record-retention-days", 30);
@@ -318,9 +330,24 @@ public final class EcoBalancer extends CubexPlugin {
             saveResource("lang" + File.separator + lang + ".yml", false);
         }
         langConfig = YamlConfiguration.loadConfiguration(langFile);
+        messagePrefixTemplate = langConfig.getString("prefix", "<gray>[<gold>EcoBalancer<gray>]<reset>");
+        messagePrefix = MessageUtils.renderMiniMessage(messagePrefixTemplate, null, "");
+        i18n = I18nServices.create(this, I18nOptions.create()
+                .currentLocale(lang)
+                .defaultLocale("en_US")
+                .fallbackLocales(Arrays.asList("zh_CN"))
+                .bundledLocales(Arrays.asList("en_US", "zh_CN"))
+                .prefixToken("<prefix>")
+                .placeholderStyles(EnumSet.of(PlaceholderStyle.MINIMESSAGE_TAG))
+                .colorMode(ColorMode.MINIMESSAGE)
+                .missingKeyMode(MissingKeyMode.RETURN_KEY));
+        i18n.reload();
     }
 
     public String getFormattedMessage(String path, Map<String, String> placeholders) {
+        if (i18n != null && (placeholders == null || placeholders.isEmpty()) && langConfig.getString(path) != null) {
+            return i18n.message(path);
+        }
         return MessageUtils.formatMessage(langConfig, path, placeholders, messagePrefix);
     }
 
