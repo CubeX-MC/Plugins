@@ -5,11 +5,12 @@ import org.incendo.cloud.annotations.Command;
 import org.incendo.cloud.annotations.Permission;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.cubexmc.config.MigrationException;
 import org.cubexmc.metro.Metro;
 import org.cubexmc.metro.manager.LineManager;
 import org.cubexmc.metro.manager.StopManager;
-import org.cubexmc.metro.update.ConfigUpdater;
 import org.cubexmc.metro.update.DataFileUpdater;
+import org.cubexmc.metro.update.MetroMigrations;
 import org.cubexmc.metro.util.OwnershipUtil;
 
 public class MetroMainCommand {
@@ -62,8 +63,16 @@ public class MetroMainCommand {
 
         plugin.flushPersistentData();
         plugin.ensureDefaultConfigs();
+        try {
+            MetroMigrations.migrateConfig(plugin);
+            MetroMigrations.ensureLanguageResources(plugin);
+            MetroMigrations.migrateBundledLanguages(plugin);
+        } catch (MigrationException ex) {
+            plugin.getLogger().warning("Failed to migrate Metro configuration during reload: " + ex.getMessage());
+            sender.sendMessage("§cMetro reload aborted: configuration migration failed.");
+            return;
+        }
         plugin.reloadConfig();
-        ConfigUpdater.applyDefaults(plugin, "config.yml");
         plugin.getConfigFacade().reload();
         DataFileUpdater.migrateAll(plugin);
         lineManager.reload();

@@ -34,8 +34,8 @@ import org.cubexmc.metro.persistence.SaveCoordinator;
 import org.cubexmc.metro.train.ScoreboardManager;
 import org.cubexmc.metro.train.TrainDisplayController;
 import org.cubexmc.metro.train.TrainMovementTask;
-import org.cubexmc.metro.update.ConfigUpdater;
 import org.cubexmc.metro.update.DataFileUpdater;
+import org.cubexmc.metro.update.MetroMigrations;
 import org.cubexmc.metro.util.MetroConstants;
 import org.cubexmc.metro.util.VersionUtil;
 
@@ -71,7 +71,7 @@ public final class Metro extends CubexPlugin {
     private BedrockCompatibility bedrockCompatibility;
 
     @Override
-    protected void enablePlugin() {
+    protected void enablePlugin() throws Exception {
         bindShutdownActions();
 
         // 创建配置目录
@@ -79,11 +79,10 @@ public final class Metro extends CubexPlugin {
             getDataFolder().mkdirs();
         }
 
-        // 初始化配置文件
-        saveDefaultConfig();
-
-        // 自动更新配置文件，添加新版本的配置项
-        ConfigUpdater.applyDefaults(this, "config.yml");
+        // 初始化并迁移配置文件
+        MetroMigrations.ensureConfigResources(this);
+        MetroMigrations.migrateConfig(this);
+        reloadConfig();
         this.configFacade = new ConfigFacade(this);
         this.configFacade.reload();
 
@@ -94,7 +93,9 @@ public final class Metro extends CubexPlugin {
         // 初始化 Bedrock 兼容 facade
         this.bedrockCompatibility = new BedrockCompatibility(this);
 
-        // 初始化语言管理器（内部会自动更新语言文件）
+        // 初始化并迁移语言文件
+        MetroMigrations.ensureLanguageResources(this);
+        MetroMigrations.migrateBundledLanguages(this);
         this.languageManager = new LanguageManager(this);
         this.saveCoordinator = new SaveCoordinator(getLogger(),
                 command -> org.cubexmc.metro.util.SchedulerUtil.asyncRun(this, command, 0L));
