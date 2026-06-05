@@ -5,7 +5,7 @@ import java.util.List;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.cubexmc.metro.Metro;
-import org.cubexmc.metro.util.ColorUtil;
+import org.cubexmc.metro.util.MetroTextRenderer;
 
 /**
  * Centralized read access and memory cache for plugin configuration values.
@@ -156,17 +156,17 @@ public class ConfigFacade {
         stopContinuousTitle = colorize(getStopContinuousString("title", "&b{stop_name}"));
         stopContinuousSubtitle = colorize(getStopContinuousString("subtitle",
                 "&d➔ {terminus_name} &8| &e» {next_stop_name} &8| &a⇄ {stop_transfers}"));
-        stopContinuousActionbar = getStopContinuousString("actionbar",
-                "&fNext train &e{eta_formatted} &7| &fRight-click rail to board &7[&r{line_color_code}{line}&7]");
+        stopContinuousActionbar = colorize(getStopContinuousString("actionbar",
+                "&fNext train &e{eta_formatted} &7| &fRight-click rail to board &7[&r{line_color_code}{line}&7]"));
         stopContinuousStartTitle = colorize(getStopContinuousString("start_stop.title", stopContinuousTitle));
         stopContinuousStartSubtitle = colorize(getStopContinuousString("start_stop.subtitle",
                 "&d➔ {terminus_name} &8| &fOrigin &8| &a⇄ {stop_transfers}"));
-        stopContinuousStartActionbar = getStopContinuousString("start_stop.actionbar", stopContinuousActionbar);
+        stopContinuousStartActionbar = colorize(getStopContinuousString("start_stop.actionbar", stopContinuousActionbar));
         stopContinuousEndTitle = colorize(getStopContinuousString("end_stop.title", stopContinuousTitle));
         stopContinuousEndSubtitle = colorize(getStopContinuousString("end_stop.subtitle",
                 "&c🛑 Terminal Station &8| &a⇄ {stop_transfers}"));
-        stopContinuousEndActionbar = getStopContinuousString("end_stop.actionbar",
-                "&cEnd of line. Please allow passengers to exit.");
+        stopContinuousEndActionbar = colorize(getStopContinuousString("end_stop.actionbar",
+                "&cEnd of line. Please allow passengers to exit."));
         stopContinuousFadeIn = getStopContinuousInt("fade_in", 10);
         stopContinuousStay = getStopContinuousInt("stay", 40);
         stopContinuousFadeOut = getStopContinuousInt("fade_out", 10);
@@ -189,19 +189,19 @@ public class ConfigFacade {
 
         // Departure
         departureTitleEnabled = plugin.getConfig().getBoolean("titles.departure.enabled", true);
-        departureTitle = plugin.getConfig().getString("titles.departure.title", "");
-        departureSubtitle = plugin.getConfig().getString("titles.departure.subtitle", "");
-        departureActionbar = plugin.getConfig().getString("titles.departure.actionbar", "列车已启动，请扶好站稳，注意安全");
+        departureTitle = colorize(plugin.getConfig().getString("titles.departure.title", ""));
+        departureSubtitle = colorize(plugin.getConfig().getString("titles.departure.subtitle", ""));
+        departureActionbar = colorize(plugin.getConfig().getString("titles.departure.actionbar", "列车已启动，请扶好站稳，注意安全"));
         departureFadeIn = plugin.getConfig().getInt("titles.departure.fade_in", 5);
         departureStay = plugin.getConfig().getInt("titles.departure.stay", 40);
         departureFadeOut = plugin.getConfig().getInt("titles.departure.fade_out", 5);
 
         // Waiting
         waitingTitleEnabled = plugin.getConfig().getBoolean("titles.waiting.enabled", true);
-        waitingTitle = plugin.getConfig().getString("titles.waiting.title", "列车即将发车");
-        waitingSubtitle = plugin.getConfig().getString("titles.waiting.subtitle",
-                "当前站点: &a{stop_name} | 下一站: &e{next_stop_name}");
-        waitingActionbar = plugin.getConfig().getString("titles.waiting.actionbar", "列车将在 &c{countdown} &f秒后发车");
+        waitingTitle = colorize(plugin.getConfig().getString("titles.waiting.title", "列车即将发车"));
+        waitingSubtitle = colorize(plugin.getConfig().getString("titles.waiting.subtitle",
+                "当前站点: &a{stop_name} | 下一站: &e{next_stop_name}"));
+        waitingActionbar = colorize(plugin.getConfig().getString("titles.waiting.actionbar", "列车将在 &c{countdown} &f秒后发车"));
 
         // Sounds
         departureSoundEnabled = plugin.getConfig().getBoolean("sounds.departure.enabled", true);
@@ -648,7 +648,7 @@ public class ConfigFacade {
     }
 
     private String colorize(String text) {
-        return ColorUtil.colorize(text);
+        return MetroTextRenderer.renderPreservingPlaceholders(text);
     }
 
     private boolean getStopContinuousBoolean(String key, boolean defaultValue) {

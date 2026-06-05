@@ -109,7 +109,7 @@ public class EntityModelListener implements Listener {
             String colorized = ChatColor.translateAlternateColorCodes('&', train.getLine().getColor());
             player.sendMessage(language.getMessage("passenger.boarded",
                     LanguageManager.put(LanguageManager.put(LanguageManager.args(),
-                            "color", colorized),
+                            "color_code", colorized),
                             "line_name", train.getLine().getName())));
         }
 

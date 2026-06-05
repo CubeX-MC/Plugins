@@ -186,7 +186,7 @@ final class LineCommandView {
         player.sendMessage(plugin.getLanguageManager().getMessage("line.info_name",
                 LanguageManager.put(LanguageManager.args(), "line_name", line.getName())));
         player.sendMessage(plugin.getLanguageManager().getMessage("line.info_color",
-                LanguageManager.put(LanguageManager.args(), "color", line.getColor())));
+                LanguageManager.put(LanguageManager.args(), "color_code", line.getColor())));
         player.sendMessage(plugin.getLanguageManager().getMessage("line.info_terminus",
                 LanguageManager.put(LanguageManager.args(), "terminus_name",
                         line.getTerminusName().isBlank()

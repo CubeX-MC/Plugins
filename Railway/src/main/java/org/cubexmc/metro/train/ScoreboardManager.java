@@ -11,6 +11,7 @@ import org.cubexmc.metro.manager.LineManager;
 import org.cubexmc.metro.manager.StopManager;
 import org.cubexmc.metro.model.Line;
 import org.cubexmc.metro.model.Stop;
+import org.cubexmc.metro.util.ColorUtil;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -115,7 +116,7 @@ public class ScoreboardManager {
         StopManager stopManager = plugin.getStopManager();
         LineManager lineManager = plugin.getLineManager();
 
-        LegacyComponentSerializer serializer = LegacyComponentSerializer.legacyAmpersand();
+        LegacyComponentSerializer serializer = LegacyComponentSerializer.legacySection();
         
         String styleCurrent = plugin.getConfigFacade().getSbStyleCurrent();
         String stylePassed = plugin.getConfigFacade().getSbStylePassed();
@@ -208,7 +209,7 @@ public class ScoreboardManager {
                 if (transferLineId.equals(currentLine.getId())) continue;
                 Line transferLine = lineManager.getLine(transferLineId);
                 if (transferLine != null) {
-                    transferInfo.append(transferLine.getColor()).append(lineSymbol).append(" ");
+                    transferInfo.append(ColorUtil.colorize(transferLine.getColor())).append(lineSymbol).append(" ");
                 }
             }
         }

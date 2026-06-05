@@ -49,7 +49,7 @@ public final class LineSettingsView {
                 .build());
         inv.setItem(GuiSlots.LINE_SETTINGS_COLOR, new ItemBuilder(GuiColors.getWoolByColor(line.getColor()))
                 .name(msg("gui.line_settings.set_color"))
-                .lore(msg("gui.line_settings.current_color", "color", line.getColor()),
+                .lore(msg("gui.line_settings.current_color", "color_code", line.getColor()),
                         msg("gui.line_settings.set_color_lore"))
                 .build());
 

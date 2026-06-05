@@ -138,7 +138,7 @@ public class LineCommand {
         if (status == LineCommandService.WriteStatus.SUCCESS) {
             player.sendMessage(plugin.getLanguageManager().getMessage("line.setcolor_success",
                     LanguageManager.put(LanguageManager.put(LanguageManager.put(LanguageManager.args(),
-                            "line_id", line.getId()), "line_name", line.getName()), "color", color)));
+                            "line_id", line.getId()), "line_name", line.getName()), "color_code", color)));
         } else {
             player.sendMessage(plugin.getLanguageManager().getMessage("line.setcolor_fail"));
         }

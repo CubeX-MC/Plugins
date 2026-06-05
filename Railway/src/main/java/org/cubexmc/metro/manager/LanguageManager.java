@@ -5,13 +5,21 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.cubexmc.metro.util.ColorUtil;
+import org.cubexmc.i18n.ColorMode;
+import org.cubexmc.i18n.I18nOptions;
+import org.cubexmc.i18n.I18nService;
+import org.cubexmc.i18n.I18nServices;
+import org.cubexmc.i18n.MissingKeyMode;
+import org.cubexmc.i18n.PlaceholderStyle;
 import org.cubexmc.metro.Metro;
 import org.cubexmc.metro.update.LanguageUpdater;
+import org.cubexmc.metro.update.MetroMigrations;
+import org.cubexmc.metro.util.MetroTextRenderer;
 
 /**
  * 管理多语言消息的类
@@ -19,6 +27,7 @@ import org.cubexmc.metro.update.LanguageUpdater;
 public class LanguageManager {
 
     private final Metro plugin;
+    private final I18nService i18n;
     private final Map<String, YamlConfiguration> languageFiles = new HashMap<>();
     private String defaultLanguage = "zh_CN";
     private String currentLanguage = "zh_CN";
@@ -30,6 +39,16 @@ public class LanguageManager {
      */
     public LanguageManager(Metro plugin) {
         this.plugin = plugin;
+        this.i18n = I18nServices.create(plugin, I18nOptions.create()
+                .languageDirectory("lang")
+                .currentLocale(() -> currentLanguage)
+                .defaultLocale(defaultLanguage)
+                .fallbackLocales(List.of("en_US", "zh_CN"))
+                .bundledLocales(MetroMigrations.BUNDLED_LANGUAGES)
+                .prefixToken("<prefix>")
+                .missingKeyMode(MissingKeyMode.RETURN_MISSING_MESSAGE_PREFIX)
+                .placeholderStyles(List.of(PlaceholderStyle.MINIMESSAGE_TAG, PlaceholderStyle.POSITIONAL_PERCENT_INDEX))
+                .colorMode(ColorMode.MINIMESSAGE));
         loadLanguages();
     }
 
@@ -55,7 +74,7 @@ public class LanguageManager {
         for (String lang : bundledLanguages) {
             saveDefaultLanguageFile(lang);
         }
-        
+
         // 加载语言目录下的所有yml文件
         File[] langFiles = langDir.listFiles((dir, name) -> name.endsWith(".yml"));
         if (langFiles != null) {
@@ -85,6 +104,8 @@ public class LanguageManager {
                 plugin.getLogger().log(Level.WARNING, "Failed to load default language: " + defaultLanguage, e);
             }
         }
+        i18n.setCurrentLocale(currentLanguage);
+        i18n.reload();
     }
 
     /**
@@ -95,12 +116,12 @@ public class LanguageManager {
     private void saveDefaultLanguageFile(String langCode) {
         File langFile = new File(plugin.getDataFolder(), "lang/" + langCode + ".yml");
         String resourcePath = "lang/" + langCode + ".yml";
-        
+
         if (!langFile.exists()) {
             // 首次运行，复制默认文件
             plugin.saveResource(resourcePath, false);
         } else {
-            // 文件已存在，合并新的语言键（不覆盖用户修改）
+            // 文件已存在，迁移到当前语言版本并合并缺失键（不覆盖用户修改）
             LanguageUpdater.merge(plugin, langFile, resourcePath);
         }
     }
@@ -123,22 +144,7 @@ public class LanguageManager {
      * @return 格式化后的消息
      */
     public String getMessage(String key, String langCode) {
-        // 尝试从指定语言获取消息
-        YamlConfiguration langConfig = languageFiles.get(langCode);
-        
-        // 如果找不到指定语言或该语言中没有这个键，则尝试从默认语言获取
-        if (langConfig == null || !langConfig.contains(key)) {
-            langConfig = languageFiles.get(defaultLanguage);
-        }
-        
-        // 如果默认语言也没有，则返回键名作为后备
-        if (langConfig == null || !langConfig.contains(key)) {
-            return "Missing message: " + key;
-        }
-        
-        // 获取消息并替换颜色代码
-        String message = langConfig.getString(key);
-        return ColorUtil.colorize(message);
+        return MetroTextRenderer.renderPreservingPlaceholders(rawMessage(key, langCode));
     }
 
     /**
@@ -149,11 +155,12 @@ public class LanguageManager {
      * @return 格式化后的消息
      */
     public String getMessage(String key, Object... args) {
-        String message = getMessage(key);
+        String message = rawMessage(key, currentLanguage);
+        Map<String, Object> positional = new HashMap<>();
         for (int i = 0; i < args.length; i++) {
-            message = message.replace("%" + (i + 1), String.valueOf(args[i]));
+            positional.put("arg" + (i + 1), args[i]);
         }
-        return message;
+        return MetroTextRenderer.render(message, positional);
     }
 
     /**
@@ -164,13 +171,7 @@ public class LanguageManager {
      * @return 格式化后的消息
      */
     public String getMessage(String key, Map<String, Object> namedArgs) {
-        String message = getMessage(key);
-        if (namedArgs != null) {
-            for (Map.Entry<String, Object> entry : namedArgs.entrySet()) {
-                message = message.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
-            }
-        }
-        return message;
+        return MetroTextRenderer.render(rawMessage(key, currentLanguage), namedArgs);
     }
 
     /**
@@ -194,4 +195,15 @@ public class LanguageManager {
         args.put(key, value);
         return args;
     }
-} 
+
+    private String rawMessage(String key, String langCode) {
+        YamlConfiguration langConfig = languageFiles.get(langCode);
+        if (langConfig == null || !langConfig.contains(key)) {
+            langConfig = languageFiles.get(defaultLanguage);
+        }
+        if (langConfig != null && langConfig.contains(key)) {
+            return langConfig.getString(key, "");
+        }
+        return "Missing message: " + key;
+    }
+}

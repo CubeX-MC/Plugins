@@ -262,7 +262,7 @@ public final class LineSettingsController {
                                     LanguageManager.put(LanguageManager.args(), "color", color)));
                         } else if (status == LineCommandService.WriteStatus.SUCCESS) {
                             player.sendMessage(plugin.getLanguageManager().getMessage("line.setcolor_success",
-                                    args("line_id", lineId, "line_name", currentLine.getName(), "color", color)));
+                                    args("line_id", lineId, "line_name", currentLine.getName(), "color_code", color)));
                         } else {
                             player.sendMessage(plugin.getLanguageManager().getMessage("line.setcolor_fail"));
                         }

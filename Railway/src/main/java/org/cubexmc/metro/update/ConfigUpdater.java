@@ -9,6 +9,8 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.cubexmc.config.MigrationException;
+import org.cubexmc.metro.Metro;
 
 /**
  * 配置文件更新工具类
@@ -27,24 +29,15 @@ public final class ConfigUpdater {
      * @param resourcePath 资源文件路径（如 "config.yml"）
      */
     public static void applyDefaults(JavaPlugin plugin, String resourcePath) {
-        try (InputStream in = plugin.getResource(resourcePath)) {
-            if (in == null) {
-                plugin.getLogger().warning("Default resource not found: " + resourcePath);
-                return;
+        if (plugin instanceof Metro metro && "config.yml".equals(resourcePath)) {
+            try {
+                MetroMigrations.migrateConfig(metro);
+            } catch (MigrationException ex) {
+                throw new IllegalStateException("Failed to migrate Railway config", ex);
             }
-            boolean migratedLegacyEnterStop = migrateLegacyEnterStop(plugin.getConfig());
-            YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
-                    new InputStreamReader(in, StandardCharsets.UTF_8));
-            plugin.getConfig().addDefaults(defaults);
-            plugin.getConfig().options().copyDefaults(true);
-            plugin.saveConfig();
-            if (migratedLegacyEnterStop) {
-                plugin.getLogger().info("Migrated legacy titles.enter_stop settings to titles.stop_continuous.");
-            }
-            plugin.getLogger().info("Config updated with new default values from " + resourcePath);
-        } catch (Exception ex) {
-            plugin.getLogger().warning("Failed to apply default config values from " + resourcePath + ": " + ex.getMessage());
+            return;
         }
+        plugin.getLogger().warning("Unsupported config migration resource: " + resourcePath);
     }
 
     /**

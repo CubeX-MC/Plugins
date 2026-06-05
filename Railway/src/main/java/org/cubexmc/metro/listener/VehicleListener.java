@@ -91,7 +91,7 @@ public class VehicleListener implements Listener {
         String colorized = ChatColor.translateAlternateColorCodes('&', line.getColor());
         player.sendMessage(plugin.getLanguageManager().getMessage("passenger.boarded",
                 LanguageManager.put(LanguageManager.put(LanguageManager.args(),
-                        "color", colorized), "line_name", line.getName())));
+                        "color_code", colorized), "line_name", line.getName())));
     }
 
     /**
