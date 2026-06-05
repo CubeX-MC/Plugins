@@ -1,0 +1,24 @@
+name: Clarity
+version: '${version}'
+main: org.cubexmc.clarity.ClarityPlugin
+api-version: '1.21'
+author: CubeX
+description: Scan and purge orphaned player state and item metadata left by removed plugins.
+commands:
+  clarity:
+    description: Scan or purge player state and item metadata on target player(s).
+    usage: |-
+      /clarity player scan <player|@selector>
+      /clarity player sweep <player|@selector>
+      /clarity player purge <player|@selector> attr <namespace|id>
+      /clarity player purge <player|@selector> effect <type|all-infinite>
+      /clarity item scan <player|@selector> [hand|inventory|equipment|ender|all]
+      /clarity item sweep <player|@selector> [hand|inventory|equipment|ender|all]
+      /clarity item purge <player|@selector> [hand|inventory|equipment|ender|all] leveltools
+      /clarity reload
+    aliases: [clar, clarify]
+    permission: clarity.use
+permissions:
+  clarity.use:
+    description: Allows using Clarity.
+    default: op

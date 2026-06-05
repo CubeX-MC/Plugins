@@ -1,0 +1,60 @@
+# ============================================================
+# Clarity
+# 清理遗留在玩家身上的 attribute modifier / 药水效果,以及道具上的插件残留元数据。
+# 典型用途:某个会改属性的插件(如 Adapt)卸载后,它写进玩家 NBT 的
+# AttributeModifier 成了"幽灵"——/effect clear 和 base 重置都碰不到;
+# 或者 LevelTools 卸载后,工具上还留着等级 lore / PDC 数据。
+#
+# 安全原则:
+#   1. 只清你显式点名(黑名单)的东西,绝不动 minecraft 命名空间。
+#   2. 默认全部关闭 + dry-run。启用前先用 scan 看清楚要清什么。
+# ============================================================
+
+# 玩家进服时按下面的黑名单自动检查并清理。默认关闭。
+auto-clean-on-join: false
+
+# 干跑:只在控制台记录"会清什么",不实际修改。
+# 强烈建议先开着观察几天,确认命中的都是该清的,再关掉真正执行。
+dry-run: true
+
+# 进服后延迟多少 tick 再检查(给其它插件留出加载时间,>=1)。
+join-delay-ticks: 40
+
+attributes:
+  # 只清命名空间或精确 id 命中下列项的 modifier(大小写不敏感;支持前缀匹配)。
+  # 例:卸载 Adapt 后想清掉它残留的 modifier,填它的命名空间即可。
+  # 先用 /clarity player scan 看输出里 modifier 的实际 id,再往这里填。
+  remove-modifier-ids:
+    - "adapt"
+
+effects:
+  # 只清类型命中下列项的药水效果(用类型名,如 SPEED / minecraft:speed)。
+  remove-types: []
+  # true = 只清"无限/超长时长"的效果(避免误删玩家自己喝的有限时长药水)。
+  infinite-only: true
+
+items:
+  leveltools:
+    # sweep/scan 是否检查 LevelTools 道具残留。purge leveltools 会强制走这组规则。
+    enabled: true
+    # LevelTools 现代版本写进 ItemMeta PersistentDataContainer 的 key。
+    # 匹配大小写不敏感;老版本若写的是原始 NBT 根键,Clarity 暂不解析二进制 NBT。
+    remove-pdc-keys:
+      - "leveltools:leveltoolslevel"
+      - "leveltools:leveltoolsxp"
+      - "leveltools:leveltoolsreward"
+    # 移除 LevelTools 自己标记的 lore 行。LevelTools 会用 "§§" 前缀,显示/反色后可识别为 "&&"。
+    remove-lore: true
+    # true = 对带 LevelTools 标记(PDC 或 lore)的物品,移除全部 item attribute modifiers。
+    # 如果你的 LevelTools 奖励曾经给工具加异常属性,可先 dry-run 观察,再开启。
+    remove-attributes-on-marked-items: false
+
+  attributes:
+    # 清理道具自身 ItemMeta 上命中下列 id/命名空间的 attribute modifier。
+    # 与玩家 attribute 一样,永远不按 minecraft 整个命名空间批量命中。
+    remove-modifier-ids: []
+    # 清理 amount 绝对值超过阈值的道具 attribute modifier。格式: "<attribute-key>=<max>"
+    # 例:
+    #   - "minecraft:generic.attack_damage=100.0"
+    #   - "generic.movement_speed=1.0"
+    max-amounts: []
