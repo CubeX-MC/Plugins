@@ -66,6 +66,7 @@ jobs:
           - RuleGems
           - Metro
           - Railway
+          - Clarity
 
     steps:
       - name: Checkout
