@@ -1,4 +1,4 @@
-plugins { id("cubex-plugin") }
+plugins { id("cubex-kotlin-plugin") }
 
 version = "0.1.0"
 description = "BookLite"
