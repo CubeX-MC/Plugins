@@ -2,11 +2,15 @@
 .gradle/
 .gradle-verification/
 **/build/
+# IDE/Eclipse 编译输出
+**/bin/
 # 保留 wrapper jar(必须提交,否则别人无法用 ./gradlew 构建)
 !gradle/wrapper/gradle-wrapper.jar
 
 # —— run-paper 本地测试服残留 ——
 **/run/
+# RuleGems dev-run 数据残留(误生成在源码目录)
+RuleGems/cubex_config/
 
 # —— 旧 Maven 产物(第1阶段迁移期间各插件可能仍有 target/)——
 **/target/
