@@ -68,6 +68,13 @@ public final class Contract {
     public static Contract createService(UUID ownerUuid, String ownerName, String title, String description,
                                          BigDecimal reward, BigDecimal creationFee, BigDecimal commissionPercent,
                                          long now, long expiresAt) {
+        return createService(UUID.randomUUID().toString(), ownerUuid, ownerName, title, description,
+            reward, creationFee, commissionPercent, now, expiresAt);
+    }
+
+    public static Contract createService(String id, UUID ownerUuid, String ownerName, String title, String description,
+                                         BigDecimal reward, BigDecimal creationFee, BigDecimal commissionPercent,
+                                         long now, long expiresAt) {
         Participant owner = new Participant(ParticipantRole.OWNER, ownerUuid, ownerName,
             List.of(Asset.money(reward)));
         Participant contractor = new Participant(ParticipantRole.CONTRACTOR, null, null,
@@ -84,7 +91,7 @@ public final class Contract {
             PayoutRecipient.participant(ParticipantRole.OWNER), new BigDecimal("100")));
 
         Contract contract = new Contract(
-            UUID.randomUUID().toString(),
+            id,
             ContractType.SERVICE,
             title,
             description,
@@ -112,6 +119,16 @@ public final class Contract {
      * winner takes both stakes minus commission.
      */
     public static Contract createWager(UUID partyAUuid, String partyAName,
+                                       UUID partyBUuid, String partyBName,
+                                       UUID arbiterUuid, String arbiterName,
+                                       String title, String description,
+                                       BigDecimal stake, BigDecimal commissionPercent,
+                                       long now, long expiresAt) {
+        return createWager(UUID.randomUUID().toString(), partyAUuid, partyAName, partyBUuid, partyBName,
+            arbiterUuid, arbiterName, title, description, stake, commissionPercent, now, expiresAt);
+    }
+
+    public static Contract createWager(String id, UUID partyAUuid, String partyAName,
                                        UUID partyBUuid, String partyBName,
                                        UUID arbiterUuid, String arbiterName,
                                        String title, String description,
@@ -157,7 +174,7 @@ public final class Contract {
             ParticipantRole.PARTY_A, PayoutRecipient.participant(ParticipantRole.PARTY_A), new BigDecimal("100")));
 
         Contract contract = new Contract(
-            UUID.randomUUID().toString(),
+            id,
             ContractType.WAGER,
             title,
             description,
@@ -186,6 +203,16 @@ public final class Contract {
      * minus commission. No violator judgement in v1 — disputed cancels go to admin arbitration.
      */
     public static Contract createPartnership(UUID creatorUuid, String creatorName,
+                                             UUID partnerUuid, String partnerName,
+                                             BigDecimal stakeA, BigDecimal stakeB,
+                                             BigDecimal commissionPercent,
+                                             String title, String description,
+                                             long now, long expiresAt) {
+        return createPartnership(UUID.randomUUID().toString(), creatorUuid, creatorName, partnerUuid, partnerName,
+            stakeA, stakeB, commissionPercent, title, description, now, expiresAt);
+    }
+
+    public static Contract createPartnership(String id, UUID creatorUuid, String creatorName,
                                              UUID partnerUuid, String partnerName,
                                              BigDecimal stakeA, BigDecimal stakeB,
                                              BigDecimal commissionPercent,
@@ -231,7 +258,7 @@ public final class Contract {
             ParticipantRole.PARTY_B, PayoutRecipient.participant(ParticipantRole.PARTY_B), new BigDecimal("100")));
 
         Contract contract = new Contract(
-            UUID.randomUUID().toString(),
+            id,
             ContractType.PARTNERSHIP,
             title,
             description,

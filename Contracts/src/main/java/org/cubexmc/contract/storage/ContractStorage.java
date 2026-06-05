@@ -2,6 +2,7 @@ package org.cubexmc.contract.storage;
 
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.cubexmc.contract.ContractPlugin;
 import org.cubexmc.contract.model.Asset;
@@ -19,6 +20,10 @@ import org.cubexmc.contract.model.ResolutionRule;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -28,16 +33,25 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 public final class ContractStorage {
-    private final ContractPlugin plugin;
     private final File file;
+    private final File backupFile;
+    private final File dataFolder;
+    private final Logger logger;
     private final Map<String, Contract> contracts = new LinkedHashMap<>();
     private volatile boolean dirty = false;
 
     public ContractStorage(ContractPlugin plugin) {
-        this.plugin = plugin;
-        this.file = new File(plugin.getDataFolder(), "contract.yml");
+        this(new File(plugin.getDataFolder(), "contract.yml"), plugin.getLogger());
+    }
+
+    ContractStorage(File file, Logger logger) {
+        this.file = file;
+        this.backupFile = new File(file.getParentFile(), file.getName() + ".bak");
+        this.dataFolder = file.getParentFile();
+        this.logger = logger;
     }
 
     public void markDirty() {
@@ -56,14 +70,48 @@ public final class ContractStorage {
     }
 
     public void load() {
+        // Read into a temp map first so a failed/recovered load never leaves the live map half-populated.
+        Map<String, Contract> loaded = readContracts();
         contracts.clear();
+        contracts.putAll(loaded);
+    }
+
+    private Map<String, Contract> readContracts() {
         if (!file.exists()) {
-            return;
+            return new LinkedHashMap<>();
         }
-        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        try {
+            return parseContracts(loadStrict(file));
+        } catch (Exception primary) {
+            logger.severe("contract.yml is unreadable: " + primary.getMessage());
+            if (backupFile.exists()) {
+                try {
+                    Map<String, Contract> recovered = parseContracts(loadStrict(backupFile));
+                    logger.warning("Recovered " + recovered.size() + " contracts from " + backupFile.getName() + ".");
+                    return recovered;
+                } catch (Exception backup) {
+                    logger.severe("Backup " + backupFile.getName() + " is also unreadable: " + backup.getMessage());
+                }
+            }
+            // Refusing to start empty protects escrowed funds: an empty map would be flushed over the only
+            // copy of the data and orphan every player's withdrawn money. Force the admin to restore a backup.
+            throw new IllegalStateException(
+                "contract.yml and its backup are both unreadable; refusing to start with an empty contract set.",
+                primary);
+        }
+    }
+
+    private YamlConfiguration loadStrict(File source) throws IOException, InvalidConfigurationException {
+        YamlConfiguration yaml = new YamlConfiguration();
+        yaml.load(source);
+        return yaml;
+    }
+
+    private Map<String, Contract> parseContracts(YamlConfiguration yaml) {
+        Map<String, Contract> result = new LinkedHashMap<>();
         ConfigurationSection root = yaml.getConfigurationSection("contracts");
         if (root == null) {
-            return;
+            return result;
         }
         for (String id : root.getKeys(false)) {
             ConfigurationSection section = root.getConfigurationSection(id);
@@ -72,24 +120,52 @@ public final class ContractStorage {
             }
             try {
                 Contract contract = readContract(id, section);
-                contracts.put(contract.id(), contract);
+                result.put(contract.id(), contract);
             } catch (RuntimeException ex) {
-                plugin.getLogger().warning("Skipping malformed contract " + id + ": " + ex.getMessage());
+                logger.warning("Skipping malformed contract " + id + ": " + ex.getMessage());
             }
         }
+        return result;
     }
 
     public void save() throws IOException {
-        if (!plugin.getDataFolder().exists()) {
-            plugin.getDataFolder().mkdirs();
+        if (dataFolder != null && !dataFolder.exists()) {
+            dataFolder.mkdirs();
         }
         YamlConfiguration yaml = new YamlConfiguration();
         ConfigurationSection root = yaml.createSection("contracts");
         for (Contract contract : contracts.values()) {
             writeContract(root.createSection(contract.id()), contract);
         }
-        yaml.save(file);
+        saveAtomically(yaml);
         dirty = false;
+    }
+
+    /**
+     * Persist the financial database crash-safely: serialize to a temp file, roll the previous good file
+     * into {@code contract.yml.bak}, then atomically swap the temp file in. A crash mid-write can therefore
+     * never truncate {@code contract.yml} and orphan escrowed funds.
+     */
+    private void saveAtomically(YamlConfiguration yaml) throws IOException {
+        Path target = file.toPath();
+        Path dir = target.getParent();
+        if (dir != null) {
+            Files.createDirectories(dir);
+        }
+        Path temp = Files.createTempFile(dir, "contract", ".tmp");
+        try {
+            yaml.save(temp.toFile());
+            if (Files.exists(target)) {
+                Files.copy(target, backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            try {
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temp);
+        }
     }
 
     public void put(Contract contract) {
@@ -330,8 +406,13 @@ public final class ContractStorage {
         if (uuid == null) {
             return fallback;
         }
-        String current = Bukkit.getOfflinePlayer(uuid).getName();
-        return current != null ? current : fallback;
+        try {
+            String current = Bukkit.getOfflinePlayer(uuid).getName();
+            return current != null ? current : fallback;
+        } catch (Throwable t) {
+            // Bukkit not initialized (unit tests) or a name lookup failure — keep the stored name.
+            return fallback;
+        }
     }
 
     private UUID uuidOrNull(String value) {

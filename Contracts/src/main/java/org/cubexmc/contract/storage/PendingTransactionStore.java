@@ -26,6 +26,16 @@ public final class PendingTransactionStore {
     }
 
     public String beginWithdraw(UUID playerUuid, BigDecimal amount, String purpose) throws IOException {
+        return beginWithdraw(playerUuid, amount, purpose, null);
+    }
+
+    /**
+     * Records a write-ahead withdraw intent. The {@code contractId} lets crash recovery correlate the
+     * withdraw with the contract it was meant to fund, so a withdraw that already became escrow is not
+     * refunded a second time on restart.
+     */
+    public String beginWithdraw(UUID playerUuid, BigDecimal amount, String purpose, String contractId)
+            throws IOException {
         String id = UUID.randomUUID().toString();
         YamlConfiguration yaml = loadYaml();
         ConfigurationSection section = yaml.createSection("pending." + id);
@@ -33,6 +43,9 @@ public final class PendingTransactionStore {
         section.set("player-uuid", playerUuid.toString());
         section.set("amount", amount.toPlainString());
         section.set("purpose", purpose);
+        if (contractId != null && !contractId.isBlank()) {
+            section.set("contract-id", contractId);
+        }
         section.set("created-at", System.currentTimeMillis());
         yaml.save(file);
         return id;

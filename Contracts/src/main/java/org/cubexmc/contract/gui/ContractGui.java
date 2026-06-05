@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class ContractGui implements Listener {
@@ -64,8 +65,10 @@ public final class ContractGui implements Listener {
 
     private final ContractPlugin plugin;
     private final Map<UUID, Session> sessions = new HashMap<>();
-    private final Map<UUID, DisputePrompt> disputePrompts = new HashMap<>();
-    private final Map<UUID, DescriptionPrompt> descriptionPrompts = new HashMap<>();
+    // disputePrompts/descriptionPrompts are read and mutated from the async chat thread (onChat) as well as the
+    // main thread, so they must be concurrent. The rest are main-thread only.
+    private final Map<UUID, DisputePrompt> disputePrompts = new ConcurrentHashMap<>();
+    private final Map<UUID, DescriptionPrompt> descriptionPrompts = new ConcurrentHashMap<>();
     private final Map<UUID, CreateDraft> drafts = new HashMap<>();
     private final Set<UUID> anvilSuppressReopen = new HashSet<>();
 
@@ -1053,7 +1056,8 @@ public final class ContractGui implements Listener {
     private static Double parsePositive(String text) {
         try {
             double value = Double.parseDouble(text);
-            return value > 0 ? value : null;
+            // Must be positive AND finite — Infinity passes "> 0" but later crashes BigDecimal.valueOf.
+            return value > 0 && Double.isFinite(value) ? value : null;
         } catch (NumberFormatException ex) {
             return null;
         }

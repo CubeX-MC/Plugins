@@ -54,6 +54,23 @@ class PendingTransactionStoreTest {
         assertNull(settlement.playerUuid());
     }
 
+    @Test
+    void withdrawCarriesContractIdForRecovery() throws Exception {
+        PendingTransactionStore store = new PendingTransactionStore(
+            tempDir.resolve("pending-transactions.yml").toFile(),
+            Logger.getAnonymousLogger()
+        );
+        UUID player = UUID.randomUUID();
+
+        String id = store.beginWithdraw(player, new BigDecimal("250.00"), "contract-create", "contract-xyz");
+
+        PendingTransactionStore.PendingEntry entry = find(store.loadAll(), id);
+        assertEquals(PendingTransactionStore.PendingType.WITHDRAW, entry.type());
+        assertEquals(player, entry.playerUuid());
+        assertEquals(new BigDecimal("250.00"), entry.amount());
+        assertEquals("contract-xyz", entry.contractId());
+    }
+
     private PendingTransactionStore.PendingEntry find(List<PendingTransactionStore.PendingEntry> entries, String id) {
         return entries.stream()
             .filter(entry -> entry.id().equals(id))

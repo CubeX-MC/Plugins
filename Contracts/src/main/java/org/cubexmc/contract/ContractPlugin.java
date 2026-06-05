@@ -97,6 +97,17 @@ public final class ContractPlugin extends CubexPlugin {
         if (contractGui != null) {
             contractGui.closeSessions();
         }
+        // Persist pending in-memory changes before re-reading from disk; otherwise an admin reload within the
+        // flush window would silently discard recent accepts/disputes/submissions. Only re-read if the flush
+        // succeeded, so an I/O failure can never trade away unsaved state.
+        boolean canReloadData = true;
+        try {
+            contractStorage.flushIfDirty();
+        } catch (IOException ex) {
+            canReloadData = false;
+            getLogger().warning("Reload: could not flush contracts; keeping in-memory state and skipping data"
+                + " reload. " + ex.getMessage());
+        }
         saveDefaultFiles();
         try {
             migrateConfigAndLang();
@@ -106,7 +117,14 @@ public final class ContractPlugin extends CubexPlugin {
         }
         reloadConfig();
         languageManager.load();
-        contractStorage.load();
+        if (canReloadData) {
+            try {
+                contractStorage.load();
+            } catch (RuntimeException ex) {
+                getLogger().severe("Reload: contract data unreadable (" + ex.getMessage()
+                    + "); keeping current in-memory contracts.");
+            }
+        }
     }
 
     public LanguageManager lang() {

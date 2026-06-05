@@ -4,7 +4,10 @@ main: org.cubexmc.contract.ContractPlugin
 api-version: '1.18'
 author: CubeX-MC
 description: Player-to-player contract board with Vault-backed escrow.
+# Vault is required for the economy API; soft-depend on common providers so Contract enables AFTER the
+# economy is registered (otherwise a load-order race can disable Contract until a manual reload).
 depend: [Vault]
+softdepend: [Essentials, CMI, EssentialsX]
 
 commands:
   contract:

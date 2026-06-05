@@ -50,6 +50,9 @@ public final class ContractService {
 
     public ServiceResult create(Player owner, double rewardDouble, int hours, String title, String description,
                                 String mediatorName) {
+        if (!Double.isFinite(rewardDouble)) {
+            return ServiceResult.fail("奖金必须是有效数字");
+        }
         String cleanTitle = Text.stripControl(title);
         if (cleanTitle.isBlank()) {
             return ServiceResult.fail("标题不能为空");
@@ -98,9 +101,10 @@ public final class ContractService {
             return ServiceResult.fail("余额不足，需要 " + economy.format(totalCost));
         }
 
+        String contractId = UUID.randomUUID().toString();
         String pendingId;
         try {
-            pendingId = pending.beginWithdraw(owner.getUniqueId(), totalCost, "contract-create");
+            pendingId = pending.beginWithdraw(owner.getUniqueId(), totalCost, "contract-create", contractId);
         } catch (IOException ex) {
             return ServiceResult.fail("无法写入待办事务日志: " + ex.getMessage());
         }
@@ -116,6 +120,7 @@ public final class ContractService {
         BigDecimal commissionPercent = clampCommissionPercent(
             plugin.getConfig().getDouble("economy.completion-commission-percent", 5.0));
         Contract contract = Contract.createService(
+            contractId,
             owner.getUniqueId(),
             owner.getName(),
             cleanTitle,
@@ -133,8 +138,7 @@ public final class ContractService {
             storage.save();
         } catch (IOException ex) {
             storage.remove(contract.id());
-            economy.deposit(owner.getUniqueId(), totalCost);
-            tryClearPending(pendingId);
+            refundOrKeepPending(owner.getUniqueId(), totalCost, pendingId);
             return ServiceResult.fail("保存失败，已退回扣款: " + ex.getMessage());
         }
 
@@ -209,14 +213,64 @@ public final class ContractService {
             plugin.getLogger().warning("Cannot recover pending withdraw " + entry.id() + " without player uuid.");
             return;
         }
-        EconomyService.TransactionResult refund = economy.deposit(entry.playerUuid(), entry.amount());
-        if (!refund.success()) {
-            plugin.getLogger().warning("Failed to recover pending withdraw " + entry.id() + ": " + refund.reason());
+        String contractId = entry.contractId();
+        boolean refund;
+        if (contractId == null || contractId.isBlank()) {
+            // Legacy entry written before withdraws carried a contract id: cannot correlate, refund conservatively.
+            refund = true;
+        } else {
+            ContractStatus status = storage.findById(contractId).map(Contract::status).orElse(null);
+            refund = shouldRefundOrphanWithdraw(entry.purpose(), status);
+        }
+        if (!refund) {
+            plugin.getLogger().warning("Pending withdraw " + entry.id() + " (" + entry.purpose()
+                + ") already became escrow for contract " + contractId + "; clearing without refund.");
+            tryClearPending(entry.id());
+            return;
+        }
+        EconomyService.TransactionResult result = economy.deposit(entry.playerUuid(), entry.amount());
+        if (!result.success()) {
+            plugin.getLogger().warning("Failed to recover pending withdraw " + entry.id() + ": " + result.reason());
             return;
         }
         plugin.getLogger().warning("Recovered orphan pending withdraw " + entry.id()
             + " (" + entry.purpose() + ") refunded " + entry.amount() + " to " + entry.playerUuid());
         tryClearPending(entry.id());
+    }
+
+    /**
+     * Decide whether a lingering write-ahead withdraw must be refunded on restart. Money was already taken
+     * when the WAL entry was written, so we refund only when the operation provably did NOT persist. A
+     * withdraw that already became escrow (its contract exists / acceptance landed) is never double-refunded.
+     *
+     * <p>Note: a crash in the microsecond window between writing the WAL entry and the economy withdraw
+     * itself still leaves an entry with no contract; we then refund money that was never taken. That residual
+     * window is acceptable — erring toward refund cannot lose player money, only the rarer over-credit.
+     */
+    static boolean shouldRefundOrphanWithdraw(String purpose, ContractStatus contractStatusOrNull) {
+        if (contractStatusOrNull == null) {
+            return true;
+        }
+        if (purpose != null && purpose.endsWith("-accept")) {
+            // Counterparty stake only "lands" once acceptance advanced the contract past PENDING_ACCEPT.
+            return contractStatusOrNull == ContractStatus.PENDING_ACCEPT;
+        }
+        // *-create purposes: the contract exists, so creation persisted and the money is rightfully escrowed.
+        return false;
+    }
+
+    /**
+     * Refund after a failed persist. Clears the write-ahead entry only if the refund actually succeeded;
+     * otherwise the entry is kept so crash recovery can retry, instead of silently losing player money.
+     */
+    private void refundOrKeepPending(UUID playerUuid, BigDecimal amount, String pendingId) {
+        EconomyService.TransactionResult refund = economy.deposit(playerUuid, amount);
+        if (refund.success()) {
+            tryClearPending(pendingId);
+            return;
+        }
+        plugin.getLogger().severe("Refund of " + amount + " to " + playerUuid + " failed ("
+            + refund.reason() + "); keeping pending transaction " + pendingId + " for crash recovery.");
     }
 
     private void recoverInterruptedSettlement(PendingTransactionStore.PendingEntry entry) {
@@ -308,7 +362,7 @@ public final class ContractService {
 
         String pendingId;
         try {
-            pendingId = pending.beginWithdraw(player.getUniqueId(), stake, "wager-accept");
+            pendingId = pending.beginWithdraw(player.getUniqueId(), stake, "wager-accept", contract.id());
         } catch (IOException ex) {
             return ServiceResult.fail("无法写入待办事务日志: " + ex.getMessage());
         }
@@ -328,8 +382,9 @@ public final class ContractService {
 
         ServiceResult result = saveSync(contract, stake);
         if (!result.success()) {
-            economy.deposit(player.getUniqueId(), stake);
-            tryClearPending(pendingId);
+            contract.status(ContractStatus.PENDING_ACCEPT);
+            contract.acceptedAt(null);
+            refundOrKeepPending(player.getUniqueId(), stake, pendingId);
             return result;
         }
         tryClearPending(pendingId);
@@ -352,7 +407,7 @@ public final class ContractService {
 
         String pendingId;
         try {
-            pendingId = pending.beginWithdraw(player.getUniqueId(), stake, "partnership-accept");
+            pendingId = pending.beginWithdraw(player.getUniqueId(), stake, "partnership-accept", contract.id());
         } catch (IOException ex) {
             return ServiceResult.fail("无法写入待办事务日志: " + ex.getMessage());
         }
@@ -372,8 +427,9 @@ public final class ContractService {
 
         ServiceResult result = saveSync(contract, stake);
         if (!result.success()) {
-            economy.deposit(player.getUniqueId(), stake);
-            tryClearPending(pendingId);
+            contract.status(ContractStatus.PENDING_ACCEPT);
+            contract.acceptedAt(null);
+            refundOrKeepPending(player.getUniqueId(), stake, pendingId);
             return result;
         }
         tryClearPending(pendingId);
@@ -431,9 +487,10 @@ public final class ContractService {
             return ServiceResult.fail("余额不足,需要 " + economy.format(normA));
         }
 
+        String contractId = UUID.randomUUID().toString();
         String pendingId;
         try {
-            pendingId = pending.beginWithdraw(creator.getUniqueId(), normA, "partnership-create");
+            pendingId = pending.beginWithdraw(creator.getUniqueId(), normA, "partnership-create", contractId);
         } catch (IOException ex) {
             return ServiceResult.fail("无法写入待办事务日志: " + ex.getMessage());
         }
@@ -449,6 +506,7 @@ public final class ContractService {
         BigDecimal commissionPercent = clampCommissionPercent(
             plugin.getConfig().getDouble("economy.completion-commission-percent", 5.0));
         Contract contract = Contract.createPartnership(
+            contractId,
             creator.getUniqueId(), creator.getName(),
             partner.getUniqueId(), partner.getName() != null ? partner.getName() : partnerName,
             normA, normB, commissionPercent,
@@ -462,8 +520,7 @@ public final class ContractService {
             storage.save();
         } catch (IOException ex) {
             storage.remove(contract.id());
-            economy.deposit(creator.getUniqueId(), normA);
-            tryClearPending(pendingId);
+            refundOrKeepPending(creator.getUniqueId(), normA, pendingId);
             return ServiceResult.fail("保存失败,已退回扣款: " + ex.getMessage());
         }
 
@@ -556,9 +613,10 @@ public final class ContractService {
             return ServiceResult.fail("余额不足,需要 " + economy.format(normalizedStake));
         }
 
+        String contractId = UUID.randomUUID().toString();
         String pendingId;
         try {
-            pendingId = pending.beginWithdraw(creator.getUniqueId(), normalizedStake, "wager-create");
+            pendingId = pending.beginWithdraw(creator.getUniqueId(), normalizedStake, "wager-create", contractId);
         } catch (IOException ex) {
             return ServiceResult.fail("无法写入待办事务日志: " + ex.getMessage());
         }
@@ -574,6 +632,7 @@ public final class ContractService {
         BigDecimal commissionPercent = clampCommissionPercent(
             plugin.getConfig().getDouble("economy.completion-commission-percent", 5.0));
         Contract contract = Contract.createWager(
+            contractId,
             creator.getUniqueId(), creator.getName(),
             opponent.getUniqueId(), opponent.getName() != null ? opponent.getName() : opponentName,
             arbiter.getUniqueId(), arbiter.getName() != null ? arbiter.getName() : arbiterName,
@@ -587,8 +646,7 @@ public final class ContractService {
             storage.save();
         } catch (IOException ex) {
             storage.remove(contract.id());
-            economy.deposit(creator.getUniqueId(), normalizedStake);
-            tryClearPending(pendingId);
+            refundOrKeepPending(creator.getUniqueId(), normalizedStake, pendingId);
             return ServiceResult.fail("保存失败,已退回扣款: " + ex.getMessage());
         }
 

@@ -670,7 +670,9 @@ public final class ContractCommand implements CommandExecutor, TabCompleter {
 
     private Double parseDouble(String value) {
         try {
-            return Double.parseDouble(value);
+            double parsed = Double.parseDouble(value);
+            // Reject NaN / Infinity so they never reach BigDecimal.valueOf (which throws on non-finite doubles).
+            return Double.isFinite(parsed) ? parsed : null;
         } catch (NumberFormatException ex) {
             return null;
         }
