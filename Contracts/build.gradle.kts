@@ -1,4 +1,4 @@
-plugins { id("cubex-plugin") }
+plugins { id("cubex-kotlin-plugin") }
 
 version = "0.1.0"
 description = "Contract"
@@ -22,6 +22,7 @@ tasks.shadowJar {
         include(project(":modules:cubex-i18n"))
         include(dependency("net.kyori:.*:.*"))
         include(dependency("net.wesjd:anvilgui:.*"))
+        include(dependency("org.jetbrains.kotlin:.*:.*"))
     }
     relocate("net.kyori", "org.cubexmc.contract.libs.kyori")
     relocate("net.wesjd.anvilgui", "org.cubexmc.contract.lib.anvilgui")

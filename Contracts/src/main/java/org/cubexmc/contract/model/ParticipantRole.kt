@@ -1,6 +1,6 @@
-package org.cubexmc.contract.model;
+package org.cubexmc.contract.model
 
-public enum ParticipantRole {
+enum class ParticipantRole {
     OWNER,
     CONTRACTOR,
     PARTNER,
@@ -11,5 +11,5 @@ public enum ParticipantRole {
     CLAIMER,
     DEBTOR,
     CREDITOR,
-    MEDIATOR
+    MEDIATOR,
 }
