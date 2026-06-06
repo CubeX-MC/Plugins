@@ -1,4 +1,4 @@
-plugins { id("cubex-plugin") }
+plugins { id("cubex-kotlin-plugin") }
 
 version = "1.2.1"
 description = "EcoBalancer"
