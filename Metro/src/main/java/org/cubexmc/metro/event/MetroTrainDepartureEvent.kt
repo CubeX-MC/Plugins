@@ -8,7 +8,7 @@ import org.cubexmc.metro.model.Line
 import org.cubexmc.metro.model.Stop
 
 class MetroTrainDepartureEvent(
-    val minecart: Minecart,
+    val minecart: Minecart?,
     val passenger: Player?,
     val line: Line,
     val currentStop: Stop,
