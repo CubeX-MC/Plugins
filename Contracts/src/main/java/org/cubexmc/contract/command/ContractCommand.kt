@@ -25,7 +25,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {
         if (args.isEmpty()) {
             if (sender is Player && sender.hasPermission("contract.use")) {
-                plugin.gui().openHub(sender)
+                plugin.gui().open(sender)
             } else {
                 send(sender, plugin.lang().message("help"))
             }
@@ -47,12 +47,14 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             "list" -> list(sender, args, false)
             "all" -> list(sender, args, true)
             "my" -> my(sender)
+            "rep" -> rep(sender, args)
             "info" -> info(sender, args)
             "accept" -> accept(sender, args)
             "submit" -> submit(sender, args)
             "approve" -> approve(sender, args)
             "cancel" -> cancel(sender, args)
             "dispute" -> dispute(sender, args)
+            "withdraw" -> withdraw(sender, args)
             "admin" -> admin(sender, args)
             else -> {
                 send(sender, plugin.lang().message("help"))
@@ -66,7 +68,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         if (player == null || !requirePermission(player, "contract.use")) {
             return true
         }
-        plugin.gui().openHub(player)
+        plugin.gui().open(player)
         return true
     }
 
@@ -76,27 +78,27 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 6) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract wager <对方> <押注> <小时> <仲裁者> <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract wager <对方> <押注> <天> <仲裁者> <标题>|<描述>")))
             return true
         }
         val opponentName = args[1]
         val stake = parseDouble(args[2])
-        val hours = parseInt(args[3])
+        val days = parseInt(args[3])
         val arbiterName = args[4]
-        if (stake == null || hours == null) {
+        if (stake == null || days == null) {
             send(sender, plugin.lang().message("invalid-number"))
             return true
         }
         val text = parseContractText(args, 5, false)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract wager <对方> <押注> <小时> <仲裁者> <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract wager <对方> <押注> <天> <仲裁者> <标题>|<描述>")))
             return true
         }
         val result = plugin.contracts().createWager(
             player,
             opponentName,
             BigDecimal.valueOf(stake),
-            hours,
+            days,
             arbiterName,
             text.title(),
             text.description(),
@@ -120,20 +122,20 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 6) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract partner <对方> <我押注> <对方押注> <小时> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract partner <对方> <我押注> <对方押注> <天> [--mediator <中间人>] <标题>|<描述>")))
             return true
         }
         val partnerName = args[1]
         val stakeA = parseDouble(args[2])
         val stakeB = parseDouble(args[3])
-        val hours = parseInt(args[4])
-        if (stakeA == null || stakeB == null || hours == null) {
+        val days = parseInt(args[4])
+        if (stakeA == null || stakeB == null || days == null) {
             send(sender, plugin.lang().message("invalid-number"))
             return true
         }
         val text = parseContractText(args, 5, true)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract partner <对方> <我押注> <对方押注> <小时> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract partner <对方> <我押注> <对方押注> <天> [--mediator <中间人>] <标题>|<描述>")))
             return true
         }
         val result = plugin.contracts().createPartnership(
@@ -141,7 +143,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             partnerName,
             BigDecimal.valueOf(stakeA),
             BigDecimal.valueOf(stakeB),
-            hours,
+            days,
             text.title(),
             text.description(),
             text.mediatorName(),
@@ -220,21 +222,21 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 4) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金> <小时> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金> <天> [--mediator <中间人>] <标题>|<描述>")))
             return true
         }
         val reward = parseDouble(args[1])
-        val hours = parseInt(args[2])
-        if (reward == null || hours == null) {
+        val days = parseInt(args[2])
+        if (reward == null || days == null) {
             send(sender, plugin.lang().message("invalid-number"))
             return true
         }
         val text = parseContractText(args, 3, true)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金> <小时> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金> <天> [--mediator <中间人>] <标题>|<描述>")))
             return true
         }
-        val result = plugin.contracts().create(player, reward, hours, text.title(), text.description(), text.mediatorName())
+        val result = plugin.contracts().create(player, reward, days, text.title(), text.description(), text.mediatorName())
         if (!result.success()) {
             send(sender, plugin.lang().message("cannot-create", mapOf("reason" to result.reason())))
             return true
@@ -364,6 +366,41 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val result = plugin.contracts().dispute(player, contract.get(), join(args, 2))
         sendResult(sender, result, "dispute-success")
+        return true
+    }
+
+    private fun rep(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("contract.use")) {
+            send(sender, plugin.lang().message("no-permission"))
+            return true
+        }
+        val record = if (args.size >= 2) {
+            plugin.reputation().findByName(args[1])
+        } else {
+            val player = requirePlayer(sender) ?: return true
+            plugin.reputation().snapshot(player.uniqueId)
+        }
+        val fallbackName = if (args.size >= 2) args[1] else sender.name
+        if (record == null) {
+            send(sender, Text.color("&#FFE066$fallbackName 暂无合同履约记录。"))
+            return true
+        }
+        send(sender, Text.color("&#F4D03F${record.name.ifBlank { fallbackName }} 的履约档案:"))
+        send(sender, Text.color("&#CFD8DC完成 &#69DB7C${record.completed} &#CFD8DC· 取消 &#FFE066${record.cancelled} &#CFD8DC· 逾期 &#E63946${record.expired} &#CFD8DC· 争议 &#E63946${record.disputed}"))
+        return true
+    }
+
+    private fun withdraw(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.dispute")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().withdrawDispute(player, contract.get())
+        sendResult(sender, result, "withdraw-success")
         return true
     }
 
@@ -660,7 +697,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<String>): List<String> {
         if (args.size == 1) {
-            return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "list", "all", "my", "info", "accept", "submit", "approve", "cancel", "dispute", "admin", "help"), args[0])
+            return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "list", "all", "my", "rep", "info", "accept", "submit", "approve", "cancel", "dispute", "withdraw", "admin", "help"), args[0])
         }
         if (args.size == 4 && args[0].equals("service", ignoreCase = true)) {
             return startsWith(listOf("--mediator"), args[3])
@@ -674,7 +711,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         if (args.size == 2 && args[0].equals("admin", ignoreCase = true)) {
             return startsWith(listOf("reload", "pay", "refund", "close"), args[1])
         }
-        if ((args.size == 2 && listOf("info", "accept", "submit", "approve", "cancel", "dispute", "resolve", "mediate").contains(args[0].lowercase(Locale.ROOT))) ||
+        if ((args.size == 2 && listOf("info", "accept", "submit", "approve", "cancel", "dispute", "withdraw", "resolve", "mediate").contains(args[0].lowercase(Locale.ROOT))) ||
             (args.size == 3 && args[0].equals("admin", ignoreCase = true))
         ) {
             val prefix = args[args.size - 1].lowercase(Locale.ROOT)

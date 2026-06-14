@@ -37,13 +37,13 @@ class ContractService(
         eventLog.append(contract.id(), type, detail)
     }
 
-    fun create(owner: Player, rewardDouble: Double, hours: Int, title: String, description: String): ServiceResult =
-        create(owner, rewardDouble, hours, title, description, null)
+    fun create(owner: Player, rewardDouble: Double, days: Int, title: String, description: String): ServiceResult =
+        create(owner, rewardDouble, days, title, description, null)
 
     fun create(
         owner: Player,
         rewardDouble: Double,
-        hours: Int,
+        days: Int,
         title: String,
         description: String,
         mediatorName: String?,
@@ -73,10 +73,10 @@ class ContractService(
         if (reward < minReward || reward > maxReward) {
             return ServiceResult.fail("奖金必须在 ${economy.format(minReward)} 到 ${economy.format(maxReward)} 之间")
         }
-        val minHours = plugin.config.getInt("limits.min-deadline-hours", 1)
-        val maxHours = plugin.config.getInt("limits.max-deadline-hours", 168)
-        if (hours < minHours || hours > maxHours) {
-            return ServiceResult.fail("截止时间必须在 $minHours 到 $maxHours 小时之间")
+        val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
+        val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
+        if (days < minDays || days > maxDays) {
+            return ServiceResult.fail("有效期必须在 $minDays 到 $maxDays 天之间")
         }
         val openLimit = plugin.config.getInt("limits.max-open-contracts", 3)
         val openCount = storage.all().stream()
@@ -117,7 +117,7 @@ class ContractService(
         }
 
         val now = System.currentTimeMillis()
-        val expiresAt = now + hours * 60L * 60L * 1000L
+        val expiresAt = now + days * 24L * 60L * 60L * 1000L
         val commissionPercent = clampCommissionPercent(
             plugin.config.getDouble("economy.completion-commission-percent", 5.0),
         )
@@ -167,8 +167,8 @@ class ContractService(
                 return MediatorSpec.fail("中间人不能是合同参与方")
             }
         }
-        if (!mediator.hasPlayedBefore() && mediator.name == null) {
-            return MediatorSpec.fail("找不到中间人 $mediatorName")
+        if (!mediator.isOnline && !mediator.hasPlayedBefore()) {
+            return MediatorSpec.fail("找不到中间人 $mediatorName(需在线或曾登录本服)")
         }
         return MediatorSpec.ok(mediatorUuid, mediator.name ?: mediatorName)
     }
@@ -409,17 +409,17 @@ class ContractService(
         partnerName: String,
         stakeA: BigDecimal,
         stakeB: BigDecimal,
-        hours: Int,
+        days: Int,
         title: String,
         description: String,
-    ): ServiceResult = createPartnership(creator, partnerName, stakeA, stakeB, hours, title, description, null)
+    ): ServiceResult = createPartnership(creator, partnerName, stakeA, stakeB, days, title, description, null)
 
     fun createPartnership(
         creator: Player,
         partnerName: String,
         stakeA: BigDecimal,
         stakeB: BigDecimal,
-        hours: Int,
+        days: Int,
         title: String,
         description: String,
         mediatorName: String?,
@@ -443,18 +443,18 @@ class ContractService(
         if (normA < minStake || normA > maxStake || normB < minStake || normB > maxStake) {
             return ServiceResult.fail("双方押注都必须在 ${economy.format(minStake)} 到 ${economy.format(maxStake)} 之间")
         }
-        val minHours = plugin.config.getInt("limits.min-deadline-hours", 1)
-        val maxHours = plugin.config.getInt("limits.max-deadline-hours", 168)
-        if (hours < minHours || hours > maxHours) {
-            return ServiceResult.fail("截止时间必须在 $minHours 到 $maxHours 小时之间")
+        val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
+        val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
+        if (days < minDays || days > maxDays) {
+            return ServiceResult.fail("有效期必须在 $minDays 到 $maxDays 天之间")
         }
 
         val partner = Bukkit.getOfflinePlayer(partnerName)
         if (partner.uniqueId == creator.uniqueId) {
             return ServiceResult.fail("不能和自己合作")
         }
-        if (!partner.hasPlayedBefore() && partner.name == null) {
-            return ServiceResult.fail("找不到玩家 $partnerName")
+        if (!partner.isOnline && !partner.hasPlayedBefore()) {
+            return ServiceResult.fail("找不到玩家 $partnerName(需在线或曾登录本服)")
         }
         val mediator = resolveOptionalMediator(mediatorName, creator.uniqueId, partner.uniqueId)
         if (!mediator.success()) {
@@ -478,7 +478,7 @@ class ContractService(
         }
 
         val now = System.currentTimeMillis()
-        val expiresAt = now + hours * 60L * 60L * 1000L
+        val expiresAt = now + days * 24L * 60L * 60L * 1000L
         val commissionPercent = clampCommissionPercent(plugin.config.getDouble("economy.completion-commission-percent", 5.0))
         val contract = Contract.createPartnership(
             contractId,
@@ -554,7 +554,7 @@ class ContractService(
         creator: Player,
         opponentName: String,
         stake: BigDecimal,
-        hours: Int,
+        days: Int,
         arbiterName: String,
         title: String,
         description: String,
@@ -579,10 +579,10 @@ class ContractService(
             return ServiceResult.fail("押注必须在 ${economy.format(minStake)} 到 ${economy.format(maxStake)} 之间")
         }
 
-        val minHours = plugin.config.getInt("limits.min-deadline-hours", 1)
-        val maxHours = plugin.config.getInt("limits.max-deadline-hours", 168)
-        if (hours < minHours || hours > maxHours) {
-            return ServiceResult.fail("截止时间必须在 $minHours 到 $maxHours 小时之间")
+        val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
+        val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
+        if (days < minDays || days > maxDays) {
+            return ServiceResult.fail("有效期必须在 $minDays 到 $maxDays 天之间")
         }
 
         val opponent = Bukkit.getOfflinePlayer(opponentName)
@@ -593,11 +593,11 @@ class ContractService(
         if (arbiter.uniqueId == creator.uniqueId || arbiter.uniqueId == opponent.uniqueId) {
             return ServiceResult.fail("仲裁者必须是第三方")
         }
-        if (!opponent.hasPlayedBefore() && opponent.name == null) {
-            return ServiceResult.fail("找不到玩家 $opponentName")
+        if (!opponent.isOnline && !opponent.hasPlayedBefore()) {
+            return ServiceResult.fail("找不到玩家 $opponentName(需在线或曾登录本服)")
         }
-        if (!arbiter.hasPlayedBefore() && arbiter.name == null) {
-            return ServiceResult.fail("找不到玩家 $arbiterName")
+        if (!arbiter.isOnline && !arbiter.hasPlayedBefore()) {
+            return ServiceResult.fail("找不到玩家 $arbiterName(需在线或曾登录本服)")
         }
 
         if (!economy.has(creator, normalizedStake)) {
@@ -617,7 +617,7 @@ class ContractService(
         }
 
         val now = System.currentTimeMillis()
-        val expiresAt = now + hours * 60L * 60L * 1000L
+        val expiresAt = now + days * 24L * 60L * 60L * 1000L
         val commissionPercent = clampCommissionPercent(plugin.config.getDouble("economy.completion-commission-percent", 5.0))
         val contract = Contract.createWager(
             contractId,
@@ -772,16 +772,33 @@ class ContractService(
         if (contract.type() != ContractType.SERVICE) {
             return ServiceResult.fail("这个合同类型不能用 approve 确认")
         }
-        if (contract.status() != ContractStatus.SUBMITTED) {
-            return ServiceResult.fail("只有待确认的合同可以确认付款")
+        // Owner may confirm payment as soon as the work is done — either after the contractor submits
+        // (SUBMITTED) or proactively while still IN_PROGRESS (early acceptance). The owner only ever
+        // gives away their own escrow to the contractor they chose, so this harms no third party.
+        if (contract.status() != ContractStatus.SUBMITTED && contract.status() != ContractStatus.IN_PROGRESS) {
+            return ServiceResult.fail("只有进行中或待确认的合同可以确认付款")
         }
         if (player.uniqueId != contract.ownerUuid()) {
             return ServiceResult.fail("只有雇主可以确认这个合同")
         }
-        return pay(contract, "APPROVED", "${player.name} approved the contract")
+        val early = contract.status() == ContractStatus.IN_PROGRESS
+        return pay(
+            contract,
+            if (early) "APPROVED_EARLY" else "APPROVED",
+            if (early) "${player.name} approved early before submission" else "${player.name} approved the contract",
+        )
     }
 
     fun cancel(player: Player, contract: Contract): ServiceResult {
+        val result = cancelInternal(player, contract)
+        // Only count a real cancellation against the canceller; an escalation to dispute is not one.
+        if (result.success() && result.contract()?.status() == ContractStatus.CANCELLED) {
+            plugin.reputation().recordCancelled(player.uniqueId, player.name)
+        }
+        return result
+    }
+
+    private fun cancelInternal(player: Player, contract: Contract): ServiceResult {
         val playerUuid = player.uniqueId
         val isOwner = playerUuid == contract.ownerUuid()
         val isContractor = playerUuid == contract.contractorUuid()
@@ -826,9 +843,44 @@ class ContractService(
             return ServiceResult.fail("已结束的合同不能发起争议")
         }
         val now = System.currentTimeMillis()
+        // Remember who raised it and the state to return to, so the initiator can withdraw it later.
+        contract.metadata["dispute-by"] = playerUuid.toString()
+        contract.metadata["dispute-prev-status"] = contract.status().name
         contract.status(ContractStatus.DISPUTED)
         contract.disputeReason(Text.stripControl(reason))
         logEvent(contract, now, "DISPUTED", "${player.name}: ${contract.disputeReason()}")
+        plugin.reputation().recordDisputed(playerUuid, player.name)
+        return dirty(contract)
+    }
+
+    /**
+     * Lets the player who raised a dispute withdraw it, restoring the contract to its pre-dispute
+     * state. Only player-initiated disputes carry the `dispute-by`/`dispute-prev-status` markers;
+     * system settlement-interruption holds do not, so those still require an admin.
+     */
+    fun withdrawDispute(player: Player, contract: Contract): ServiceResult {
+        if (contract.status() != ContractStatus.DISPUTED) {
+            return ServiceResult.fail("只有处于争议中的合同可以撤销争议")
+        }
+        val raisedBy = contract.metadata["dispute-by"]
+        val previousName = contract.metadata["dispute-prev-status"]
+        if (raisedBy == null || previousName == null) {
+            return ServiceResult.fail("这个争议需要管理员处理，不能自行撤销")
+        }
+        if (raisedBy != player.uniqueId.toString()) {
+            return ServiceResult.fail("只有发起争议的玩家可以撤销争议")
+        }
+        val previous = try {
+            ContractStatus.valueOf(previousName)
+        } catch (ex: IllegalArgumentException) {
+            return ServiceResult.fail("无法恢复争议前的状态，请联系管理员")
+        }
+        val now = System.currentTimeMillis()
+        contract.status(previous)
+        contract.disputeReason(null)
+        contract.metadata.remove("dispute-by")
+        contract.metadata.remove("dispute-prev-status")
+        logEvent(contract, now, "DISPUTE_WITHDRAWN", "${player.name} withdrew the dispute")
         return dirty(contract)
     }
 
@@ -974,6 +1026,7 @@ class ContractService(
         val now = System.currentTimeMillis()
         contract.status(newStatus)
         contract.completedAt(now)
+        plugin.reputation().recordSettlement(contract, newStatus)
         val totalParticipantPayout = outcome.toRole.values.stream().reduce(BigDecimal.ZERO) { left, right -> left.add(right) }
         logEvent(contract, now, eventType, "$detail; payouts ${outcome.toRole}; sink ${outcome.toSink.toPlainString()}")
         try {

@@ -70,6 +70,7 @@ messages:
   approve-success: "<prefix><#69DB7C>合同已确认，已向 <#FFE066><player> <#69DB7C>支付 <#FFE066><amount><#69DB7C>。"
   cancel-success: "<prefix><#69DB7C>合同已取消，资金已按规则处理。"
   dispute-success: "<prefix><#FFE066>合同已进入争议状态，等待管理员处理。"
+  withdraw-success: "<prefix><#69DB7C>已撤销争议，合同恢复到争议前的状态。"
   admin-pay-success: "<prefix><#69DB7C>已强制支付合同 <#FFE066>#<id><#69DB7C>。"
   admin-refund-success: "<prefix><#69DB7C>已强制退款合同 <#FFE066>#<id><#69DB7C>。"
   admin-close-success: "<prefix><#69DB7C>已关闭合同 <#FFE066>#<id><#69DB7C>，未移动任何资金。"
@@ -103,18 +104,20 @@ messages:
   help: |
     <#F4D03F>==== Contract ====
     <#FFE066>/contract <#F1F5F9>- 打开合同大厅
-    <#FFE066>/contract service \<奖金> \<小时> \<标题>|\<描述> <#F1F5F9>- 发布雇佣合同
-    <#CFD8DC>可选: <#FFE066>/contract service \<奖金> \<小时> --mediator \<中间人> \<标题>|\<描述>
-    <#FFE066>/contract wager \<对方> \<押注> \<小时> \<仲裁> \<标题>|\<描述> <#F1F5F9>- 发起对赌
-    <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<小时> \<标题>|\<描述> <#F1F5F9>- 发起合作
-    <#CFD8DC>可选: <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<小时> --mediator \<中间人> \<标题>|\<描述>
+    <#FFE066>/contract service \<奖金> \<天> \<标题>|\<描述> <#F1F5F9>- 发布雇佣合同
+    <#CFD8DC>可选: <#FFE066>/contract service \<奖金> \<天> --mediator \<中间人> \<标题>|\<描述>
+    <#FFE066>/contract wager \<对方> \<押注> \<天> \<仲裁> \<标题>|\<描述> <#F1F5F9>- 发起对赌
+    <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<天> \<标题>|\<描述> <#F1F5F9>- 发起合作
+    <#CFD8DC>可选: <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<天> --mediator \<中间人> \<标题>|\<描述>
     <#FFE066>/contract resolve \<id> \<a|b> <#F1F5F9>- 仲裁者裁决对赌
     <#FFE066>/contract mediate \<id> \<accept|pay|refund|owner|contractor> <#F1F5F9>- 中间人接受职责或裁决
     <#FFE066>/contract list [页码] <#F1F5F9>- 查看公开合同
     <#FFE066>/contract my <#F1F5F9>- 查看我的合同
+    <#FFE066>/contract rep [玩家] <#F1F5F9>- 查看履约档案/信誉
     <#FFE066>/contract info \<id> <#F1F5F9>- 查看详情
     <#FFE066>/contract accept \<id> <#F1F5F9>- 接单
     <#FFE066>/contract submit \<id> <#F1F5F9>- 提交完成
     <#FFE066>/contract approve \<id> <#F1F5F9>- 雇主确认并付款
     <#FFE066>/contract cancel \<id> <#F1F5F9>- 取消可取消的合同
     <#FFE066>/contract dispute \<id> \<原因> <#F1F5F9>- 发起争议
+    <#FFE066>/contract withdraw \<id> <#F1F5F9>- 撤销你发起的争议

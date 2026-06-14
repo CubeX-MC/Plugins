@@ -10,7 +10,7 @@ import org.cubexmc.contract.model.ContractType
 class CreateDraft(private val type: ContractType) {
     private var title: String? = null
     private var description: String? = null
-    private var hours: Int? = null
+    private var days: Int? = null
     private var amount: Double? = null
     private var partnerStake: Double? = null
     private var counterparty: String? = null
@@ -30,10 +30,10 @@ class CreateDraft(private val type: ContractType) {
         this.description = description
     }
 
-    fun hours(): Int? = hours
+    fun days(): Int? = days
 
-    fun hours(hours: Int?) {
-        this.hours = hours
+    fun days(days: Int?) {
+        this.days = days
     }
 
     fun amount(): Double? = amount
@@ -66,13 +66,13 @@ class CreateDraft(private val type: ContractType) {
 
     fun mediatorRequired(): Boolean = type == ContractType.WAGER
 
-    fun validate(minAmount: Double, maxAmount: Double, minHours: Int, maxHours: Int): String? {
+    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int): String? {
         if (title.isNullOrBlank()) {
             return "请先填写标题"
         }
-        val currentHours = hours ?: return "请先填写期限"
-        if (currentHours < minHours || currentHours > maxHours) {
-            return "期限必须在 $minHours 到 $maxHours 小时之间"
+        val currentDays = days ?: return "请先填写期限"
+        if (currentDays < minDays || currentDays > maxDays) {
+            return "有效期必须在 $minDays 到 $maxDays 天之间"
         }
         val currentAmount = amount ?: return "请先填写金额"
         if (currentAmount < minAmount || currentAmount > maxAmount) {
@@ -93,6 +93,6 @@ class CreateDraft(private val type: ContractType) {
         return null
     }
 
-    fun isReady(minAmount: Double, maxAmount: Double, minHours: Int, maxHours: Int): Boolean =
-        validate(minAmount, maxAmount, minHours, maxHours) == null
+    fun isReady(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int): Boolean =
+        validate(minAmount, maxAmount, minDays, maxDays) == null
 }

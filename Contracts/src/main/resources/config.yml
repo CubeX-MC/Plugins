@@ -1,4 +1,4 @@
-config-version: 2
+config-version: 3
 language: zh_CN
 
 economy:
@@ -20,8 +20,9 @@ limits:
   max-active-accepted-contracts: 3
   max-title-length: 80
   max-description-length: 500
-  min-deadline-hours: 1
-  max-deadline-hours: 168
+  # 合同有效期(天)
+  min-deadline-days: 1
+  max-deadline-days: 7
 
 expiry:
   cleanup-interval-minutes: 10

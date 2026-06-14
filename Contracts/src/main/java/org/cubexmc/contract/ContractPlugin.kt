@@ -2,10 +2,13 @@ package org.cubexmc.contract
 
 import org.bukkit.command.PluginCommand
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.configuration.file.YamlConfiguration
 import org.cubexmc.config.LegacyTextToMiniMessageStep
+import org.cubexmc.config.MigrationContext
 import org.cubexmc.config.MigrationException
 import org.cubexmc.config.MigrationPlan
 import org.cubexmc.config.MigrationRunner
+import org.cubexmc.config.MigrationStep
 import org.cubexmc.config.NoOpMigrationStep
 import org.cubexmc.config.ResourceFiles
 import org.cubexmc.contract.command.ContractCommand
@@ -16,6 +19,7 @@ import org.cubexmc.contract.service.ContractService
 import org.cubexmc.contract.storage.ContractStorage
 import org.cubexmc.contract.storage.EventLog
 import org.cubexmc.contract.storage.PendingTransactionStore
+import org.cubexmc.contract.storage.ReputationStore
 import org.cubexmc.core.CubexPlugin
 import java.io.IOException
 import kotlin.math.max
@@ -24,6 +28,7 @@ class ContractPlugin : CubexPlugin() {
     private var languageManager: LanguageManager? = null
     private var economyService: EconomyService? = null
     private var contractStorage: ContractStorage? = null
+    private var reputationStore: ReputationStore? = null
     private var pendingStore: PendingTransactionStore? = null
     private var eventLog: EventLog? = null
     private var contractService: ContractService? = null
@@ -62,6 +67,11 @@ class ContractPlugin : CubexPlugin() {
             }
         }
         bind(saveContractStorage)
+
+        reputationStore = ReputationStore(this)
+        reputation().load()
+        bind(Runnable { reputationStore?.flushIfDirty() })
+
         pendingStore = PendingTransactionStore(this)
         eventLog = EventLog(this)
         contractService = ContractService(this, storage(), economy(), pending(), eventLog())
@@ -72,6 +82,8 @@ class ContractPlugin : CubexPlugin() {
         }
         bind(closeContractGui)
         server.pluginManager.registerEvents(gui(), this)
+        server.pluginManager.registerEvents(gui().registry, this)
+        server.pluginManager.registerEvents(gui().input, this)
 
         val command = ContractCommand(this)
         val pluginCommand: PluginCommand? = getCommand("contract")
@@ -124,6 +136,8 @@ class ContractPlugin : CubexPlugin() {
 
     fun storage(): ContractStorage = contractStorage ?: throw IllegalStateException("contractStorage not initialized")
 
+    fun reputation(): ReputationStore = reputationStore ?: throw IllegalStateException("reputationStore not initialized")
+
     fun contracts(): ContractService = contractService ?: throw IllegalStateException("contractService not initialized")
 
     fun gui(): ContractGui = contractGui ?: throw IllegalStateException("contractGui not initialized")
@@ -142,11 +156,36 @@ class ContractPlugin : CubexPlugin() {
         migrations.run(
             MigrationPlan.yaml("Contracts config", "config.yml")
                 .versionKey("config-version")
-                .targetVersion(2)
-                .addStep(NoOpMigrationStep(1, 2, "Add Contracts config-version.")),
+                .targetVersion(3)
+                .addStep(NoOpMigrationStep(1, 2, "Add Contracts config-version."))
+                .addStep(deadlineHoursToDaysStep()),
         )
         migrateLang(migrations, "zh_CN")
         migrateLang(migrations, "en_US")
+    }
+
+    /** v2 → v3: contract deadline limits switch from hours to days. */
+    private fun deadlineHoursToDaysStep(): MigrationStep = object : MigrationStep {
+        override fun fromVersion(): Int = 2
+
+        override fun toVersion(): Int = 3
+
+        override fun description(): String = "Rename deadline limits from hours to days."
+
+        override fun migrate(context: MigrationContext) {
+            convertHoursKeyToDays(context.yaml(), "limits.min-deadline-hours", "limits.min-deadline-days")
+            convertHoursKeyToDays(context.yaml(), "limits.max-deadline-hours", "limits.max-deadline-days")
+        }
+    }
+
+    private fun convertHoursKeyToDays(yaml: YamlConfiguration, oldKey: String, newKey: String) {
+        if (!yaml.isSet(oldKey)) {
+            return
+        }
+        if (!yaml.isSet(newKey)) {
+            yaml.set(newKey, max(1, Math.round(yaml.getInt(oldKey) / 24.0).toInt()))
+        }
+        yaml.set(oldKey, null)
     }
 
     @Throws(MigrationException::class)
@@ -170,6 +209,7 @@ class ContractPlugin : CubexPlugin() {
                 } catch (ex: IOException) {
                     logger.warning("Async flush failed: ${ex.message}")
                 }
+                reputationStore?.flushIfDirty()
             },
             periodTicks,
             periodTicks,
