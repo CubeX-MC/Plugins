@@ -1,0 +1,20 @@
+name: Reputations
+version: ${project.version}
+main: org.cubexmc.reputations.ReputationsPlugin
+api-version: '1.18'
+author: CubeX-MC
+description: Shared player reputation service. Other plugins register fields and update them via the API (Vault-style, ServicesManager).
+
+commands:
+  reputation:
+    description: View or manage player reputation.
+    aliases: [rep, reps]
+    usage: /reputation [player]
+
+permissions:
+  reputation.use:
+    default: true
+    description: View reputation profiles.
+  reputation.admin:
+    default: op
+    description: Set, add or reset reputation values and reload.

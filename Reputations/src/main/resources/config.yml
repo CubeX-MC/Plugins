@@ -1,0 +1,5 @@
+config-version: 1
+
+gui:
+  # Title prefix for the reputation viewer (the viewed player's name is appended).
+  title: "&#F4D03F玩家信誉"

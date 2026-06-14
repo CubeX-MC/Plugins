@@ -9,6 +9,6 @@ include(":modules:cubex-i18n"); project(":modules:cubex-i18n").projectDir = file
 
 // —— 插件子项目(目录原名,原地成为子项目)——
 // 第0阶段先只纳入 BookLite;第1阶段把其余插件逐个加进这个列表。
-listOf("BookLite", "FAWEReplacer", "MountLicense", "Contracts", "EcoBalancer", "RuleGems", "Metro", "Railway", "Clarity").forEach {
+listOf("BookLite", "FAWEReplacer", "MountLicense", "Contracts", "EcoBalancer", "RuleGems", "Metro", "Railway", "Clarity", "Reputations").forEach {
     include(":$it"); project(":$it").projectDir = file(it)
 }
