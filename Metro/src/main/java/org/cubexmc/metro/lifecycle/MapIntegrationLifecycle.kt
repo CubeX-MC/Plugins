@@ -59,11 +59,11 @@ class MapIntegrationLifecycle {
     }
 
     fun requestRefresh() {
-        if (plugin.configFacade == null || !plugin.configFacade.isMapIntegrationEnabled || refreshQueued) {
+        if (plugin.configFacade == null || !plugin.configFacade.isMapIntegrationEnabled() || refreshQueued) {
             return
         }
         refreshQueued = true
-        val delay = plugin.configFacade.mapRefreshDelayTicks
+        val delay = plugin.configFacade.getMapRefreshDelayTicks()
         refreshTaskId = refreshScheduler.schedule(
             plugin,
             Runnable {
@@ -86,12 +86,12 @@ class MapIntegrationLifecycle {
     }
 
     private fun activateConfiguredProvider(): Boolean {
-        if (plugin.configFacade == null || !plugin.configFacade.isMapIntegrationEnabled) {
+        if (plugin.configFacade == null || !plugin.configFacade.isMapIntegrationEnabled()) {
             disable()
             return false
         }
 
-        val provider = normalizeProvider(plugin.configFacade.mapProvider)
+        val provider = normalizeProvider(plugin.configFacade.getMapProvider())
         if (provider == null || provider.isBlank()) {
             plugin.logger.warning("[Map] map_integration.provider is empty. Skipping map integration.")
             disable()

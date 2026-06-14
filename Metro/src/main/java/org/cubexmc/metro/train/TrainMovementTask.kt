@@ -189,7 +189,7 @@ class TrainMovementTask @JvmOverloads constructor(
             return
         }
 
-        physicsController.applyApproachBraking(minecart, distance, session.plugin.configFacade.cartSpeed)
+        physicsController.applyApproachBraking(minecart, distance, session.plugin.configFacade.getCartSpeed())
     }
 
     private fun transitionToStoppedAtStation(stop: Stop) {
@@ -354,7 +354,7 @@ class TrainMovementTask @JvmOverloads constructor(
 
         var maxSpeed = line.getMaxSpeed() ?: -1.0
         if (maxSpeed == -1.0) {
-            maxSpeed = session.plugin.configFacade.cartSpeed
+            maxSpeed = session.plugin.configFacade.getCartSpeed()
         }
         minecart.maxSpeed = maxSpeed
         session.plugin.bedrockCompatibility.onTrainDeparture(minecart)
@@ -369,7 +369,7 @@ class TrainMovementTask @JvmOverloads constructor(
     }
 
     private fun scheduleNextDeparture() {
-        val delay = session.plugin.configFacade.cartDepartureDelay
+        val delay = session.plugin.configFacade.getCartDepartureDelay()
         session.debug(
             "Schedule departure in $delay ticks for passenger=${session.safePassengerName()}, " +
                 "currentStop=${session.currentStopId}",

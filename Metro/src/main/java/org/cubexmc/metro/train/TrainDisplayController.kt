@@ -36,7 +36,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             playStationArrivalSound(targetStop, passenger)
 
             if (event.isTerminus()) {
-                if (plugin.configFacade.isTerminalStopTitleEnabled) {
+                if (plugin.configFacade.isTerminalStopTitleEnabled()) {
                     showTerminalStopInfo(passenger, targetStop, line)
                 }
             } else {
@@ -63,22 +63,22 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
         val minecart = event.minecart
 
         playDepartureSound(passenger)
-        if (plugin.configFacade.isDepartureTitleEnabled) {
+        if (plugin.configFacade.isDepartureTitleEnabled()) {
             showDepartureInfo(passenger, minecart, currentStop, nextStop, line)
         }
     }
 
     private fun playStationArrivalSound(stop: Stop, passenger: Player) {
-        if (!plugin.configFacade.isStationArrivalSoundEnabled) {
+        if (!plugin.configFacade.isStationArrivalSoundEnabled()) {
             return
         }
 
-        val notes = plugin.configFacade.stationArrivalNotes
+        val notes = plugin.configFacade.getStationArrivalNotes()
         if (notes.isEmpty()) {
             return
         }
 
-        val initialDelay = plugin.configFacade.stationArrivalInitialDelay
+        val initialDelay = plugin.configFacade.getStationArrivalInitialDelay()
         val stopLocation = stop.stopPointLocation
         val world = stopLocation?.world ?: return
 
@@ -93,29 +93,29 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
     }
 
     private fun playArrivalSound(passenger: Player?) {
-        if (plugin.configFacade.isArrivalSoundEnabled &&
-            plugin.configFacade.arrivalNotes.isNotEmpty() &&
+        if (plugin.configFacade.isArrivalSoundEnabled() &&
+            plugin.configFacade.getArrivalNotes().isNotEmpty() &&
             passenger != null
         ) {
             SoundUtil.playNoteSequence(
                 plugin,
                 passenger,
-                plugin.configFacade.arrivalNotes,
-                plugin.configFacade.arrivalInitialDelay,
+                plugin.configFacade.getArrivalNotes(),
+                plugin.configFacade.getArrivalInitialDelay(),
             )
         }
     }
 
     private fun playDepartureSound(passenger: Player?) {
-        if (plugin.configFacade.isDepartureSoundEnabled &&
-            plugin.configFacade.departureNotes.isNotEmpty() &&
+        if (plugin.configFacade.isDepartureSoundEnabled() &&
+            plugin.configFacade.getDepartureNotes().isNotEmpty() &&
             passenger != null
         ) {
             SoundUtil.playNoteSequence(
                 plugin,
                 passenger,
-                plugin.configFacade.departureNotes,
-                plugin.configFacade.departureInitialDelay,
+                plugin.configFacade.getDepartureNotes(),
+                plugin.configFacade.getDepartureInitialDelay(),
             )
         }
     }
@@ -142,9 +142,9 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             null,
             nextStop,
             terminusStop,
-            plugin.configFacade.arriveStopFadeIn,
-            plugin.configFacade.arriveStopStay,
-            plugin.configFacade.arriveStopFadeOut,
+            plugin.configFacade.getArriveStopFadeIn(),
+            plugin.configFacade.getArriveStopStay(),
+            plugin.configFacade.getArriveStopFadeOut(),
         )
     }
 
@@ -161,9 +161,9 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             null,
             null,
             stop,
-            plugin.configFacade.terminalStopFadeIn,
-            plugin.configFacade.terminalStopStay,
-            plugin.configFacade.terminalStopFadeOut,
+            plugin.configFacade.getTerminalStopFadeIn(),
+            plugin.configFacade.getTerminalStopStay(),
+            plugin.configFacade.getTerminalStopFadeOut(),
         )
     }
 
@@ -179,7 +179,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             null
         }
 
-        var actionbarTemplate = plugin.configFacade.departureActionbar
+        var actionbarTemplate = plugin.configFacade.getDepartureActionbar()
         val customTitle = currentStop.getCustomTitle("departure")
         if (customTitle != null && customTitle.containsKey("actionbar")) {
             actionbarTemplate = customTitle.getValue("actionbar")
@@ -206,9 +206,9 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             currentStop,
             nextStop,
             terminusStop,
-            plugin.configFacade.departureFadeIn,
-            plugin.configFacade.departureStay,
-            plugin.configFacade.departureFadeOut,
+            plugin.configFacade.getDepartureFadeIn(),
+            plugin.configFacade.getDepartureStay(),
+            plugin.configFacade.getDepartureFadeOut(),
         )
     }
 
@@ -216,7 +216,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
         if (passenger == null || !passenger.isOnline) {
             return
         }
-        if (!plugin.configFacade.isWaitingTitleEnabled) {
+        if (!plugin.configFacade.isWaitingTitleEnabled()) {
             return
         }
 
@@ -227,8 +227,8 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
         val terminusStop = if (stopIds.isNotEmpty()) stopManager.getStop(stopIds[stopIds.size - 1]) else null
         val lineManager = plugin.lineManager
 
-        var titleTemplate = plugin.configFacade.waitingTitle
-        var subtitleTemplate = plugin.configFacade.waitingSubtitle
+        var titleTemplate = plugin.configFacade.getWaitingTitle()
+        var subtitleTemplate = plugin.configFacade.getWaitingSubtitle()
 
         val customTitle = currentStop.getCustomTitle("waiting")
         if (customTitle != null) {
@@ -255,7 +255,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
         subtitle = ChatColor.translateAlternateColorCodes('&', subtitle)
         passenger.sendTitle(title, subtitle, 0, 1000000, 0)
 
-        var actionbarTemplate = plugin.configFacade.waitingActionbar
+        var actionbarTemplate = plugin.configFacade.getWaitingActionbar()
         if (customTitle != null && customTitle.containsKey("actionbar")) {
             actionbarTemplate = customTitle.getValue("actionbar")
         }
@@ -293,8 +293,8 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
 
         var actionbarTemplate = ""
         when (infoType) {
-            "waiting" -> actionbarTemplate = plugin.configFacade.waitingActionbar
-            "departure" -> actionbarTemplate = plugin.configFacade.departureActionbar
+            "waiting" -> actionbarTemplate = plugin.configFacade.getWaitingActionbar()
+            "departure" -> actionbarTemplate = plugin.configFacade.getDepartureActionbar()
             "arrive_stop", "terminal_stop" -> {
                 // No default actionbar for these yet, wait for implementation if needed
             }
@@ -307,7 +307,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
 
         val template = actionbarTemplate
         val lineManager = plugin.lineManager
-        val totalSeconds = kotlin.math.ceil(plugin.configFacade.cartDepartureDelay / 20.0).toInt()
+        val totalSeconds = kotlin.math.ceil(plugin.configFacade.getCartDepartureDelay() / 20.0).toInt()
 
         for (secondsLeft in totalSeconds downTo 0) {
             val delayTicks = (totalSeconds - secondsLeft) * 20L
@@ -330,8 +330,8 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
     }
 
     private fun startWaitingSound(minecart: Minecart?, passenger: Player?) {
-        if (!plugin.configFacade.isWaitingSoundEnabled ||
-            plugin.configFacade.waitingNotes.isEmpty() ||
+        if (!plugin.configFacade.isWaitingSoundEnabled() ||
+            plugin.configFacade.getWaitingNotes().isEmpty() ||
             passenger == null
         ) {
             return
@@ -342,16 +342,16 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             Runnable {
                 playWaitingSoundOnce(passenger)
             },
-            plugin.configFacade.waitingInitialDelay.toLong(),
+            plugin.configFacade.getWaitingInitialDelay().toLong(),
             -1,
         )
 
-        val interval = plugin.configFacade.waitingSoundInterval
+        val interval = plugin.configFacade.getWaitingSoundInterval()
         if (interval <= 0) {
             return
         }
 
-        val repeatTimes = (plugin.configFacade.cartDepartureDelay + interval - 1L) / interval
+        val repeatTimes = (plugin.configFacade.getCartDepartureDelay() + interval - 1L) / interval
         for (index in 1..repeatTimes) {
             scheduleTrainTask(
                 minecart,
@@ -360,7 +360,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
                         playWaitingSoundOnce(passenger)
                     }
                 },
-                plugin.configFacade.waitingInitialDelay + interval * index,
+                plugin.configFacade.getWaitingInitialDelay() + interval * index,
                 -1,
             )
         }
@@ -379,7 +379,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
 
     private fun playWaitingSoundOnce(passenger: Player?) {
         if (passenger != null && passenger.isOnline) {
-            SoundUtil.playNoteSequence(plugin, passenger, plugin.configFacade.waitingNotes, 0)
+            SoundUtil.playNoteSequence(plugin, passenger, plugin.configFacade.getWaitingNotes(), 0)
         }
     }
 
@@ -406,25 +406,25 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
 
         when (infoType) {
             "arrive_stop" -> {
-                titleTemplate = plugin.configFacade.arriveStopTitle
-                subtitleTemplate = plugin.configFacade.arriveStopSubtitle
+                titleTemplate = plugin.configFacade.getArriveStopTitle()
+                subtitleTemplate = plugin.configFacade.getArriveStopSubtitle()
             }
 
             "terminal_stop" -> {
-                titleTemplate = plugin.configFacade.terminalStopTitle
-                subtitleTemplate = plugin.configFacade.terminalStopSubtitle
+                titleTemplate = plugin.configFacade.getTerminalStopTitle()
+                subtitleTemplate = plugin.configFacade.getTerminalStopSubtitle()
             }
 
             "departure" -> {
-                titleTemplate = plugin.configFacade.departureTitle
-                subtitleTemplate = plugin.configFacade.departureSubtitle
-                actionbarTemplate = plugin.configFacade.departureActionbar
+                titleTemplate = plugin.configFacade.getDepartureTitle()
+                subtitleTemplate = plugin.configFacade.getDepartureSubtitle()
+                actionbarTemplate = plugin.configFacade.getDepartureActionbar()
             }
 
             "waiting" -> {
-                titleTemplate = plugin.configFacade.waitingTitle
-                subtitleTemplate = plugin.configFacade.waitingSubtitle
-                actionbarTemplate = plugin.configFacade.waitingActionbar
+                titleTemplate = plugin.configFacade.getWaitingTitle()
+                subtitleTemplate = plugin.configFacade.getWaitingSubtitle()
+                actionbarTemplate = plugin.configFacade.getWaitingActionbar()
             }
         }
 

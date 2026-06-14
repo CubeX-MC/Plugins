@@ -70,7 +70,7 @@ class ScoreboardManager(private val plugin: Metro) {
             plugin.debug("scoreboard", "shouldUseScoreboard: ScoreboardLibrary is null (failed to load)")
             return false
         }
-        val enabled = plugin.configFacade.isScoreboardEnabled
+        val enabled = plugin.configFacade.isScoreboardEnabled()
         if (!enabled) {
             plugin.debug("scoreboard", "shouldUseScoreboard: scoreboard disabled in config")
         }
@@ -106,14 +106,14 @@ class ScoreboardManager(private val plugin: Metro) {
         val lineManager = plugin.lineManager
         val serializer = LegacyComponentSerializer.legacySection()
 
-        val styleCurrent = plugin.configFacade.sbStyleCurrent
-        val stylePassed = plugin.configFacade.sbStylePassed
-        val styleWaitingNext = plugin.configFacade.sbStyleWaitingNext
-        val styleMovingNext = plugin.configFacade.sbStyleMovingNext
-        val styleTerminal = plugin.configFacade.sbStyleTerminal
-        val styleFolding = plugin.configFacade.sbStyleFolding
-        val styleNext = plugin.configFacade.sbStyleNext
-        val lineSymbol = plugin.configFacade.lineSymbol
+        val styleCurrent = plugin.configFacade.getSbStyleCurrent()
+        val stylePassed = plugin.configFacade.getSbStylePassed()
+        val styleWaitingNext = plugin.configFacade.getSbStyleWaitingNext()
+        val styleMovingNext = plugin.configFacade.getSbStyleMovingNext()
+        val styleTerminal = plugin.configFacade.getSbStyleTerminal()
+        val styleFolding = plugin.configFacade.getSbStyleFolding()
+        val styleNext = plugin.configFacade.getSbStyleNext()
+        val lineSymbol = plugin.configFacade.getLineSymbol()
 
         val currentStopIndex = if (currentStopId != null) stopIds.indexOf(currentStopId) else -1
         val nextStopIndex = if (nextStopId != null) stopIds.indexOf(nextStopId) else -1

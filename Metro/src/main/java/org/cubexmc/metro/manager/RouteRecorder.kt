@@ -107,13 +107,13 @@ class RouteRecorder(private val plugin: Metro) {
     }
 
     private fun shouldSimplifyCollinearPoints(): Boolean =
-        plugin.configFacade == null || plugin.configFacade.isRouteRecordingSimplifyCollinearPoints
+        plugin.configFacade == null || plugin.configFacade.isRouteRecordingSimplifyCollinearPoints()
 
     private fun minSampleDistanceSquared(): Double {
         val distance = if (plugin.configFacade == null) {
             DEFAULT_MIN_SAMPLE_DISTANCE_BLOCKS
         } else {
-            plugin.configFacade.routeRecordingMinSampleDistanceBlocks
+            plugin.configFacade.getRouteRecordingMinSampleDistanceBlocks()
         }
         return distance * distance
     }
@@ -122,7 +122,7 @@ class RouteRecorder(private val plugin: Metro) {
         if (plugin.configFacade == null) {
             DEFAULT_SIMPLIFY_EPSILON_BLOCKS
         } else {
-            plugin.configFacade.routeRecordingSimplifyEpsilonBlocks
+            plugin.configFacade.getRouteRecordingSimplifyEpsilonBlocks()
         }
 
     private class RecordingSession(

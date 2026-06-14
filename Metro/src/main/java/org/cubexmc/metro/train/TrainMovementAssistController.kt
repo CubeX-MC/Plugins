@@ -17,10 +17,10 @@ class TrainMovementAssistController(
     fun start() {
         stop()
         val minecart = session.minecart
-        if (!session.plugin.configFacade.isSafeModeMovementAssist || minecart == null) {
+        if (!session.plugin.configFacade.isSafeModeMovementAssist() || minecart == null) {
             return
         }
-        val interval = max(1L, session.plugin.configFacade.safeModeStallRecoveryTicks)
+        val interval = max(1L, session.plugin.configFacade.getSafeModeStallRecoveryTicks())
         movementAssistTaskId = trainScheduler.entityRun(
             minecart,
             Runnable { recoverStalledMinecart() },
@@ -35,7 +35,7 @@ class TrainMovementAssistController(
     }
 
     private fun recoverStalledMinecart() {
-        if (!session.plugin.configFacade.isSafeModeMovementAssist) {
+        if (!session.plugin.configFacade.isSafeModeMovementAssist()) {
             stop()
             return
         }
@@ -52,14 +52,14 @@ class TrainMovementAssistController(
             return
         }
 
-        val minCruiseSpeed = max(0.01, session.plugin.configFacade.safeModeMinCruiseSpeed)
+        val minCruiseSpeed = max(0.01, session.plugin.configFacade.getSafeModeMinCruiseSpeed())
         if (!physicsController.isBelowCruiseSpeed(minecart, minCruiseSpeed)) {
             return
         }
 
         val targetSpeed = physicsController.resolveAssistSpeed(
             minecart,
-            session.plugin.configFacade.cartSpeed,
+            session.plugin.configFacade.getCartSpeed(),
             minCruiseSpeed,
         )
         val lastTravelDirection = session.lastTravelDirection ?: return

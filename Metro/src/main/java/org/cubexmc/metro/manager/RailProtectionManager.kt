@@ -201,7 +201,7 @@ class RailProtectionManager(private val plugin: Metro) : Listener {
     }
 
     private fun isMetroPassengerBreakingRail(player: Player, block: Block): Boolean {
-        if (!plugin.configFacade.isSafeModePassengerRailBreakProtection || !isRail(block)) {
+        if (!plugin.configFacade.isSafeModePassengerRailBreakProtection() || !isRail(block)) {
             return false
         }
         val minecart = player.vehicle as? Minecart ?: return false
