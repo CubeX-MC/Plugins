@@ -34,8 +34,6 @@ class Portal(val id: String) {
     var destYaw: Float = 0.0f
         private set
 
-    // 可选的双向配对
-    var linkedPortalId: String? = null
     var owner: UUID? = null
         set(value) {
             field = value
@@ -60,9 +58,6 @@ class Portal(val id: String) {
         section.set("dest_y", destY)
         section.set("dest_z", destZ)
         section.set("dest_yaw", destYaw.toDouble())
-        if (linkedPortalId != null) {
-            section.set("linked", linkedPortalId)
-        }
         section.set("owner", owner?.toString())
         if (adminIds.isNotEmpty()) {
             val adminStrings = adminIds
@@ -173,7 +168,6 @@ class Portal(val id: String) {
             portal.destY = section.getDouble("dest_y")
             portal.destZ = section.getDouble("dest_z")
             portal.destYaw = section.getDouble("dest_yaw", 0.0).toFloat()
-            portal.linkedPortalId = section.getString("linked", null)
             val ownerString = section.getString("owner")
             if (ownerString != null && ownerString.isNotEmpty()) {
                 try {

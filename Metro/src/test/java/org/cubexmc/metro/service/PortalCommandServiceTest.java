@@ -82,18 +82,6 @@ class PortalCommandServiceTest {
     }
 
     @Test
-    void shouldValidateLinkTargets() {
-        assertEquals(WriteStatus.FAILED, service.linkPortals("p1", "p1"));
-        verify(portalManager, never()).linkPortals("p1", "p1");
-
-        when(portalManager.linkPortals("p1", "p2")).thenReturn(false);
-        assertEquals(WriteStatus.NOT_FOUND, service.linkPortals("p1", "p2"));
-
-        when(portalManager.linkPortals("p1", "p2")).thenReturn(true);
-        assertEquals(WriteStatus.SUCCESS, service.linkPortals("p1", "p2"));
-    }
-
-    @Test
     void shouldGrantAndRemovePortalAdminsThroughManager() {
         Portal portal = new Portal("p1");
         UUID adminId = UUID.randomUUID();

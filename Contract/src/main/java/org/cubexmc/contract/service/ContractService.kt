@@ -303,6 +303,9 @@ class ContractService(
         if (contract.status() != ContractStatus.OPEN) {
             return ServiceResult.fail("合同当前不可接取")
         }
+        if (contract.isExpired(System.currentTimeMillis())) {
+            return rejectExpiredAcceptance(contract)
+        }
         if (contract.ownerUuid() == contractor.uniqueId) {
             return ServiceResult.fail("不能接取自己发布的合同")
         }
@@ -329,6 +332,9 @@ class ContractService(
     private fun acceptWager(player: Player, contract: Contract): ServiceResult {
         if (contract.status() != ContractStatus.PENDING_ACCEPT) {
             return ServiceResult.fail("对赌合同当前不可接受")
+        }
+        if (contract.isExpired(System.currentTimeMillis())) {
+            return rejectExpiredAcceptance(contract)
         }
         val partyB = contract.participant(ParticipantRole.PARTY_B).orElse(null)
         if (partyB == null || partyB.uuid() == null || partyB.uuid() != player.uniqueId) {
@@ -368,6 +374,9 @@ class ContractService(
     private fun acceptPartnership(player: Player, contract: Contract): ServiceResult {
         if (contract.status() != ContractStatus.PENDING_ACCEPT) {
             return ServiceResult.fail("合作合同当前不可接受")
+        }
+        if (contract.isExpired(System.currentTimeMillis())) {
+            return rejectExpiredAcceptance(contract)
         }
         val partyB = contract.participant(ParticipantRole.PARTY_B).orElse(null)
         if (partyB == null || partyB.uuid() == null || partyB.uuid() != player.uniqueId) {
@@ -929,19 +938,56 @@ class ContractService(
                 continue
             }
             if (contract.isExpired(now)) {
-                val current = contract.status()
-                val result = when {
-                    current == ContractStatus.PENDING_ACCEPT -> refundPendingAcceptance(contract, ContractStatus.CANCELLED, "EXPIRED_PENDING", "opponent did not accept in time")
-                    current == ContractStatus.OPEN || current == ContractStatus.IN_PROGRESS -> refund(contract, ContractStatus.EXPIRED, "EXPIRED", "contract expired")
-                    else -> markDisputed(contract, "contract expired while waiting for approval")
-                }
+                val result = expireAwaitingAcceptance(contract)
                 if (result.success()) {
                     changed++
                 }
             }
         }
+        changed += purgeRetiredContracts(now)
         return changed
     }
+
+    private fun purgeRetiredContracts(now: Long): Int {
+        val completedDays = plugin.config.getInt("retention.completed-contract-days", 90)
+        val closedDays = plugin.config.getInt("retention.closed-contract-days", 30)
+        var removed = 0
+        for (contract in storage.all()) {
+            if (shouldPurgeFinalContract(contract.status(), contract.completedAt(), now, completedDays, closedDays)) {
+                storage.remove(contract.id())
+                removed++
+            }
+        }
+        if (removed > 0) {
+            storage.markDirty()
+            try {
+                storage.save()
+            } catch (ex: IOException) {
+                plugin.logger.warning("Failed to persist retired contract purge: ${ex.message}")
+            }
+        }
+        return removed
+    }
+
+    private fun rejectExpiredAcceptance(contract: Contract): ServiceResult {
+        val result = expireAwaitingAcceptance(contract)
+        if (!result.success()) {
+            return ServiceResult.fail("合同已过接单截止时间，自动处理失败: ${result.reason()}")
+        }
+        return ServiceResult.fail("合同已过接单截止时间")
+    }
+
+    private fun expireAwaitingAcceptance(contract: Contract): ServiceResult =
+        when (contract.status()) {
+            ContractStatus.OPEN -> refund(contract, ContractStatus.EXPIRED, "EXPIRED", "contract expired before acceptance")
+            ContractStatus.PENDING_ACCEPT -> refundPendingAcceptance(
+                contract,
+                ContractStatus.CANCELLED,
+                "EXPIRED_PENDING",
+                "opponent did not accept in time",
+            )
+            else -> ServiceResult.fail("合同当前状态不按接单截止处理")
+        }
 
     fun openContracts(): List<Contract> = storage.openContracts()
 
@@ -1217,6 +1263,26 @@ class ContractService(
                 return contractStatusOrNull == ContractStatus.PENDING_ACCEPT
             }
             return false
+        }
+
+        @JvmStatic
+        fun shouldPurgeFinalContract(
+            status: ContractStatus,
+            completedAt: Long?,
+            now: Long,
+            completedDays: Int,
+            closedDays: Int,
+        ): Boolean {
+            val settledAt = completedAt ?: return false
+            val retentionDays = when (status) {
+                ContractStatus.COMPLETED -> completedDays
+                ContractStatus.CANCELLED, ContractStatus.EXPIRED -> closedDays
+                else -> return false
+            }
+            if (retentionDays <= 0) {
+                return false
+            }
+            return now >= settledAt + retentionDays * 24L * 60L * 60L * 1000L
         }
     }
 }

@@ -1,5 +1,7 @@
 package org.cubexmc.metro.train;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -26,6 +28,7 @@ import org.cubexmc.metro.model.Stop;
 import org.cubexmc.metro.util.SoundUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import net.md_5.bungee.api.ChatMessageType;
 
@@ -243,6 +246,32 @@ class TrainDisplayControllerTest {
         controller.onTrainDeparture(event);
 
         verify(passenger).sendTitle(anyString(), anyString(), eq(5), eq(30), eq(5));
+    }
+
+    @Test
+    void shouldColorizeHexLineColorInDepartureTitle() {
+        when(configFacade.getDepartureTitle()).thenReturn("{line_color_code}{line}");
+        TrainDisplayController controller = new TrainDisplayController(plugin);
+        Line line = createLineWithStops("l1", "A", "B");
+        line.setColor("&#55AAFF");
+        Minecart cart = mock(Minecart.class);
+        Player passenger = createPlayerWithSpigot();
+
+        Stop stopA = new Stop("A", "Alpha");
+        Stop stopB = new Stop("B", "Bravo");
+        when(stopManager.getStop("B")).thenReturn(stopB);
+        when(stopManager.getStop("A")).thenReturn(stopA);
+
+        MetroTrainDepartureEvent event = new MetroTrainDepartureEvent(
+                cart, passenger, line, stopA, stopB);
+
+        controller.onTrainDeparture(event);
+
+        ArgumentCaptor<String> titleCaptor = ArgumentCaptor.forClass(String.class);
+        verify(passenger).sendTitle(titleCaptor.capture(), anyString(), eq(5), eq(30), eq(5));
+        String title = titleCaptor.getValue();
+        assertTrue(title.contains("\u00a7"));
+        assertFalse(title.contains("&#55AAFF"));
     }
 
     @Test

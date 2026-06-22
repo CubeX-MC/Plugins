@@ -68,13 +68,6 @@ class PortalCommandService(private val portalManager: PortalManager) {
         return PortalWriteResult(WriteStatus.SUCCESS, portalManager.getPortal(id), destination)
     }
 
-    fun linkPortals(id1: String?, id2: String?): WriteStatus {
-        if (id1 == null || id1 == id2) {
-            return WriteStatus.FAILED
-        }
-        return if (portalManager.linkPortals(id1, id2)) WriteStatus.SUCCESS else WriteStatus.NOT_FOUND
-    }
-
     fun deletePortal(id: String): WriteStatus =
         if (portalManager.deletePortal(id)) WriteStatus.SUCCESS else WriteStatus.NOT_FOUND
 

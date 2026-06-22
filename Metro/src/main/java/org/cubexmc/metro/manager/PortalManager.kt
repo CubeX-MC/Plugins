@@ -155,12 +155,6 @@ class PortalManager(private val plugin: Metro) {
         try {
             val removed = portals.remove(id)
             removedPortal = removed != null
-            if (removed != null && removed.linkedPortalId != null) {
-                val linked = portals[removed.linkedPortalId]
-                if (linked != null) {
-                    linked.linkedPortalId = null
-                }
-            }
         } finally {
             lock.writeLock().unlock()
         }
@@ -179,20 +173,6 @@ class PortalManager(private val plugin: Metro) {
         try {
             val portal = portals[id] ?: return false
             portal.setDestination(destination)
-        } finally {
-            lock.writeLock().unlock()
-        }
-        save()
-        return true
-    }
-
-    fun linkPortals(id1: String?, id2: String?): Boolean {
-        lock.writeLock().lock()
-        try {
-            val p1 = portals[id1] ?: return false
-            val p2 = portals[id2] ?: return false
-            p1.linkedPortalId = id2
-            p2.linkedPortalId = id1
         } finally {
             lock.writeLock().unlock()
         }

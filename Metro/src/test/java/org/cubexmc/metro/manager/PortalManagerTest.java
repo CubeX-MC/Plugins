@@ -100,7 +100,7 @@ class PortalManagerTest {
     }
 
     @Test
-    void shouldUnlinkDeleteAndNotifyLineManager() throws IOException {
+    void shouldDeleteAndNotifyLineManager() throws IOException {
         LineManager lineManager = mock(LineManager.class);
         Metro plugin = createPluginMock(tempDir);
         when(plugin.getLineManager()).thenReturn(lineManager);
@@ -108,21 +108,16 @@ class PortalManagerTest {
 
         manager.createPortal("p1", location("world", 1, 64, 1), UUID.randomUUID());
         manager.createPortal("p2", location("world", 2, 64, 2), UUID.randomUUID());
-        assertTrue(manager.linkPortals("p1", "p2"));
-        assertEquals("p2", manager.getPortal("p1").getLinkedPortalId());
-        assertEquals("p1", manager.getPortal("p2").getLinkedPortalId());
 
         assertTrue(manager.deletePortal("p1"));
         assertFalse(manager.deletePortal("p1"));
         assertNull(manager.getPortal("p1"));
-        assertNull(manager.getPortal("p2").getLinkedPortalId());
         verify(lineManager).delPortalFromAllLines("p1");
 
         manager.forceSaveSync();
         String savedYaml = Files.readString(tempDir.resolve("portals.yml"));
         assertFalse(savedYaml.contains("p1:"));
         assertTrue(savedYaml.contains("p2:"));
-        assertFalse(savedYaml.contains("linked: p1"));
     }
 
     @Test

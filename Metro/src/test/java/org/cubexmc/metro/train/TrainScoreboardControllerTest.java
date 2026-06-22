@@ -113,8 +113,11 @@ class TrainScoreboardControllerTest {
     }
 
     @Test
-    void shouldDoNothingWhenMovingBetweenStations() {
+    void shouldUpdateTravelingScoreboardWhenMovingBetweenStations() {
         Metro plugin = mock(Metro.class);
+        ScoreboardManager sbManager = mock(ScoreboardManager.class);
+        when(plugin.getScoreboardManager()).thenReturn(sbManager);
+
         Line line = new Line("l1", "Line1");
         line.addStop("A", -1);
         line.addStop("B", -1);
@@ -128,6 +131,6 @@ class TrainScoreboardControllerTest {
         TrainScoreboardController controller = new TrainScoreboardController();
         controller.updateBasedOnState(session);
 
-        verify(plugin, never()).getScoreboardManager();
+        verify(sbManager).updateTravelingScoreboard(player, line, "B");
     }
 }

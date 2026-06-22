@@ -35,4 +35,7 @@ object ColorUtil {
         // 处理传统的 & 颜色代码
         return ChatColor.translateAlternateColorCodes('&', buffer.toString())
     }
+
+    @JvmStatic
+    fun colorizeOrEmpty(text: String?): String = colorize(text) ?: ""
 }

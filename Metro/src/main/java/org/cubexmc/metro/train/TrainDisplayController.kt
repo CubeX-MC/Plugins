@@ -2,7 +2,6 @@ package org.cubexmc.metro.train
 
 import net.md_5.bungee.api.ChatMessageType
 import net.md_5.bungee.api.chat.TextComponent
-import org.bukkit.ChatColor
 import org.bukkit.Location
 import org.bukkit.entity.Minecart
 import org.bukkit.entity.Player
@@ -15,6 +14,7 @@ import org.cubexmc.metro.event.MetroTrainDepartureEvent
 import org.cubexmc.metro.manager.LineManager
 import org.cubexmc.metro.model.Line
 import org.cubexmc.metro.model.Stop
+import org.cubexmc.metro.util.ColorUtil
 import org.cubexmc.metro.util.SchedulerUtil
 import org.cubexmc.metro.util.SoundUtil
 import org.cubexmc.metro.util.TextUtil
@@ -251,8 +251,8 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             lineManager,
         )
 
-        title = ChatColor.translateAlternateColorCodes('&', title)
-        subtitle = ChatColor.translateAlternateColorCodes('&', subtitle)
+        title = ColorUtil.colorizeOrEmpty(title)
+        subtitle = ColorUtil.colorizeOrEmpty(subtitle)
         passenger.sendTitle(title, subtitle, 0, 1000000, 0)
 
         var actionbarTemplate = plugin.configFacade.getWaitingActionbar()
@@ -272,7 +272,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
                 terminusStop,
                 lineManager,
             )
-            actionbarText = ChatColor.translateAlternateColorCodes('&', actionbarText)
+            actionbarText = ColorUtil.colorizeOrEmpty(actionbarText)
             passenger.spigot().sendMessage(ChatMessageType.ACTION_BAR, *TextComponent.fromLegacyText(actionbarText))
         }
     }
@@ -320,7 +320,7 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
 
                     var text = template.replace("{countdown}", secondsLeft.toString())
                     text = TextUtil.replacePlaceholders(text, line, mainStop, prevStop, nextStop, terminusStop, lineManager)
-                    text = ChatColor.translateAlternateColorCodes('&', text)
+                    text = ColorUtil.colorizeOrEmpty(text)
                     passenger.spigot().sendMessage(ChatMessageType.ACTION_BAR, *TextComponent.fromLegacyText(text))
                 },
                 delayTicks,
@@ -461,9 +461,9 @@ class TrainDisplayController(private val plugin: Metro) : Listener {
             lineManager,
         )
 
-        title = ChatColor.translateAlternateColorCodes('&', title)
-        subtitle = ChatColor.translateAlternateColorCodes('&', subtitle)
-        actionbar = ChatColor.translateAlternateColorCodes('&', actionbar)
+        title = ColorUtil.colorizeOrEmpty(title)
+        subtitle = ColorUtil.colorizeOrEmpty(subtitle)
+        actionbar = ColorUtil.colorizeOrEmpty(actionbar)
 
         passenger.sendTitle(title, subtitle, fadeIn, stay, fadeOut)
         passenger.spigot().sendMessage(ChatMessageType.ACTION_BAR, *TextComponent.fromLegacyText(actionbar))

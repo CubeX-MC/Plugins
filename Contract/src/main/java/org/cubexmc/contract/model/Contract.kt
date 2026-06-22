@@ -37,7 +37,7 @@ class Contract(
 
     fun shortId(): String = if (id.length <= 8) id else id.substring(0, 8)
 
-    fun isExpired(now: Long): Boolean = now >= expiresAt && !status.isFinal() && status != ContractStatus.DISPUTED
+    fun isExpired(now: Long): Boolean = now >= expiresAt && status.awaitsAcceptance()
 
     fun addEvent(time: Long, type: String, detail: String) {
         events.add(ContractEvent(time, type, detail))

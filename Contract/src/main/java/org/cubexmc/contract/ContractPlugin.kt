@@ -225,7 +225,7 @@ class ContractPlugin : CubexPlugin() {
             Runnable {
                 val changed = contracts().cleanupExpired()
                 if (changed > 0) {
-                    logger.info("Processed $changed expired or auto-approved contracts.")
+                    logger.info("Processed $changed contract cleanup actions.")
                 }
             },
             periodTicks,

@@ -28,6 +28,12 @@ expiry:
   cleanup-interval-minutes: 10
   submitted-auto-approve-hours: 72
 
+retention:
+  # 已完成合同保留天数;设为 0 可关闭自动删除。
+  completed-contract-days: 90
+  # 已取消/接单超时关闭合同保留天数;申诉中合同永不自动删除。
+  closed-contract-days: 30
+
 storage:
   flush-interval-seconds: 30
 

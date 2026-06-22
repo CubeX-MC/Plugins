@@ -185,7 +185,6 @@ object DataFileUpdater {
                 changed = renameIfMissing(section, "destY", "dest_y") or changed
                 changed = renameIfMissing(section, "destZ", "dest_z") or changed
                 changed = renameIfMissing(section, "destYaw", "dest_yaw") or changed
-                changed = renameIfMissing(section, "linkedPortalId", "linked") or changed
             }
         }
 

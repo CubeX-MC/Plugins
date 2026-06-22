@@ -26,6 +26,7 @@ class LineSelectionServiceTest {
         World world = world("world");
         Stop current = stop("central", world);
         current.allowLine("red");
+        current.allowLine("wrong_world");
 
         Stop next = stop("next", world);
         Stop incompleteNext = new Stop("missing_point", "Missing Point");
@@ -46,7 +47,7 @@ class LineSelectionServiceTest {
 
         LineSelectionService service = new LineSelectionService(lineManager, stopManager);
 
-        assertEquals(List.of(red), service.getBoardableLines(current));
+        assertEquals(List.of(red, wrongWorld), service.getBoardableLines(current));
         assertEquals(red, service.resolveDefaultLine(player(0.0f), current, current.getStopPointLocation()));
     }
 
@@ -68,7 +69,7 @@ class LineSelectionServiceTest {
         LineSelectionService service = new LineSelectionService(lineManager, stopManager);
 
         assertEquals(List.of(boardable), service.getBoardableLines(current));
-        assertEquals(List.of(terminal), service.getTerminalLines(current));
+        assertEquals(List.of(terminal, wrongWorld), service.getTerminalLines(current));
     }
 
     @Test

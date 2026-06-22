@@ -21,8 +21,8 @@ class TrainScoreboardController {
             }
             TrainMovementTask.TrainState.MOVING_IN_STATION ->
                 session.plugin.scoreboardManager.updateTravelingScoreboard(passenger, line, session.targetStopId)
-            TrainMovementTask.TrainState.MOVING_BETWEEN_STATIONS -> {
-            }
+            TrainMovementTask.TrainState.MOVING_BETWEEN_STATIONS ->
+                session.plugin.scoreboardManager.updateTravelingScoreboard(passenger, line, session.targetStopId)
         }
     }
 }

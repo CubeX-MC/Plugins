@@ -45,7 +45,6 @@ class MetroAPI private constructor(private val plugin: Metro) {
         EXISTS,
         INVALID_ID,
         INVALID_LOCATION,
-        SAME_PORTAL,
         FAILED,
     }
 
@@ -326,7 +325,6 @@ class MetroAPI private constructor(private val plugin: Metro) {
         private val destinationY: Double,
         private val destinationZ: Double,
         private val destinationYaw: Float,
-        private val linkedPortalId: String?,
         private val owner: UUID?,
         private val admins: Set<UUID>,
     ) {
@@ -350,8 +348,6 @@ class MetroAPI private constructor(private val plugin: Metro) {
 
         fun destinationYaw(): Float = destinationYaw
 
-        fun linkedPortalId(): String? = linkedPortalId
-
         fun owner(): UUID? = owner
 
         fun admins(): Set<UUID> = admins
@@ -373,7 +369,6 @@ class MetroAPI private constructor(private val plugin: Metro) {
                     portal.destY,
                     portal.destZ,
                     portal.destYaw,
-                    portal.linkedPortalId,
                     portal.owner,
                     immutableSet(portal.admins),
                 )
@@ -452,14 +447,6 @@ class MetroAPI private constructor(private val plugin: Metro) {
             return PortalWriteStatus.FAILED
         }
         return toPortalWriteStatus(service.setDestination(portalId, destination).status())
-    }
-
-    fun linkPortals(firstPortalId: String?, secondPortalId: String?): PortalWriteStatus {
-        if (firstPortalId != null && firstPortalId == secondPortalId) {
-            return PortalWriteStatus.SAME_PORTAL
-        }
-        val service = portalService() ?: return PortalWriteStatus.FAILED
-        return toPortalWriteStatus(service.linkPortals(firstPortalId, secondPortalId))
     }
 
     fun deletePortal(portalId: String?): PortalWriteStatus {

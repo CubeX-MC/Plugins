@@ -99,7 +99,7 @@ messages:
     <#FFE066>Settlement preview:
     <payouts>
     <approval>
-    <#FFE066>Deadline: <#FFFFFF><deadline>
+    <#FFE066>Accept-by: <#FFFFFF><deadline>
     <#FFE066>Description: <#F1F5F9><description>
   help: |
     <#F4D03F>==== Contract ====

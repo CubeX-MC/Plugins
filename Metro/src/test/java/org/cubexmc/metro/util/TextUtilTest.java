@@ -1,5 +1,6 @@
 package org.cubexmc.metro.util;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.cubexmc.metro.model.Line;
@@ -24,7 +25,19 @@ class TextUtilTest {
         assertTrue(result.contains("Central"));
         assertTrue(result.contains("Harbor"));
         assertTrue(result.contains("Airport"));
-        assertTrue(result.contains("&a"));
+        assertTrue(result.contains("\u00a7a"));
+    }
+
+    @Test
+    void shouldColorizeHexLineColorPlaceholder() {
+        Line line = new Line("line_1", "Line 1");
+        line.setColor("&#55AAFF");
+
+        String result = TextUtil.replacePlaceholders("{line_color_code}{line}", line, null, null, null, null, null);
+
+        assertTrue(result.contains("Line 1"));
+        assertTrue(result.contains("\u00a7"));
+        assertFalse(result.contains("&#55AAFF"));
     }
 }
 

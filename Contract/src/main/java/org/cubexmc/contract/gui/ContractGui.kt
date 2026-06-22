@@ -22,10 +22,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Drives the contract GUI. The hall (`openHall`) is the landing screen; the public board, "my
- * contracts" and the action inbox are the same grid under different [HallView]s. Navigation runs
- * through the [framework.Menu]/[framework.MenuRegistry] button framework rather than a central
- * slot switch; text/number entry runs through [ChatInputService].
+ * Drives the contract GUI. The hall (`openHall`) is the landing screen; contracts are grouped by
+ * their workflow state so players can answer "what needs attention now?" before opening details.
+ * Navigation runs through the [framework.Menu]/[framework.MenuRegistry] button framework rather than
+ * a central slot switch; text/number entry runs through [ChatInputService].
  */
 class ContractGui(private val plugin: ContractPlugin) : Listener {
     private val drafts: MutableMap<UUID, CreateDraft> = HashMap()
@@ -50,7 +50,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     /** Opens the hall landing screen (public board). */
     fun open(player: Player) {
-        openHall(player, HallView.OPEN, 1, TypeFilter.ALL)
+        openHall(player, HallView.OPEN, 1)
     }
 
     fun closeSessions() {
@@ -66,27 +66,29 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     // ---- Hall (public board / my contracts / inbox) --------------------------------------------
 
-    fun openHall(player: Player, view: HallView, page: Int, filter: TypeFilter) {
-        val contracts = hallContracts(player, view, filter)
+    fun openHall(player: Player, view: HallView, page: Int) {
+        val contracts = hallContracts(player, view)
         val pages = pageCount(contracts.size)
         val current = clampPage(page, pages)
         val menu = Menu(hallTitle(view), 6)
         fillBorder(menu.inventory)
 
-        menu.button(1, filterButton(TypeFilter.ALL, filter, Material.COMPASS, "全部")) { openHall(player, view, 1, TypeFilter.ALL) }
-        menu.button(2, filterButton(TypeFilter.SERVICE, filter, Material.PAPER, "委托")) { openHall(player, view, 1, TypeFilter.SERVICE) }
-        menu.button(3, filterButton(TypeFilter.WAGER, filter, Material.TARGET, "对赌")) { openHall(player, view, 1, TypeFilter.WAGER) }
-        menu.button(4, filterButton(TypeFilter.PARTNERSHIP, filter, Material.AMETHYST_CLUSTER, "合作")) { openHall(player, view, 1, TypeFilter.PARTNERSHIP) }
+        menu.button(1, viewButton(HallView.OPEN, view, Material.EMERALD, "开放")) { openHall(player, HallView.OPEN, 1) }
+        menu.button(2, viewButton(HallView.ACTIVE, view, Material.CLOCK, "进行中")) { openHall(player, HallView.ACTIVE, 1) }
+        menu.button(3, viewButton(HallView.SUBMITTED, view, Material.DIAMOND, "待确认")) { openHall(player, HallView.SUBMITTED, 1) }
+        menu.button(4, viewButton(HallView.DISPUTED, view, Material.REDSTONE, "申诉中")) { openHall(player, HallView.DISPUTED, 1) }
+        menu.button(5, viewButton(HallView.DONE, view, Material.NETHER_STAR, "已完成")) { openHall(player, HallView.DONE, 1) }
+        menu.button(6, viewButton(HallView.CLOSED, view, Material.BARRIER, "已关闭")) { openHall(player, HallView.CLOSED, 1) }
 
-        val back = { openHall(player, view, current, filter) }
+        val back = { openHall(player, view, current) }
         val start = (current - 1) * BOARD_SLOTS.size
         val end = min(start + BOARD_SLOTS.size, contracts.size)
         for (index in start until end) {
             val slot = BOARD_SLOTS[index - start]
             val contract = contracts[index]
-            val label = if (view == HallView.INBOX) inboxLabel(player, contract) else null
+            val label = inboxLabel(player, contract)
             val contractId = contract.id()
-            menu.button(slot, render.contractItem(contract, label)) {
+            menu.button(slot, render.contractItem(contract, label, progressLabel(player, contract))) {
                 plugin.storage().findByPrefix(contractId).ifPresent { found -> openDetails(player, found, false, back) }
             }
         }
@@ -94,18 +96,15 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             menu.decoration(22, button(Material.LIME_DYE, "&#69DB7C${emptyHint(view)}", "&#CFD8DC换个筛选或稍后再来看看"))
         }
 
-        val inboxCount = inboxContracts(player).size
-        menu.button(45, button(Material.ARROW, "&#FFE066上一页", "&#CFD8DC第 $current/$pages 页")) { if (current > 1) openHall(player, view, current - 1, filter) }
-        menu.button(46, viewButton(HallView.OPEN, view, Material.EMERALD, "合同大厅")) { openHall(player, HallView.OPEN, 1, filter) }
-        menu.button(47, viewButton(HallView.MINE, view, Material.BOOK, "我的合同")) { openHall(player, HallView.MINE, 1, filter) }
-        menu.button(48, viewButton(HallView.INBOX, view, if (inboxCount > 0) Material.BELL else Material.CHEST, "行动收件箱 &#FFFFFF($inboxCount)")) { openHall(player, HallView.INBOX, 1, filter) }
+        menu.button(45, button(Material.ARROW, "&#FFE066上一页", "&#CFD8DC第 $current/$pages 页")) { if (current > 1) openHall(player, view, current - 1) }
         menu.button(49, button(Material.WRITABLE_BOOK, "&#69DB7C创建合同", "&#CFD8DC发布委托、对赌或合作")) { openWizardType(player) }
-        menu.button(50, button(Material.NETHER_STAR, "&#F4D03F刷新", "&#CFD8DC合同数: &#FFFFFF${contracts.size}")) { openHall(player, view, current, filter) }
+        val inboxCount = inboxContracts(player).size
+        menu.button(50, button(Material.BELL, "&#F4D03F刷新", "&#CFD8DC当前分栏: &#FFFFFF${contracts.size}", "&#CFD8DC待你处理: &#FFFFFF$inboxCount", "&#CFD8DC红色箭头代表当前轮到你操作")) { openHall(player, view, current) }
         if (player.hasPermission("contract.admin.view")) {
             menu.button(51, button(Material.CRAFTING_TABLE, "&#E63946管理工作台", "&#CFD8DC处理争议、中断结算与全部合同")) { openAdmin(player, AdminFilter.DISPUTED, 1) }
         }
         menu.button(52, button(Material.KNOWLEDGE_BOOK, "&#FFE066帮助", "&#CFD8DC查看命令与资金规则说明")) { sendHelp(player) }
-        menu.button(53, button(Material.ARROW, "&#FFE066下一页", "&#CFD8DC第 $current/$pages 页")) { openHall(player, view, current + 1, filter) }
+        menu.button(53, button(Material.ARROW, "&#FFE066下一页", "&#CFD8DC第 $current/$pages 页")) { openHall(player, view, current + 1) }
 
         registry.open(player, menu)
     }
@@ -444,7 +443,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
                 player.sendMessage(Text.color("&#69DB7C签署成功,操作已完成。"))
                 drafts.remove(player.uniqueId)
                 val done = result.contract()
-                val mineBack = { openHall(player, HallView.MINE, 1, TypeFilter.ALL) }
+                val mineBack = { openHall(player, HallView.OPEN, 1) }
                 if (done != null) openDetails(player, done, false, mineBack) else mineBack()
             } else {
                 player.sendMessage(plugin.lang().message("operation-failed", mapOf("reason" to result.reason())))
@@ -592,11 +591,23 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     // ---- Data queries --------------------------------------------------------------------------
 
-    private fun hallContracts(player: Player, view: HallView, filter: TypeFilter): List<Contract> = when (view) {
-        HallView.OPEN -> plugin.contracts().openContracts().stream().filter { filter.matches(it) }.toList()
-        HallView.MINE -> plugin.contracts().allContracts().stream().filter { it.relatedTo(player.uniqueId) && filter.matches(it) }.toList()
-        HallView.INBOX -> inboxContracts(player).filter { filter.matches(it) }
+    private fun hallContracts(player: Player, view: HallView): List<Contract> = when (view) {
+        HallView.OPEN -> plugin.contracts().allContracts().stream()
+            .filter { contract -> contract.status() == ContractStatus.OPEN || contract.status() == ContractStatus.PENDING_ACCEPT && contract.relatedTo(player.uniqueId) }
+            .toList()
+        HallView.ACTIVE -> relatedContracts(player, ContractStatus.IN_PROGRESS)
+        HallView.SUBMITTED -> relatedContracts(player, ContractStatus.SUBMITTED)
+        HallView.DISPUTED -> relatedContracts(player, ContractStatus.DISPUTED)
+        HallView.DONE -> relatedContracts(player, ContractStatus.COMPLETED)
+        HallView.CLOSED -> plugin.contracts().allContracts().stream()
+            .filter { contract -> contract.relatedTo(player.uniqueId) && (contract.status() == ContractStatus.CANCELLED || contract.status() == ContractStatus.EXPIRED) }
+            .toList()
     }
+
+    private fun relatedContracts(player: Player, status: ContractStatus): List<Contract> =
+        plugin.contracts().allContracts().stream()
+            .filter { contract -> contract.relatedTo(player.uniqueId) && contract.status() == status }
+            .toList()
 
     private fun inboxContracts(player: Player): List<Contract> {
         val result = ArrayList<Contract>()
@@ -632,6 +643,28 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         return null
     }
 
+    private fun progressLabel(player: Player, contract: Contract): String {
+        val id = player.uniqueId
+        val status = contract.status()
+        val action = inboxLabel(player, contract)
+        if (action != null) {
+            return action
+        }
+        if (isArbiter(contract, id) && contract.type() != ContractType.WAGER && contract.arbiterAccepted()) {
+            return "中间人已接受,等待争议或双方处理"
+        }
+        return when (status) {
+            ContractStatus.OPEN -> "等待玩家接单"
+            ContractStatus.PENDING_ACCEPT -> "等待指定对方接受邀请"
+            ContractStatus.IN_PROGRESS -> "执行中,等待接单方完成"
+            ContractStatus.SUBMITTED -> "已提交,等待雇主确认"
+            ContractStatus.DISPUTED -> "申诉中,等待管理员或中间人处理"
+            ContractStatus.COMPLETED -> "已完成并结算"
+            ContractStatus.CANCELLED -> "已关闭或撤销"
+            ContractStatus.EXPIRED -> "接单超时,已关闭"
+        }
+    }
+
     private fun adminContracts(filter: AdminFilter): List<Contract> {
         val result = ArrayList<Contract>()
         for (contract in plugin.contracts().allContracts()) {
@@ -661,9 +694,6 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         val name = (if (filled) "&#69DB7C" else "&#FFE066") + "描述"
         return button(Material.BOOK, name, "&#CFD8DC当前: &#FFFFFF${ContractTerms.preview(value)}", "&#FFE066点击后在聊天输入", "&#CFD8DC输入 cancel 取消, clear 清空")
     }
-
-    private fun filterButton(filter: TypeFilter, selected: TypeFilter, material: Material, label: String): ItemStack =
-        button(material, (if (filter == selected) "&#69DB7C" else "&#CFD8DC") + label, "&#CFD8DC点击筛选此类型")
 
     private fun adminFilterButton(filter: AdminFilter, selected: AdminFilter, material: Material, label: String): ItemStack =
         button(material, (if (filter == selected) "&#69DB7C" else "&#CFD8DC") + label, "&#CFD8DC点击切换分栏")
@@ -698,14 +728,20 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun hallTitle(view: HallView): String = when (view) {
         HallView.OPEN -> BOARD_TITLE
-        HallView.MINE -> MY_TITLE
-        HallView.INBOX -> INBOX_TITLE
+        HallView.ACTIVE -> ACTIVE_TITLE
+        HallView.SUBMITTED -> SUBMITTED_TITLE
+        HallView.DISPUTED -> DISPUTED_TITLE
+        HallView.DONE -> DONE_TITLE
+        HallView.CLOSED -> CLOSED_TITLE
     }
 
     private fun emptyHint(view: HallView): String = when (view) {
-        HallView.OPEN -> "暂无公开合同"
-        HallView.MINE -> "你还没有参与任何合同"
-        HallView.INBOX -> "没有待办事项"
+        HallView.OPEN -> "暂无可接取合同"
+        HallView.ACTIVE -> "暂无进行中的合同"
+        HallView.SUBMITTED -> "暂无待确认合同"
+        HallView.DISPUTED -> "暂无申诉中的合同"
+        HallView.DONE -> "暂无已完成合同"
+        HallView.CLOSED -> "暂无已关闭合同"
     }
 
     private fun minAmount(): Double = plugin.config.getDouble("economy.min-reward", 100.0)
@@ -716,23 +752,17 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun maxDays(): Int = plugin.config.getInt("limits.max-deadline-days", 7)
 
-    enum class HallView { OPEN, MINE, INBOX }
-
-    enum class TypeFilter(private val type: ContractType?) {
-        ALL(null),
-        SERVICE(ContractType.SERVICE),
-        WAGER(ContractType.WAGER),
-        PARTNERSHIP(ContractType.PARTNERSHIP);
-
-        fun matches(contract: Contract): Boolean = type == null || contract.type() == type
-    }
+    enum class HallView { OPEN, ACTIVE, SUBMITTED, DISPUTED, DONE, CLOSED }
 
     enum class AdminFilter { DISPUTED, ACTIVE, ALL }
 
     companion object {
-        private val INBOX_TITLE = Text.color("&#F4D03F行动收件箱")
-        private val BOARD_TITLE = Text.color("&#F4D03F合同大厅")
-        private val MY_TITLE = Text.color("&#F4D03F我的合同")
+        private val BOARD_TITLE = Text.color("&#F4D03F合同 · 开放")
+        private val ACTIVE_TITLE = Text.color("&#F4D03F合同 · 进行中")
+        private val SUBMITTED_TITLE = Text.color("&#F4D03F合同 · 待确认")
+        private val DISPUTED_TITLE = Text.color("&#F4D03F合同 · 申诉中")
+        private val DONE_TITLE = Text.color("&#F4D03F合同 · 已完成")
+        private val CLOSED_TITLE = Text.color("&#F4D03F合同 · 已关闭")
         private val DETAIL_TITLE_PREFIX = Text.color("&#F4D03F合同详情 ")
         private val WIZARD_TYPE_TITLE = Text.color("&#F4D03F创建合同 · 选择类型")
         private val WIZARD_FORM_TITLE = Text.color("&#F4D03F创建合同 · 填写")

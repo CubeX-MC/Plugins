@@ -28,7 +28,6 @@ public class PortalCommand {
     private static final List<String> HELP_KEYS = List.of(
             "portal.help_create",
             "portal.help_setdest",
-            "portal.help_link",
             "portal.help_delete",
             "portal.help_list",
             "portal.help_trust",
@@ -132,28 +131,6 @@ public class PortalCommand {
                         "yaw", String.format("%.1f", loc.getYaw())), "world", loc.getWorld().getName())));
     }
 
-    @Command("m|metro portal link <id1> <id2>")
-    @CommandDescription("双向配对两个传送门")
-    public void linkPortals(Player sender,
-                            @Argument(value = "id1", suggestions = "portalIds") String id1,
-                            @Argument(value = "id2", suggestions = "portalIds") String id2) {
-        Portal portal1 = guard.requireManageablePortal(sender, id1);
-        if (portal1 == null) {
-            return;
-        }
-        Portal portal2 = guard.requireManageablePortal(sender, id2);
-        if (portal2 == null) {
-            return;
-        }
-
-        if (portalService.linkPortals(id1, id2) != PortalCommandService.WriteStatus.SUCCESS) {
-            sender.sendMessage(plugin.getLanguageManager().getMessage("portal.link_fail"));
-            return;
-        }
-        sender.sendMessage(plugin.getLanguageManager().getMessage("portal.link_success",
-                LanguageManager.put(LanguageManager.put(LanguageManager.args(), "portal_id_1", id1), "portal_id_2", id2)));
-    }
-
     @Command("m|metro portal delete <portalId> [confirm]")
     @CommandDescription("Delete a portal")
     public void deletePortal(Player sender,
@@ -191,18 +168,13 @@ public class PortalCommand {
                         LanguageManager.put(LanguageManager.args(), "count", String.valueOf(allPortals.size()))),
                 portalPage));
         for (Portal p : portalPage.items()) {
-            String linked = p.getLinkedPortalId() != null
-                    ? plugin.getLanguageManager().getMessage("portal.list_linked",
-                            LanguageManager.put(LanguageManager.args(), "linked_portal_id", p.getLinkedPortalId()))
-                    : "";
             sender.sendMessage(plugin.getLanguageManager().getMessage("portal.list_item",
                     LanguageManager.put(LanguageManager.put(LanguageManager.put(LanguageManager.put(LanguageManager.put(
-                            LanguageManager.put(LanguageManager.put(LanguageManager.put(LanguageManager.args(),
+                            LanguageManager.put(LanguageManager.put(LanguageManager.args(),
                                     "portal_id", p.getId()), "world", p.getWorldName()),
                                     "x", String.valueOf(p.getX())), "y", String.valueOf(p.getY())),
                             "z", String.valueOf(p.getZ())), "dest_world", p.getDestWorldName()),
-                            "dest", String.format("%.0f,%.0f,%.0f", p.getDestX(), p.getDestY(), p.getDestZ())),
-                            "linked", linked)));
+                            "dest", String.format("%.0f,%.0f,%.0f", p.getDestX(), p.getDestY(), p.getDestZ()))));
         }
     }
 

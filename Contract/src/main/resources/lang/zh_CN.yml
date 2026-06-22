@@ -99,7 +99,7 @@ messages:
     <#FFE066>结算预览:
     <payouts>
     <approval>
-    <#FFE066>截止: <#FFFFFF><deadline>
+    <#FFE066>接单截止: <#FFFFFF><deadline>
     <#FFE066>描述: <#F1F5F9><description>
   help: |
     <#F4D03F>==== Contract ====

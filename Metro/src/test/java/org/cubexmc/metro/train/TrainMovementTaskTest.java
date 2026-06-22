@@ -34,6 +34,7 @@ class TrainMovementTaskTest {
         LineManager lineManager = mock(LineManager.class);
         when(plugin.getLineManager()).thenReturn(lineManager);
         when(plugin.getBedrockCompatibility()).thenReturn(new BedrockCompatibility(plugin));
+        when(plugin.getScoreboardManager()).thenReturn(mock(ScoreboardManager.class));
         when(lineManager.getLine("missing")).thenReturn(null);
 
         Player passenger = mock(Player.class);
@@ -58,6 +59,7 @@ class TrainMovementTaskTest {
         LineManager lineManager = mock(LineManager.class);
         when(plugin.getLineManager()).thenReturn(lineManager);
         when(plugin.getBedrockCompatibility()).thenReturn(new BedrockCompatibility(plugin));
+        when(plugin.getScoreboardManager()).thenReturn(mock(ScoreboardManager.class));
 
         Line line = new Line("l1", "Line1");
         line.addStop("A", -1);
@@ -129,6 +131,7 @@ class TrainMovementTaskTest {
         when(passenger.isOnline()).thenReturn(true);
         when(passenger.getVehicle()).thenReturn(null);
         when(passenger.getName()).thenReturn("Angus");
+        when(plugin.getScoreboardManager()).thenReturn(mock(ScoreboardManager.class));
 
         TrainMovementTask task = new TrainMovementTask(
                 plugin,

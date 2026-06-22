@@ -1,5 +1,8 @@
 package org.cubexmc.metro.train;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -288,5 +291,52 @@ class ScoreboardManagerTest {
         manager.updateTerminalScoreboard(player, line, "A");
 
         verify(library).createSidebar();
+    }
+
+    @Test
+    void shouldWrapCircularDisplayWhenWaitingAtLastUniqueStop() {
+        ScoreboardManager manager = new ScoreboardManager(plugin);
+        Line line = new Line("loop", "Loop");
+        line.addStop("A", -1);
+        line.addStop("B", -1);
+        line.addStop("C", -1);
+        line.addStop("A", -1);
+
+        ScoreboardManager.DisplayPlan plan = manager.resolveDisplayPlan(line, "C", "A", 8);
+
+        assertEquals(List.of("C", "A", "B", "C"), plan.getStopIds());
+        assertNull(plan.getTerminalStopId());
+        assertFalse(plan.getFolded());
+    }
+
+    @Test
+    void shouldWrapCircularDisplayWhenTravelingToInitialStop() {
+        ScoreboardManager manager = new ScoreboardManager(plugin);
+        Line line = new Line("loop", "Loop");
+        line.addStop("A", -1);
+        line.addStop("B", -1);
+        line.addStop("C", -1);
+        line.addStop("A", -1);
+
+        ScoreboardManager.DisplayPlan plan = manager.resolveDisplayPlan(line, null, "A", 8);
+
+        assertEquals(List.of("C", "A", "B", "C"), plan.getStopIds());
+        assertNull(plan.getTerminalStopId());
+        assertFalse(plan.getFolded());
+    }
+
+    @Test
+    void shouldKeepLinearDisplayTerminalForNonCircularLines() {
+        ScoreboardManager manager = new ScoreboardManager(plugin);
+        Line line = new Line("linear", "Linear");
+        for (char stop = 'A'; stop <= 'K'; stop++) {
+            line.addStop(String.valueOf(stop), -1);
+        }
+
+        ScoreboardManager.DisplayPlan plan = manager.resolveDisplayPlan(line, "B", "C", 7);
+
+        assertEquals(List.of("B", "C", "D", "E", "F", "G", "H"), plan.getStopIds());
+        assertEquals("K", plan.getTerminalStopId());
+        assertEquals(true, plan.getFolded());
     }
 }

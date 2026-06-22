@@ -31,4 +31,28 @@ class ContractServiceRecoveryTest {
         assertFalse(ContractService.shouldRefundOrphanWithdraw("wager-accept", ContractStatus.IN_PROGRESS));
         assertFalse(ContractService.shouldRefundOrphanWithdraw("partnership-accept", ContractStatus.COMPLETED));
     }
+
+    @Test
+    void purgesOnlyFinalContractsAfterConfiguredRetention() {
+        long now = 10L * 24L * 60L * 60L * 1000L;
+        long fiveDaysAgo = now - 5L * 24L * 60L * 60L * 1000L;
+        long twoDaysAgo = now - 2L * 24L * 60L * 60L * 1000L;
+
+        assertTrue(ContractService.shouldPurgeFinalContract(ContractStatus.CANCELLED, fiveDaysAgo, now, 3, 3));
+        assertTrue(ContractService.shouldPurgeFinalContract(ContractStatus.EXPIRED, fiveDaysAgo, now, 3, 3));
+        assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.COMPLETED, fiveDaysAgo, now, 7, 3));
+        assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.CANCELLED, twoDaysAgo, now, 3, 3));
+        assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.DISPUTED, fiveDaysAgo, now, 3, 3));
+        assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.IN_PROGRESS, fiveDaysAgo, now, 3, 3));
+    }
+
+    @Test
+    void doesNotPurgeOldFinalDataWithoutCompletedTimestampOrDisabledRetention() {
+        long now = 10L * 24L * 60L * 60L * 1000L;
+        long fiveDaysAgo = now - 5L * 24L * 60L * 60L * 1000L;
+
+        assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.CANCELLED, null, now, 3, 3));
+        assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.COMPLETED, fiveDaysAgo, now, 0, 3));
+        assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.CANCELLED, fiveDaysAgo, now, 3, 0));
+    }
 }

@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,6 +20,7 @@ import org.cubexmc.metro.manager.LineManager;
 import org.cubexmc.metro.manager.StopManager;
 import org.cubexmc.metro.model.Line;
 import org.cubexmc.metro.model.Stop;
+import org.cubexmc.metro.util.ColorUtil;
 import org.cubexmc.metro.util.MetroConstants;
 import org.cubexmc.metro.util.SchedulerUtil;
 import org.cubexmc.metro.util.TextUtil;
@@ -224,10 +224,10 @@ public class PlayerMoveListener implements Listener {
                 terminalStop, lineManager);
         final String finalActionbar = TextUtil.replacePlaceholders(actionbar, line, stop, lastStop, nextStop,
                 terminalStop, lineManager);
-        final String translatedTitle = ChatColor.translateAlternateColorCodes('&', finalTitle);
-        final String translatedSubtitle = ChatColor.translateAlternateColorCodes('&', finalSubtitle);
+        final String translatedTitle = ColorUtil.colorizeOrEmpty(finalTitle);
+        final String translatedSubtitle = ColorUtil.colorizeOrEmpty(finalSubtitle);
         final net.md_5.bungee.api.chat.BaseComponent[] actionbarComponent = TextComponent.fromLegacyText(
-                ChatColor.translateAlternateColorCodes('&', finalActionbar));
+                ColorUtil.colorizeOrEmpty(finalActionbar));
 
         if (alwaysShow) {
             Object actionBarTaskId = SchedulerUtil.entityRun(plugin, player, new Runnable() {
@@ -283,10 +283,6 @@ public class PlayerMoveListener implements Listener {
                             effectiveContinuousFadeIn,
                             effectiveContinuousStay,
                             effectiveContinuousFadeOut);
-                    // Title title = new Title(ChatColor.translateAlternateColorCodes('&',
-                    // finalTitle), ChatColor.translateAlternateColorCodes('&', finalSubtitle), 0,
-                    // 40, interval);
-                    // player.showTitle(title);
                 }
             }, 0L, interval);
             continuousInfoTasks.put(playerId, titleTaskId);
@@ -362,14 +358,14 @@ public class PlayerMoveListener implements Listener {
             continuousStay = Math.max(configuredStay, interval + 1);
         }
 
-        final String translatedTitle = ChatColor.translateAlternateColorCodes('&',
+        final String translatedTitle = ColorUtil.colorizeOrEmpty(
                 plugin.getLanguageManager().getMessage("interact.multi_line_title",
                         Map.of("stop_name", stop.getName())));
-        final String translatedSubtitle = ChatColor.translateAlternateColorCodes('&',
+        final String translatedSubtitle = ColorUtil.colorizeOrEmpty(
                 plugin.getLanguageManager().getMessage("interact.multi_line_subtitle",
                         Map.of("count", String.valueOf(boardableLines.size()))));
         final net.md_5.bungee.api.chat.BaseComponent[] actionbarComponent = TextComponent.fromLegacyText(
-                ChatColor.translateAlternateColorCodes('&',
+                ColorUtil.colorizeOrEmpty(
                         plugin.getLanguageManager().getMessage("interact.multi_line_actionbar",
                                 Map.of("routes", buildBoardableRouteSummary(stop, boardableLines)))));
 

@@ -16,6 +16,7 @@ import org.cubexmc.metro.manager.LineManager
 import org.cubexmc.metro.model.Line
 import org.cubexmc.metro.model.Stop
 import org.cubexmc.metro.util.ColorUtil
+import kotlin.math.min
 
 /**
  * 计分板管理器，用于在玩家乘坐矿车时显示线路信息。
@@ -25,6 +26,11 @@ class ScoreboardManager(private val plugin: Metro) {
     private val playerSidebars: MutableMap<UUID, Sidebar> = ConcurrentHashMap()
     private val playerCurrentLine: MutableMap<UUID, String> = ConcurrentHashMap()
     private val library: ScoreboardLibrary? = plugin.globalScoreboardLibrary
+    private val legacySerializer: LegacyComponentSerializer = LegacyComponentSerializer.builder()
+        .character(LegacyComponentSerializer.SECTION_CHAR)
+        .hexColors()
+        .useUnusualXRepeatedCharacterHexFormat()
+        .build()
 
     /**
      * 为进入站点区域的乘客更新计分板
@@ -104,7 +110,6 @@ class ScoreboardManager(private val plugin: Metro) {
         val stopIds = line.orderedStopIds
         val stopManager = plugin.stopManager
         val lineManager = plugin.lineManager
-        val serializer = LegacyComponentSerializer.legacySection()
 
         val styleCurrent = plugin.configFacade.getSbStyleCurrent()
         val stylePassed = plugin.configFacade.getSbStylePassed()
@@ -115,29 +120,12 @@ class ScoreboardManager(private val plugin: Metro) {
         val styleNext = plugin.configFacade.getSbStyleNext()
         val lineSymbol = plugin.configFacade.getLineSymbol()
 
-        val currentStopIndex = if (currentStopId != null) stopIds.indexOf(currentStopId) else -1
-        val nextStopIndex = if (nextStopId != null) stopIds.indexOf(nextStopId) else -1
         val isWaiting = currentStopId != null
-
-        var startIndex = if (isWaiting) currentStopIndex else if (nextStopIndex != -1) nextStopIndex - 1 else 0
-        if (startIndex < 0) {
-            startIndex = 0
-        }
 
         val dots = stopIds.size > 9
         val maxStations = if (dots) 7 else 8
-        val displayStops = ArrayList<String>()
-        for (index in startIndex until stopIds.size) {
-            if (displayStops.size >= maxStations) {
-                break
-            }
-            displayStops.add(stopIds[index])
-        }
-
-        var terminalStopId: String? = null
-        if (displayStops.size < stopIds.size - startIndex) {
-            terminalStopId = stopIds[stopIds.size - 1]
-        }
+        val displayPlan = resolveDisplayPlan(line, currentStopId, nextStopId, maxStations)
+        val displayStops = displayPlan.stopIds
 
         val componentBuilder = SidebarComponent.builder()
         for (index in displayStops.indices) {
@@ -151,21 +139,21 @@ class ScoreboardManager(private val plugin: Metro) {
             }
 
             val rawLine = buildStopLine(stop, line, prefix, lineSymbol, lineManager)
-            val lineComponent = serializer.deserialize(rawLine)
+            val lineComponent = legacySerializer.deserialize(rawLine)
                 .decoration(TextDecoration.ITALIC, false)
             componentBuilder.addComponent(SidebarComponent.staticLine(lineComponent))
         }
 
-        if (terminalStopId != null) {
-            if (dots) {
-                val foldingComponent = serializer.deserialize(styleFolding)
+        if (displayPlan.terminalStopId != null) {
+            if (displayPlan.folded) {
+                val foldingComponent = legacySerializer.deserialize(styleFolding)
                     .decoration(TextDecoration.ITALIC, false)
                 componentBuilder.addComponent(SidebarComponent.staticLine(foldingComponent))
             }
-            val terminalStop = stopManager.getStop(terminalStopId)
+            val terminalStop = stopManager.getStop(displayPlan.terminalStopId)
             if (terminalStop != null) {
                 val rawLine = buildStopLine(terminalStop, line, styleTerminal, lineSymbol, lineManager)
-                val lineComponent = serializer.deserialize(rawLine)
+                val lineComponent = legacySerializer.deserialize(rawLine)
                     .decoration(TextDecoration.ITALIC, false)
                 componentBuilder.addComponent(SidebarComponent.staticLine(lineComponent))
             }
@@ -178,6 +166,80 @@ class ScoreboardManager(private val plugin: Metro) {
         )
         layout.apply(sidebar)
     }
+
+    fun resolveDisplayPlan(
+        line: Line,
+        currentStopId: String?,
+        nextStopId: String?,
+        maxStations: Int,
+    ): DisplayPlan {
+        val stopIds = line.orderedStopIds
+        if (stopIds.isEmpty() || maxStations <= 0) {
+            return DisplayPlan(emptyList(), null, false)
+        }
+        if (line.isCircular) {
+            val cycleStopIds = if (stopIds.size > 1 && stopIds.first() == stopIds.last()) {
+                stopIds.dropLast(1)
+            } else {
+                stopIds
+            }
+            if (cycleStopIds.isEmpty()) {
+                return DisplayPlan(emptyList(), null, false)
+            }
+            val startIndex = resolveCircularStartIndex(cycleStopIds, currentStopId, nextStopId)
+            val count = min(maxStations, cycleStopIds.size + 1)
+            val displayStops = ArrayList<String>(count)
+            for (offset in 0 until count) {
+                displayStops.add(cycleStopIds[(startIndex + offset) % cycleStopIds.size])
+            }
+            return DisplayPlan(displayStops, null, false)
+        }
+
+        val currentStopIndex = if (currentStopId != null) stopIds.indexOf(currentStopId) else -1
+        val nextStopIndex = if (nextStopId != null) stopIds.indexOf(nextStopId) else -1
+        val isWaiting = currentStopId != null
+        var startIndex = if (isWaiting) currentStopIndex else if (nextStopIndex != -1) nextStopIndex - 1 else 0
+        if (startIndex < 0) {
+            startIndex = 0
+        }
+
+        val displayStops = ArrayList<String>()
+        for (index in startIndex until stopIds.size) {
+            if (displayStops.size >= maxStations) {
+                break
+            }
+            displayStops.add(stopIds[index])
+        }
+
+        val hasHiddenTail = displayStops.size < stopIds.size - startIndex
+        return DisplayPlan(
+            displayStops,
+            if (hasHiddenTail) stopIds[stopIds.size - 1] else null,
+            hasHiddenTail && stopIds.size > 9,
+        )
+    }
+
+    private fun resolveCircularStartIndex(cycleStopIds: List<String>, currentStopId: String?, nextStopId: String?): Int {
+        if (currentStopId != null) {
+            val currentIndex = cycleStopIds.indexOf(currentStopId)
+            if (currentIndex != -1) {
+                return currentIndex
+            }
+        }
+        if (nextStopId != null) {
+            val nextIndex = cycleStopIds.indexOf(nextStopId)
+            if (nextIndex != -1) {
+                return (nextIndex - 1 + cycleStopIds.size) % cycleStopIds.size
+            }
+        }
+        return 0
+    }
+
+    data class DisplayPlan(
+        val stopIds: List<String>,
+        val terminalStopId: String?,
+        val folded: Boolean,
+    )
 
     private fun buildStopLine(
         stop: Stop,
@@ -196,7 +258,7 @@ class ScoreboardManager(private val plugin: Metro) {
                 }
                 val transferLine = lineManager.getLine(transferLineId)
                 if (transferLine != null) {
-                    transferInfo.append(ColorUtil.colorize(transferLine.color)).append(lineSymbol).append(" ")
+                    transferInfo.append(ColorUtil.colorizeOrEmpty(transferLine.color)).append(lineSymbol).append(" ")
                 }
             }
         }

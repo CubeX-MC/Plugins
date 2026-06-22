@@ -54,9 +54,32 @@ class ContractTest {
     }
 
     @Test
+    void isExpiredOnlyWhileAwaitingAcceptance() {
+        Contract c = makeContract(new BigDecimal("100"), new BigDecimal("5"), 1_000L);
+        c.status(ContractStatus.IN_PROGRESS);
+        assertFalse(c.isExpired(5_000L));
+
+        c.status(ContractStatus.SUBMITTED);
+        assertFalse(c.isExpired(5_000L));
+
+        c.status(ContractStatus.DISPUTED);
+        assertFalse(c.isExpired(5_000L));
+
+        c.status(ContractStatus.COMPLETED);
+        assertFalse(c.isExpired(5_000L));
+
+        c.status(ContractStatus.PENDING_ACCEPT);
+        assertTrue(c.isExpired(5_000L));
+    }
+
+    @Test
     void isNotExpiredWhenFinal() {
         Contract c = makeContract(new BigDecimal("100"), new BigDecimal("5"), 1_000L);
         c.status(ContractStatus.COMPLETED);
+        assertFalse(c.isExpired(5_000L));
+        c.status(ContractStatus.CANCELLED);
+        assertFalse(c.isExpired(5_000L));
+        c.status(ContractStatus.EXPIRED);
         assertFalse(c.isExpired(5_000L));
         c.status(ContractStatus.DISPUTED);
         assertFalse(c.isExpired(5_000L));

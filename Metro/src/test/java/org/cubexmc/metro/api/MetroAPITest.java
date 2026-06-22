@@ -111,7 +111,6 @@ class MetroAPITest {
         when(portalManager.getPortalAt(entrance)).thenReturn(portal);
         when(portalManager.createPortal("p1", entrance, ownerId)).thenReturn(portal);
         when(portalManager.setDestination("p1", destination)).thenReturn(true);
-        when(portalManager.linkPortals("p1", "p2")).thenReturn(true);
         when(portalManager.deletePortal("p1")).thenReturn(true);
 
         MetroAPI.PortalWriteResult create = api.createPortal("p1", entrance, ownerId);
@@ -122,8 +121,6 @@ class MetroAPITest {
         assertEquals(portal, api.getPortal("p1"));
         assertEquals(portal, api.getPortalAt(entrance));
         assertEquals(MetroAPI.PortalWriteStatus.SUCCESS, api.setPortalDestination("p1", destination));
-        assertEquals(MetroAPI.PortalWriteStatus.SUCCESS, api.linkPortals("p1", "p2"));
-        assertEquals(MetroAPI.PortalWriteStatus.SAME_PORTAL, api.linkPortals("p1", "p1"));
         assertEquals(MetroAPI.PortalWriteStatus.SUCCESS, api.deletePortal("p1"));
     }
 

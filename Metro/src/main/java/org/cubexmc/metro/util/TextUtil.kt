@@ -27,7 +27,7 @@ object TextUtil {
         if (line != null) {
             result = result.replace("{line}", line.name)
             result = result.replace("{line_id}", line.id)
-            result = result.replace("{line_color_code}", line.color)
+            result = result.replace("{line_color_code}", ColorUtil.colorizeOrEmpty(line.color))
 
             var termName = line.terminusName
             if (line.isCircular) {
@@ -104,7 +104,7 @@ object TextUtil {
                 if (!first) {
                     result.append("§f, ")
                 }
-                result.append(transferLine.color)
+                result.append(ColorUtil.colorizeOrEmpty(transferLine.color))
                     .append(transferLine.name)
                 first = false
             }

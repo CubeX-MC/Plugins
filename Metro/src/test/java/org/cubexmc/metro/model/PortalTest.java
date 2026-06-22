@@ -31,14 +31,12 @@ class PortalTest {
         section.set("dest_y", 70.0);
         section.set("dest_z", -2.5);
         section.set("dest_yaw", 135.0);
-        section.set("linked", "return");
 
         Portal portal = Portal.fromConfig("p1", section);
         assertEquals("p1", portal.getId());
         assertEquals("world", portal.getWorldName());
         assertEquals(10, portal.getX());
         assertEquals("nether", portal.getDestWorldName());
-        assertEquals("return", portal.getLinkedPortalId());
 
         World world = world("world");
         assertTrue(portal.matchesLocation(new Location(world, 10, 63, 20)));
@@ -48,7 +46,6 @@ class PortalTest {
 
         YamlConfiguration out = new YamlConfiguration();
         portal.toConfig(out.createSection("portal"));
-        assertEquals("return", out.getString("portal.linked"));
         assertEquals(135.0, out.getDouble("portal.dest_yaw"));
     }
 
@@ -62,7 +59,6 @@ class PortalTest {
         Location destination = new Location(nether, 1.5, 70.0, -2.5);
         destination.setYaw(135.0f);
         portal.setDestination(destination);
-        portal.setLinkedPortalId("return");
 
         assertEquals(10, portal.getX());
         assertEquals(64, portal.getY());

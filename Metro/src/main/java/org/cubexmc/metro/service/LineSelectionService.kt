@@ -152,14 +152,6 @@ class LineSelectionService(
             return false
         }
 
-        val lineWorld = line.worldName
-        if (lineWorld != null && lineWorld.isNotEmpty()) {
-            val stopWorld = stop.worldName
-            if (stopWorld == null || lineWorld != stopWorld) {
-                return false
-            }
-        }
-
         val linkedLineIds = stop.linkedLineIds
         return linkedLineIds.isEmpty() || linkedLineIds.contains(line.id)
     }

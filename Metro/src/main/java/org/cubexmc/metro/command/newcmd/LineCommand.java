@@ -200,9 +200,6 @@ public class LineCommand {
                             "stop_id", stopId), "line_id", line.getId())));
             case STOP_NO_WORLD -> player.sendMessage(plugin.getLanguageManager().getMessage("line.addstop_stop_no_world",
                     LanguageManager.put(LanguageManager.args(), "stop_id", stopId)));
-            case WORLD_MISMATCH -> player.sendMessage(plugin.getLanguageManager().getMessage("line.addstop_world_mismatch",
-                    LanguageManager.put(LanguageManager.put(LanguageManager.put(LanguageManager.args(),
-                            "line_id", lineId), "line_world", result.lineWorld()), "stop_world", result.stopWorld())));
             case CIRCULAR_INVALID_INDEX -> player.sendMessage(plugin.getLanguageManager().getMessage("line.addstop_circular_invalid_index"));
             default -> player.sendMessage(plugin.getLanguageManager().getMessage("line.addstop_fail"));
         }

@@ -29,26 +29,16 @@ class LineCommandService(lineManager: LineManager?) {
         NOT_FOUND,
         FAILED,
         STOP_NO_WORLD,
-        WORLD_MISMATCH,
         CIRCULAR_INVALID_INDEX,
     }
 
     data class AddStopResult(
         private val status: WriteStatus,
-        private val lineWorld: String?,
-        private val stopWorld: String?,
     ) {
         fun status(): WriteStatus = status
 
-        fun lineWorld(): String? = lineWorld
-
-        fun stopWorld(): String? = stopWorld
-
         companion object {
-            fun of(status: WriteStatus): AddStopResult = AddStopResult(status, null, null)
-
-            fun worldMismatch(lineWorld: String?, stopWorld: String?): AddStopResult =
-                AddStopResult(WriteStatus.WORLD_MISMATCH, lineWorld, stopWorld)
+            fun of(status: WriteStatus): AddStopResult = AddStopResult(status)
         }
     }
 
@@ -100,9 +90,6 @@ class LineCommandService(lineManager: LineManager?) {
         if (stopWorld == null || stopWorld.isBlank()) {
             return AddStopResult.of(WriteStatus.STOP_NO_WORLD)
         }
-        if (lineWorld != null && lineWorld != stopWorld) {
-            return AddStopResult.worldMismatch(lineWorld, stopWorld)
-        }
 
         val targetIndex = index ?: -1
         val orderedStopIds = line.orderedStopIds
@@ -113,8 +100,10 @@ class LineCommandService(lineManager: LineManager?) {
         if (!lineManager.addStopToLine(line.id, stop.id, targetIndex)) {
             return AddStopResult.of(WriteStatus.FAILED)
         }
-        if (lineWorld == null) {
+        if (orderedStopIds.isEmpty()) {
             lineManager.setLineWorldName(line.id, stopWorld)
+        } else if (lineWorld != null && lineWorld != stopWorld) {
+            lineManager.setLineWorldName(line.id, null)
         }
         return AddStopResult.of(WriteStatus.SUCCESS)
     }

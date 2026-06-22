@@ -95,17 +95,16 @@ class LineCommandServiceTest {
     }
 
     @Test
-    void shouldRejectAddingStopFromDifferentWorld() {
-        Line line = line("red", "world", List.of());
+    void shouldAllowAddingStopFromDifferentWorldAndMarkLineAsMixedWorld() {
+        Line line = line("red", "world", List.of("spawn"));
         Stop stop = stop("central", "nether");
+        when(lineManager.addStopToLine("red", "central", -1)).thenReturn(true);
 
         AddStopResult result = service.addStopToLine(line, stop, null);
 
-        assertEquals(WriteStatus.WORLD_MISMATCH, result.status());
-        assertEquals("world", result.lineWorld());
-        assertEquals("nether", result.stopWorld());
-        verify(lineManager, never()).addStopToLine(org.mockito.Mockito.anyString(), org.mockito.Mockito.anyString(),
-                org.mockito.Mockito.anyInt());
+        assertEquals(WriteStatus.SUCCESS, result.status());
+        verify(lineManager).addStopToLine("red", "central", -1);
+        verify(lineManager).setLineWorldName("red", null);
     }
 
     @Test
