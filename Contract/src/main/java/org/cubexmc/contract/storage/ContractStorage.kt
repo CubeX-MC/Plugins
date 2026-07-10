@@ -4,10 +4,12 @@ import org.bukkit.Bukkit
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.InvalidConfigurationException
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.inventory.ItemStack
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.Asset
 import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.ContractEvent
+import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
 import org.cubexmc.contract.model.ContractType
 import org.cubexmc.contract.model.Participant
@@ -49,13 +51,16 @@ class ContractStorage {
         this.logger = logger
     }
 
+    @Synchronized
     fun markDirty() {
         dirty = true
     }
 
+    @Synchronized
     fun isDirty(): Boolean = dirty
 
     @Throws(IOException::class)
+    @Synchronized
     fun flushIfDirty() {
         if (!dirty) {
             return
@@ -63,6 +68,7 @@ class ContractStorage {
         save()
     }
 
+    @Synchronized
     fun load() {
         // Read into a temp map first so a failed/recovered load never leaves the live map half-populated.
         val loaded = readContracts()
@@ -117,6 +123,7 @@ class ContractStorage {
     }
 
     @Throws(IOException::class)
+    @Synchronized
     fun save() {
         if (dataFolder != null && !dataFolder.exists()) {
             dataFolder.mkdirs()
@@ -158,14 +165,17 @@ class ContractStorage {
         }
     }
 
+    @Synchronized
     fun put(contract: Contract) {
         contracts[contract.id()] = contract
     }
 
+    @Synchronized
     fun remove(id: String) {
         contracts.remove(id)
     }
 
+    @Synchronized
     fun findByPrefix(input: String): Optional<Contract> {
         val normalized = input.replace("#", "").lowercase(java.util.Locale.ROOT)
         val matches = contracts.values.stream()
@@ -177,13 +187,16 @@ class ContractStorage {
         return if (matches.size == 1) Optional.of(matches[0]) else Optional.empty()
     }
 
+    @Synchronized
     fun findById(id: String): Optional<Contract> = Optional.ofNullable(contracts[id])
 
+    @Synchronized
     fun all(): List<Contract> =
         contracts.values.stream()
             .sorted(Comparator.comparingLong { contract: Contract -> contract.createdAt() }.reversed())
             .toList()
 
+    @Synchronized
     fun openContracts(): List<Contract> =
         contracts.values.stream()
             .filter { contract -> contract.status() == ContractStatus.OPEN }
@@ -247,7 +260,10 @@ class ContractStorage {
             nullableLong(section, "completed-at"),
             section.getLong("expires-at"),
             section.getString("dispute-reason"),
+            readObjective(section),
+            readDeliveryItems(section),
             readEvents(section),
+            readRewardItems(section),
         )
 
         val meta = section.getConfigurationSection("metadata")
@@ -321,6 +337,8 @@ class ContractStorage {
             nullableLong(section, "completed-at"),
             section.getLong("expires-at"),
             section.getString("dispute-reason"),
+            null,
+            emptyList(),
             readEvents(section),
         )
         contract.metadata["creation-fee"] = creationFee.toPlainString()
@@ -373,6 +391,16 @@ class ContractStorage {
         section["completed-at"] = contract.completedAt()
         section["expires-at"] = contract.expiresAt()
         section["dispute-reason"] = contract.disputeReason()
+        val objective = contract.objective()
+        if (objective != null) {
+            section["objective"] = objective.toMap()
+        }
+        if (contract.hasDeliveryItems()) {
+            section["delivery-items"] = contract.deliveryItems().map { it.serialize() }
+        }
+        if (contract.hasRewardItems()) {
+            section["reward-items"] = contract.rewardItems().map { it.serialize() }
+        }
 
         if (contract.metadata.isNotEmpty()) {
             val meta = section.createSection("metadata")
@@ -386,6 +414,54 @@ class ContractStorage {
             serialized.add(event.toMap())
         }
         section["events"] = serialized
+    }
+
+    private fun readObjective(section: ConfigurationSection): ContractObjective? {
+        val nested = section.getConfigurationSection("objective")
+        if (nested != null) {
+            val map = LinkedHashMap<String, Any?>()
+            for (key in nested.getKeys(false)) {
+                map[key] = nested[key]
+            }
+            return ContractObjective.fromMap(map)
+        }
+        val raw = section["objective"]
+        return if (raw is Map<*, *>) ContractObjective.fromMap(raw) else null
+    }
+
+    private fun readDeliveryItems(section: ConfigurationSection): List<ItemStack> {
+        return readItems(section, "delivery-items")
+    }
+
+    private fun readRewardItems(section: ConfigurationSection): List<ItemStack> {
+        return readItems(section, "reward-items")
+    }
+
+    private fun readItems(section: ConfigurationSection, path: String): List<ItemStack> {
+        val raw = section[path]
+        if (raw !is List<*>) {
+            return emptyList()
+        }
+        val result = ArrayList<ItemStack>()
+        for (entry in raw) {
+            try {
+                when (entry) {
+                    is ItemStack -> result.add(entry.clone())
+                    is Map<*, *> -> {
+                        val map = LinkedHashMap<String, Any>()
+                        for ((key, value) in entry) {
+                            if (key is String && value != null) {
+                                map[key] = value
+                            }
+                        }
+                        result.add(ItemStack.deserialize(map))
+                    }
+                }
+            } catch (ex: RuntimeException) {
+                logger.warning("Skipping malformed stored $path item: ${ex.message}")
+            }
+        }
+        return result
     }
 
     private fun readBigDecimal(section: ConfigurationSection, path: String): BigDecimal {

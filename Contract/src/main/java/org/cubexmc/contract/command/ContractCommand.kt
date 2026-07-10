@@ -7,7 +7,9 @@ import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.Contract
+import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
+import org.cubexmc.contract.model.ObjectiveType
 import org.cubexmc.contract.model.Participant
 import org.cubexmc.contract.model.PayoutCondition
 import org.cubexmc.contract.model.PayoutRecipient
@@ -51,6 +53,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             "info" -> info(sender, args)
             "accept" -> accept(sender, args)
             "submit" -> submit(sender, args)
+            "claim" -> claim(sender, args)
             "approve" -> approve(sender, args)
             "cancel" -> cancel(sender, args)
             "dispute" -> dispute(sender, args)
@@ -222,21 +225,27 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 4) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金> <天> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
             return true
         }
-        val reward = parseDouble(args[1])
+        val itemReward = args[1].equals("item", ignoreCase = true)
+        val reward = if (itemReward) 0.0 else parseDouble(args[1])
         val days = parseInt(args[2])
         if (reward == null || days == null) {
             send(sender, plugin.lang().message("invalid-number"))
             return true
         }
-        val text = parseContractText(args, 3, true)
+        val text = parseContractText(args, 3, true, true)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金> <天> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
             return true
         }
-        val result = plugin.contracts().create(player, reward, days, text.title(), text.description(), text.mediatorName())
+        val result =
+            if (itemReward) {
+                plugin.contracts().createWithItemReward(player, days, text.title(), text.description(), text.mediatorName(), text.objective())
+            } else {
+                plugin.contracts().create(player, reward, days, text.title(), text.description(), text.mediatorName(), text.objective())
+            }
         if (!result.success()) {
             send(sender, plugin.lang().message("cannot-create", mapOf("reason" to result.reason())))
             return true
@@ -244,7 +253,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         val contract = result.contract() ?: throw NullPointerException("contract")
         send(sender, plugin.lang().message("create-success", mapOf(
             "id" to contract.shortId(),
-            "amount" to plugin.economy().format(result.amount()),
+            "amount" to rewardSummary(contract),
         )))
         return true
     }
@@ -312,6 +321,20 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val result = plugin.contracts().submit(player, contract.get())
         sendResult(sender, result, "submit-success")
+        return true
+    }
+
+    private fun claim(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.claim")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().claimDeliveryItems(player, contract.get())
+        sendResult(sender, result, "claim-success")
         return true
     }
 
@@ -495,7 +518,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
                 "title" to contract.title(),
                 "type" to plugin.lang().type(contract.type()),
                 "status" to plugin.lang().status(contract.status()),
-                "reward" to plugin.economy().format(contract.reward()),
+                "reward" to rewardSummary(contract),
                 "owner" to (contract.ownerName() ?: ""),
             )))
         }
@@ -511,7 +534,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             "status" to plugin.lang().status(contract.status()),
             "participants" to participantLines(contract, privileged),
             "arbiter" to arbiterLine(contract, privileged),
-            "reward" to plugin.economy().format(contract.reward()),
+            "reward" to rewardSummary(contract),
             "payouts" to payoutLines(contract),
             "approval" to approvalLine(contract),
             "deadline" to DATE_FORMAT.format(Instant.ofEpochMilli(contract.expiresAt())),
@@ -519,6 +542,16 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         )))
         if (privileged && contract.status() == ContractStatus.DISPUTED && contract.disputeReason() != null) {
             send(sender, Text.color("&#E63946争议原因: &#F1F5F9${contract.disputeReason()}"))
+        }
+        val objective = contract.objective()
+        if (objective != null) {
+            send(sender, Text.color("&#69DB7C系统目标: &#FFFFFF${objective.type().name} ${objective.target()} ${objective.progressText()}"))
+        }
+        if (contract.hasDeliveryItems()) {
+            send(sender, Text.color("&#69DB7C合同暂存: &#FFFFFF${contract.deliveryItemCount()} 个交付物品"))
+        }
+        if (contract.hasRewardItems()) {
+            send(sender, Text.color("&#69DB7C奖励暂存: &#FFFFFF${contract.rewardItemCount()} 个物品"))
         }
     }
 
@@ -536,12 +569,35 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         val lines = ArrayList<String>()
         for (participant in contract.participants()) {
             val name = visibleParticipantName(participant, privileged)
-            val stake = participant.moneyStake()
+            val stake = stakeSummary(participant)
             val stakeText =
-                if (stake.signum() > 0) " &#CFD8DC${plugin.lang().term("stake", "Stake")}: &#69DB7C${plugin.economy().format(stake)}" else ""
+                if (stake.isNotBlank()) " &#CFD8DC${plugin.lang().term("stake", "Stake")}: &#69DB7C$stake" else ""
             lines.add("    &#CFD8DC- &#FFE066${plugin.lang().role(participant.role())}&#CFD8DC: &#FFFFFF$name$stakeText")
         }
         return lines.joinToString("\n")
+    }
+
+    private fun rewardSummary(contract: Contract): String {
+        val parts = ArrayList<String>()
+        if (contract.reward().signum() > 0) {
+            parts.add(plugin.economy().format(contract.reward()))
+        }
+        if (contract.hasRewardItems()) {
+            parts.add("${contract.rewardItemCount()} 个物品")
+        }
+        return if (parts.isEmpty()) plugin.economy().format(BigDecimal.ZERO) else parts.joinToString(" + ")
+    }
+
+    private fun stakeSummary(participant: Participant): String {
+        val parts = ArrayList<String>()
+        val money = participant.moneyStake()
+        if (money.signum() > 0) {
+            parts.add(plugin.economy().format(money))
+        }
+        if (participant.itemStakeCount() > 0) {
+            parts.add("${participant.itemStakeCount()} 项物品")
+        }
+        return parts.joinToString(" + ")
     }
 
     private fun visibleParticipantName(participant: Participant, privileged: Boolean): String {
@@ -652,18 +708,33 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         return builder.toString()
     }
 
-    private fun parseContractText(args: Array<String>, start: Int, allowMediator: Boolean): ContractText? {
+    private fun parseContractText(args: Array<String>, start: Int, allowMediator: Boolean, allowObjective: Boolean = false): ContractText? {
         if (start >= args.size) {
             return null
         }
         var mediatorName: String? = null
+        var objective: ContractObjective? = null
         var textStart = start
-        if (allowMediator && isMediatorFlag(args[start])) {
-            if (start + 2 >= args.size) {
-                return null
+        while (textStart < args.size) {
+            if (allowMediator && isMediatorFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                mediatorName = args[textStart + 1]
+                textStart += 2
+                continue
             }
-            mediatorName = args[start + 1]
-            textStart = start + 2
+            if (allowObjective && isObjectiveFlag(args[textStart])) {
+                if (textStart + 4 >= args.size) {
+                    return null
+                }
+                val type = parseObjectiveType(args[textStart + 1]) ?: return null
+                val required = parseInt(args[textStart + 3]) ?: return null
+                objective = ContractObjective.of(type, args[textStart + 2], required)
+                textStart += 4
+                continue
+            }
+            break
         }
         val rest = join(args, textStart)
         if (rest.isBlank()) {
@@ -671,12 +742,40 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val splitIndex = rest.indexOf('|')
         if (splitIndex < 0) {
-            return ContractText(rest, "", mediatorName)
+            return ContractText(rest, "", mediatorName, objective)
         }
-        return ContractText(rest.substring(0, splitIndex), rest.substring(splitIndex + 1), mediatorName)
+        return ContractText(rest.substring(0, splitIndex), rest.substring(splitIndex + 1), mediatorName, objective)
     }
 
     private fun isMediatorFlag(arg: String): Boolean = arg.equals("--mediator", ignoreCase = true) || arg.equals("-m", ignoreCase = true)
+
+    private fun isObjectiveFlag(arg: String): Boolean = arg.equals("--objective", ignoreCase = true) || arg.equals("-o", ignoreCase = true)
+
+    private fun parseObjectiveType(input: String): ObjectiveType? =
+        when (input.lowercase(Locale.ROOT)) {
+            "craft_item", "craftitem", "craft" -> ObjectiveType.CRAFT_ITEM
+            "block_break", "blockbreak", "break_block", "breakblock", "mine" -> ObjectiveType.BLOCK_BREAK
+            "fish", "fishing" -> ObjectiveType.FISH
+            "block_place", "blockplace", "place_block", "placeblock", "interact", "place" -> ObjectiveType.BLOCK_PLACE
+            "kill_entity", "killnormal", "kill_normal", "entity", "mob", "killmob", "kill" -> ObjectiveType.KILL_ENTITY
+            "kill_player", "killplayer", "player", "pvp" -> ObjectiveType.KILL_PLAYER
+            "consume_item", "consume", "eat", "drink" -> ObjectiveType.CONSUME_ITEM
+            "deliver_item", "deliver", "item", "submit_item", "submit" -> ObjectiveType.DELIVER_ITEM
+            "enchant_item", "enchantment", "enchant" -> ObjectiveType.ENCHANT_ITEM
+            "shear" -> ObjectiveType.SHEAR
+            "breed" -> ObjectiveType.BREED
+            "tame" -> ObjectiveType.TAME
+            "chat", "message", "say" -> ObjectiveType.CHAT
+            "block_interact", "blockinteract", "interaction", "interact_block", "interactblock" -> ObjectiveType.BLOCK_INTERACT
+            "run_command", "command", "cmd" -> ObjectiveType.RUN_COMMAND
+            "use_item", "use" -> ObjectiveType.USE_ITEM
+            "deliver_money", "money", "submit_money", "pay_money" -> ObjectiveType.DELIVER_MONEY
+            else -> try {
+                ObjectiveType.valueOf(input.uppercase(Locale.ROOT))
+            } catch (ex: IllegalArgumentException) {
+                null
+            }
+        }
 
     private fun parseDouble(value: String): Double? =
         try {
@@ -697,10 +796,13 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<String>): List<String> {
         if (args.size == 1) {
-            return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "list", "all", "my", "rep", "info", "accept", "submit", "approve", "cancel", "dispute", "withdraw", "admin", "help"), args[0])
+            return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "list", "all", "my", "rep", "info", "accept", "submit", "claim", "approve", "cancel", "dispute", "withdraw", "admin", "help"), args[0])
         }
         if (args.size == 4 && args[0].equals("service", ignoreCase = true)) {
-            return startsWith(listOf("--mediator"), args[3])
+            return startsWith(listOf("--mediator", "--objective"), args[3])
+        }
+        if (args.size >= 5 && args[0].equals("service", ignoreCase = true) && args[args.size - 2].equals("--objective", ignoreCase = true)) {
+            return startsWith(ObjectiveType.entries.map { it.name.lowercase(Locale.ROOT) }, args.last())
         }
         if (args.size == 6 && args[0].equals("partner", ignoreCase = true)) {
             return startsWith(listOf("--mediator"), args[5])
@@ -711,7 +813,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         if (args.size == 2 && args[0].equals("admin", ignoreCase = true)) {
             return startsWith(listOf("reload", "pay", "refund", "close"), args[1])
         }
-        if ((args.size == 2 && listOf("info", "accept", "submit", "approve", "cancel", "dispute", "withdraw", "resolve", "mediate").contains(args[0].lowercase(Locale.ROOT))) ||
+        if ((args.size == 2 && listOf("info", "accept", "submit", "claim", "approve", "cancel", "dispute", "withdraw", "resolve", "mediate").contains(args[0].lowercase(Locale.ROOT))) ||
             (args.size == 3 && args[0].equals("admin", ignoreCase = true))
         ) {
             val prefix = args[args.size - 1].lowercase(Locale.ROOT)
@@ -742,10 +844,12 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         private val title: String,
         private val description: String,
         private val mediatorName: String?,
+        private val objective: ContractObjective?,
     ) {
         fun title(): String = title
         fun description(): String = description
         fun mediatorName(): String? = mediatorName
+        fun objective(): ContractObjective? = objective
     }
 
     companion object {

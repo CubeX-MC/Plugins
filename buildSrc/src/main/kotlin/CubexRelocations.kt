@@ -3,13 +3,14 @@ object CubexRelocations {
         "BookLite" to "booklite",
         "FAWEReplacer" to "fawereplace",
         "MountLicense" to "mountlicense",
-        "Contracts" to "contract",
+        "Contract" to "contract",
         "EcoBalancer" to "ecobalancer",
         "RuleGems" to "rulegems",
         "Metro" to "metro",
         "Railway" to "railway",
         "Clarity" to "clarity",
         "Reputations" to "reputations",
+        "Regions" to "regions",
     )
 
     fun libsNamespace(projectName: String): String =

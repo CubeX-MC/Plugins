@@ -66,7 +66,8 @@ messages:
   mediate-accept-success: "<prefix><#69DB7C>You accepted mediator duties for contract <#FFE066>#<id><#69DB7C>."
   mediate-success: "<prefix><#69DB7C>Contract <#FFE066>#<id> <#69DB7C>was handled by mediator decision: <#FFE066><decision><#69DB7C>."
   accept-success: "<prefix><#69DB7C>You accepted contract/invite <#FFE066>#<id><#69DB7C>."
-  submit-success: "<prefix><#69DB7C>Submitted for owner approval."
+  submit-success: "<prefix><#69DB7C>Submitted. Objective items or money were stored/settled by contract rules."
+  claim-success: "<prefix><#69DB7C>Claimed stored contract items."
   approve-success: "<prefix><#69DB7C>Contract approved. Paid <#FFE066><player> <#FFE066><amount><#69DB7C>."
   cancel-success: "<prefix><#69DB7C>Contract cancelled; funds were handled by rule."
   dispute-success: "<prefix><#FFE066>Contract is disputed and awaits admin handling."
@@ -104,8 +105,10 @@ messages:
   help: |
     <#F4D03F>==== Contract ====
     <#FFE066>/contract <#F1F5F9>- Open the board
-    <#FFE066>/contract service \<reward> \<days> \<title>|\<description> <#F1F5F9>- Post a service contract
-    <#CFD8DC>Optional: <#FFE066>/contract service \<reward> \<days> --mediator \<player> \<title>|\<description>
+    <#FFE066>/contract service \<reward|item> \<days> \<title>|\<description> <#F1F5F9>- Post a service contract; item escrows the main-hand item as reward
+    <#CFD8DC>Optional: <#FFE066>/contract service \<reward|item> \<days> --mediator \<player> \<title>|\<description>
+    <#CFD8DC>System verified: <#FFE066>/contract service \<reward|item> \<days> --objective \<type> \<target> \<amount> \<title>|\<description>
+    <#CFD8DC>Objective types: <#FFE066>craft_item/block_break/fish/block_place/kill_entity/kill_player/consume_item/deliver_item/deliver_money/enchant_item/shear/breed/tame/chat/block_interact/run_command/use_item
     <#FFE066>/contract wager \<opponent> \<stake> \<days> \<arbiter> \<title>|\<description> <#F1F5F9>- Open a wager
     <#FFE066>/contract partner \<partner> \<my stake> \<their stake> \<days> \<title>|\<description> <#F1F5F9>- Invite a partner
     <#CFD8DC>Optional: <#FFE066>/contract partner \<partner> \<my stake> \<their stake> \<days> --mediator \<player> \<title>|\<description>
@@ -116,7 +119,8 @@ messages:
     <#FFE066>/contract rep [player] <#F1F5F9>- View a player's track record
     <#FFE066>/contract info \<id> <#F1F5F9>- Show details
     <#FFE066>/contract accept \<id> <#F1F5F9>- Accept a contract or invite
-    <#FFE066>/contract submit \<id> <#F1F5F9>- Submit service completion
+    <#FFE066>/contract submit \<id> <#F1F5F9>- Submit completion or deliver objective items/money
+    <#FFE066>/contract claim \<id> <#F1F5F9>- Claim stored delivery or reward items
     <#FFE066>/contract approve \<id> <#F1F5F9>- Approve payment or partnership completion
     <#FFE066>/contract cancel \<id> <#F1F5F9>- Cancel when allowed
     <#FFE066>/contract dispute \<id> \<reason> <#F1F5F9>- Open a dispute

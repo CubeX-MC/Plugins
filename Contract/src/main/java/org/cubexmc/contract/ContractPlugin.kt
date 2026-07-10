@@ -1,7 +1,6 @@
 package org.cubexmc.contract
 
 import org.bukkit.command.PluginCommand
-import org.bukkit.scheduler.BukkitTask
 import org.bukkit.configuration.file.YamlConfiguration
 import org.cubexmc.config.LegacyTextToMiniMessageStep
 import org.cubexmc.config.MigrationContext
@@ -15,12 +14,14 @@ import org.cubexmc.contract.command.ContractCommand
 import org.cubexmc.contract.config.LanguageManager
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.gui.ContractGui
+import org.cubexmc.contract.listener.ObjectiveListener
 import org.cubexmc.contract.service.ContractService
 import org.cubexmc.contract.storage.ContractStorage
 import org.cubexmc.contract.storage.EventLog
 import org.cubexmc.contract.storage.PendingTransactionStore
 import org.cubexmc.contract.storage.ReputationStore
 import org.cubexmc.core.CubexPlugin
+import org.cubexmc.scheduler.CubexScheduler
 import java.io.IOException
 import kotlin.math.max
 
@@ -34,8 +35,10 @@ class ContractPlugin : CubexPlugin() {
     private var contractService: ContractService? = null
     private var contractGui: ContractGui? = null
     private var resourceFiles: ResourceFiles? = null
+    private var cubexScheduler: CubexScheduler? = null
 
     override fun enablePlugin() {
+        cubexScheduler = CubexScheduler.bindTo(this)
         resourceFiles = ResourceFiles(this)
         saveDefaultFiles()
         try {
@@ -84,6 +87,7 @@ class ContractPlugin : CubexPlugin() {
         server.pluginManager.registerEvents(gui(), this)
         server.pluginManager.registerEvents(gui().registry, this)
         server.pluginManager.registerEvents(gui().input, this)
+        server.pluginManager.registerEvents(ObjectiveListener(this), this)
 
         val command = ContractCommand(this)
         val pluginCommand: PluginCommand? = getCommand("contract")
@@ -141,6 +145,8 @@ class ContractPlugin : CubexPlugin() {
     fun contracts(): ContractService = contractService ?: throw IllegalStateException("contractService not initialized")
 
     fun gui(): ContractGui = contractGui ?: throw IllegalStateException("contractGui not initialized")
+
+    fun scheduler(): CubexScheduler = cubexScheduler ?: throw IllegalStateException("scheduler not initialized")
 
     private fun pending(): PendingTransactionStore = pendingStore ?: throw IllegalStateException("pendingStore not initialized")
 
@@ -201,36 +207,23 @@ class ContractPlugin : CubexPlugin() {
     private fun scheduleFlush() {
         val intervalSeconds = max(5, config.getLong("storage.flush-interval-seconds", 30))
         val periodTicks = intervalSeconds * 20L
-        val task = server.scheduler.runTaskTimer(
-            this,
-            Runnable {
-                try {
-                    storage().flushIfDirty()
-                } catch (ex: IOException) {
-                    logger.warning("Async flush failed: ${ex.message}")
-                }
-                reputationStore?.flushIfDirty()
-            },
-            periodTicks,
-            periodTicks,
-        )
-        bindTask(task) { handle -> (handle as BukkitTask).cancel() }
+        scheduler().runGlobalTimer(Runnable {
+            try {
+                contracts().flushStores()
+            } catch (ex: IOException) {
+                logger.warning("Contract flush failed: ${ex.message}")
+            }
+        }, periodTicks, periodTicks)
     }
 
     private fun scheduleCleanup() {
         val intervalMinutes = max(1, config.getLong("expiry.cleanup-interval-minutes", 10))
         val periodTicks = intervalMinutes * 60L * 20L
-        val task = server.scheduler.runTaskTimer(
-            this,
-            Runnable {
-                val changed = contracts().cleanupExpired()
-                if (changed > 0) {
-                    logger.info("Processed $changed contract cleanup actions.")
-                }
-            },
-            periodTicks,
-            periodTicks,
-        )
-        bindTask(task) { handle -> (handle as BukkitTask).cancel() }
+        scheduler().runGlobalTimer(Runnable {
+            val changed = contracts().cleanupExpired()
+            if (changed > 0) {
+                logger.info("Processed $changed contract cleanup actions.")
+            }
+        }, periodTicks, periodTicks)
     }
 }

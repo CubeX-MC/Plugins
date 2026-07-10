@@ -1,5 +1,6 @@
 package org.cubexmc.contract.model
 
+import org.bukkit.inventory.ItemStack
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.ArrayList
@@ -24,10 +25,15 @@ class Contract(
     private var completedAt: Long?,
     private val expiresAt: Long,
     private var disputeReason: String?,
+    private var objective: ContractObjective?,
+    deliveryItems: List<ItemStack>,
     events: List<ContractEvent>,
+    rewardItems: List<ItemStack> = emptyList(),
 ) {
     private val participants: MutableList<Participant> = ArrayList(participants)
     private val payouts: MutableList<PayoutRule> = ArrayList(payouts)
+    private val deliveryItems: MutableList<ItemStack> = ArrayList(deliveryItems.map { it.clone() })
+    private val rewardItems: MutableList<ItemStack> = ArrayList(rewardItems.map { it.clone() })
     private val events: MutableList<ContractEvent> = ArrayList(events)
 
     // Free-form metadata bag for type-specific data (creation-fee, commission-percent, etc).
@@ -209,6 +215,51 @@ class Contract(
         this.disputeReason = disputeReason
     }
 
+    fun objective(): ContractObjective? = objective
+
+    fun objective(objective: ContractObjective?) {
+        this.objective = objective
+    }
+
+    fun systemVerifiedService(): Boolean =
+        type == ContractType.SERVICE && resolutionRule == ResolutionRule.SYSTEM_OBJECTIVE && objective != null
+
+    fun deliveryItems(): List<ItemStack> = deliveryItems.map { it.clone() }
+
+    fun deliveryItems(items: List<ItemStack>) {
+        deliveryItems.clear()
+        deliveryItems.addAll(items.map { it.clone() })
+    }
+
+    fun addDeliveryItems(items: List<ItemStack>) {
+        deliveryItems.addAll(items.map { it.clone() })
+    }
+
+    fun clearDeliveryItems() {
+        deliveryItems.clear()
+    }
+
+    fun hasDeliveryItems(): Boolean = deliveryItems.isNotEmpty()
+
+    fun deliveryItemCount(): Int = deliveryItems.sumOf { it.amount }
+
+    fun rewardItems(): List<ItemStack> = rewardItems.map { it.clone() }
+
+    fun rewardItems(items: List<ItemStack>) {
+        rewardItems.clear()
+        rewardItems.addAll(items.map { it.clone() })
+    }
+
+    fun clearRewardItems() {
+        rewardItems.clear()
+    }
+
+    fun hasRewardItems(): Boolean = rewardItems.isNotEmpty()
+
+    fun rewardItemCount(): Int = rewardItems.sumOf { it.amount }
+
+    fun hasStoredItems(): Boolean = hasDeliveryItems() || hasRewardItems()
+
     fun events(): List<ContractEvent> = Collections.unmodifiableList(ArrayList(events))
 
     companion object {
@@ -252,8 +303,71 @@ class Contract(
             commissionPercent: BigDecimal,
             now: Long,
             expiresAt: Long,
+        ): Contract = createService(
+            id,
+            ownerUuid,
+            ownerName,
+            title,
+            description,
+            reward,
+            creationFee,
+            commissionPercent,
+            now,
+            expiresAt,
+            null,
+        )
+
+        @JvmStatic
+        fun createService(
+            id: String,
+            ownerUuid: UUID,
+            ownerName: String,
+            title: String,
+            description: String,
+            reward: BigDecimal,
+            creationFee: BigDecimal,
+            commissionPercent: BigDecimal,
+            now: Long,
+            expiresAt: Long,
+            objective: ContractObjective?,
+        ): Contract = createService(
+            id,
+            ownerUuid,
+            ownerName,
+            title,
+            description,
+            reward,
+            emptyList(),
+            creationFee,
+            commissionPercent,
+            now,
+            expiresAt,
+            objective,
+        )
+
+        @JvmStatic
+        fun createService(
+            id: String,
+            ownerUuid: UUID,
+            ownerName: String,
+            title: String,
+            description: String,
+            reward: BigDecimal,
+            rewardItems: List<ItemStack>,
+            creationFee: BigDecimal,
+            commissionPercent: BigDecimal,
+            now: Long,
+            expiresAt: Long,
+            objective: ContractObjective?,
         ): Contract {
-            val owner = Participant(ParticipantRole.OWNER, ownerUuid, ownerName, listOf(Asset.money(reward)))
+            val ownerStake = ArrayList<Asset>()
+            if (reward.signum() > 0) {
+                ownerStake.add(Asset.money(reward))
+            }
+            for (item in rewardItems) {
+                ownerStake.add(Asset.item("${item.type.name} x ${item.amount}"))
+            }
+            val owner = Participant(ParticipantRole.OWNER, ownerUuid, ownerName, ownerStake)
             val contractor = Participant(ParticipantRole.CONTRACTOR, null, null, emptyList())
             val rules = ArrayList<PayoutRule>()
             val payoutShare = BigDecimal("100").subtract(commissionPercent)
@@ -267,6 +381,14 @@ class Contract(
             )
             rules.add(
                 PayoutRule(PayoutCondition.SUCCESS, ParticipantRole.OWNER, PayoutRecipient.systemSink(), commissionPercent),
+            )
+            rules.add(
+                PayoutRule(
+                    PayoutCondition.SUCCESS,
+                    ParticipantRole.CONTRACTOR,
+                    PayoutRecipient.participant(ParticipantRole.OWNER),
+                    BigDecimal("100"),
+                ),
             )
             rules.add(
                 PayoutRule(
@@ -284,6 +406,22 @@ class Contract(
                     BigDecimal("100"),
                 ),
             )
+            rules.add(
+                PayoutRule(
+                    PayoutCondition.FAILURE,
+                    ParticipantRole.CONTRACTOR,
+                    PayoutRecipient.participant(ParticipantRole.CONTRACTOR),
+                    BigDecimal("100"),
+                ),
+            )
+            rules.add(
+                PayoutRule(
+                    PayoutCondition.TIMEOUT,
+                    ParticipantRole.CONTRACTOR,
+                    PayoutRecipient.participant(ParticipantRole.CONTRACTOR),
+                    BigDecimal("100"),
+                ),
+            )
 
             val contract = Contract(
                 id,
@@ -292,7 +430,7 @@ class Contract(
                 description,
                 listOf(owner, contractor),
                 null,
-                ResolutionRule.OWNER_APPROVE,
+                if (objective == null) ResolutionRule.OWNER_APPROVE else ResolutionRule.SYSTEM_OBJECTIVE,
                 rules,
                 ContractStatus.OPEN,
                 now,
@@ -301,11 +439,15 @@ class Contract(
                 null,
                 expiresAt,
                 null,
+                objective,
                 emptyList(),
+                emptyList(),
+                rewardItems,
             )
             contract.metadata["creation-fee"] = creationFee.toPlainString()
             contract.metadata["commission-percent"] = commissionPercent.toPlainString()
-            contract.addEvent(now, "CREATED", "$ownerName created the contract and escrowed ${reward.toPlainString()}")
+            val itemText = if (rewardItems.isEmpty()) "" else " and ${rewardItems.sumOf { it.amount }} reward items"
+            contract.addEvent(now, "CREATED", "$ownerName created the contract and escrowed ${reward.toPlainString()}$itemText")
             return contract
         }
 
@@ -392,6 +534,8 @@ class Contract(
                 null,
                 expiresAt,
                 null,
+                null,
+                emptyList(),
                 emptyList(),
             )
             contract.metadata["commission-percent"] = commissionPercent.toPlainString()
@@ -482,6 +626,8 @@ class Contract(
                 null,
                 expiresAt,
                 null,
+                null,
+                emptyList(),
                 emptyList(),
             )
             contract.metadata["commission-percent"] = commissionPercent.toPlainString()

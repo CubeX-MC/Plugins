@@ -1,0 +1,69 @@
+name: Regions
+version: ${project.version}
+main: org.cubexmc.regions.RegionsPlugin
+api-version: '1.18'
+folia-supported: true
+author: CubeX-MC
+description: Region-powered venue framework for RuleGems rulers and server events.
+softdepend: [Lands, Residence, WorldGuard, RuleGems, Vault, PlaceholderAPI, LuckPerms]
+
+commands:
+  regions:
+    description: Regions root command.
+    aliases: [region, venue]
+    usage: /regions help
+
+permissions:
+  regions.use:
+    default: true
+    description: Use basic Regions commands.
+  regions.admin:
+    default: op
+    description: Full Regions administration.
+    children:
+      regions.reload: true
+      regions.region.create: true
+      regions.region.edit: true
+      regions.region.remove: true
+      regions.region.enable: true
+      regions.region.bind: true
+      regions.template.apply: true
+      regions.inspect: true
+      regions.cleanup: true
+      regions.validate: true
+  regions.reload:
+    default: op
+    description: Reload Regions.
+  regions.region.create:
+    default: op
+    description: Create Regions.
+  regions.region.edit:
+    default: op
+    description: Edit Regions.
+  regions.region.remove:
+    default: op
+    description: Remove Regions.
+  regions.region.enable:
+    default: op
+    description: Enable or disable Regions.
+  regions.region.bind:
+    default: op
+    description: Bind external region sources.
+  regions.template.apply:
+    default: op
+    description: Apply Region templates.
+  regions.inspect:
+    default: op
+    description: Inspect player Region sessions.
+  regions.cleanup:
+    default: op
+    description: Cleanup player Region state.
+  regions.validate:
+    default: op
+    description: Validate Region configuration.
+  regions.bypass.limit:
+    default: op
+    description: Bypass Region creation limits.
+  regions.bypass.flags:
+    default: op
+    description: Bypass Region flags.

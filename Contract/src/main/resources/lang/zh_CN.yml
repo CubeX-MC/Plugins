@@ -66,7 +66,8 @@ messages:
   mediate-accept-success: "<prefix><#69DB7C>你已接受合同 <#FFE066>#<id> <#69DB7C>的中间人职责。"
   mediate-success: "<prefix><#69DB7C>合同 <#FFE066>#<id> <#69DB7C>已按中间人裁决处理: <#FFE066><decision><#69DB7C>。"
   accept-success: "<prefix><#69DB7C>你已接受合同/邀请 <#FFE066>#<id><#69DB7C>。"
-  submit-success: "<prefix><#69DB7C>已提交完成，等待雇主确认。"
+  submit-success: "<prefix><#69DB7C>已提交完成；系统交付的物品或货币已按合同规则暂存/结算。"
+  claim-success: "<prefix><#69DB7C>已领取合同暂存物品。"
   approve-success: "<prefix><#69DB7C>合同已确认，已向 <#FFE066><player> <#69DB7C>支付 <#FFE066><amount><#69DB7C>。"
   cancel-success: "<prefix><#69DB7C>合同已取消，资金已按规则处理。"
   dispute-success: "<prefix><#FFE066>合同已进入争议状态，等待管理员处理。"
@@ -104,8 +105,10 @@ messages:
   help: |
     <#F4D03F>==== Contract ====
     <#FFE066>/contract <#F1F5F9>- 打开合同大厅
-    <#FFE066>/contract service \<奖金> \<天> \<标题>|\<描述> <#F1F5F9>- 发布雇佣合同
-    <#CFD8DC>可选: <#FFE066>/contract service \<奖金> \<天> --mediator \<中间人> \<标题>|\<描述>
+    <#FFE066>/contract service \<奖金|item> \<天> \<标题>|\<描述> <#F1F5F9>- 发布雇佣合同，item 表示托管主手物品作为奖励
+    <#CFD8DC>可选: <#FFE066>/contract service \<奖金|item> \<天> --mediator \<中间人> \<标题>|\<描述>
+    <#CFD8DC>系统验收: <#FFE066>/contract service \<奖金|item> \<天> --objective \<类型> \<目标> \<数量> \<标题>|\<描述>
+    <#CFD8DC>目标类型: <#FFE066>craft_item/block_break/fish/block_place/kill_entity/kill_player/consume_item/deliver_item/deliver_money/enchant_item/shear/breed/tame/chat/block_interact/run_command/use_item
     <#FFE066>/contract wager \<对方> \<押注> \<天> \<仲裁> \<标题>|\<描述> <#F1F5F9>- 发起对赌
     <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<天> \<标题>|\<描述> <#F1F5F9>- 发起合作
     <#CFD8DC>可选: <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<天> --mediator \<中间人> \<标题>|\<描述>
@@ -116,7 +119,8 @@ messages:
     <#FFE066>/contract rep [玩家] <#F1F5F9>- 查看履约档案/信誉
     <#FFE066>/contract info \<id> <#F1F5F9>- 查看详情
     <#FFE066>/contract accept \<id> <#F1F5F9>- 接单
-    <#FFE066>/contract submit \<id> <#F1F5F9>- 提交完成
+    <#FFE066>/contract submit \<id> <#F1F5F9>- 提交完成/交付系统物品或货币
+    <#FFE066>/contract claim \<id> <#F1F5F9>- 领取合同暂存的交付物品或奖励物品
     <#FFE066>/contract approve \<id> <#F1F5F9>- 雇主确认并付款
     <#FFE066>/contract cancel \<id> <#F1F5F9>- 取消可取消的合同
     <#FFE066>/contract dispute \<id> \<原因> <#F1F5F9>- 发起争议

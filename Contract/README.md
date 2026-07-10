@@ -29,8 +29,9 @@ target/contract-0.1.0.jar
 /contract help
 /contract
 /contract gui
-/contract service <奖金> <小时> <标题>|<描述>
-/contract service <奖金> <小时> --mediator <中间人> <标题>|<描述>
+/contract service <奖金|item> <小时> <标题>|<描述>
+/contract service <奖金|item> <小时> --mediator <中间人> <标题>|<描述>
+/contract service <奖金|item> <小时> --objective <类型> <目标> <数量> <标题>|<描述>
 /contract wager <对方> <押注> <小时> <仲裁者> <标题>|<描述>
 /contract partner <对方> <我押注> <对方押注> <小时> <标题>|<描述>
 /contract partner <对方> <我押注> <对方押注> <小时> --mediator <中间人> <标题>|<描述>
@@ -39,6 +40,7 @@ target/contract-0.1.0.jar
 /contract info <id>
 /contract accept <id>
 /contract submit <id>
+/contract claim <id>
 /contract approve <id>
 /contract resolve <id> <a|b>
 /contract mediate <id> <accept|pay|refund|owner|contractor>
@@ -100,6 +102,8 @@ contract.admin.view
 - `PARTNERSHIP`：合作。甲方创建时托管自己的押注，乙方 accept 时托管自己的押注，双方都 `/contract approve <id>` 后按规则结算。
 
 SERVICE 和 PARTNERSHIP 可选 `--mediator <中间人>`。中间人不是收款方，也不会经手资金；他必须先 `/contract mediate <id> accept` 接受职责，之后可在合同已生效且未结束时裁决：
+
+SERVICE 支持两种奖励托管：数字金额表示托管 Vault 货币，`item` 表示托管创建者主手整组物品。系统验收目标除事件进度和 `deliver_item` 外，也支持 `deliver_money`，接单者 `/contract submit <id>` 后会提交对应货币并按成功规则结算给雇主。完成后的奖励物品、交付物品，或取消/过期后需要领回的奖励物品，都通过 `/contract claim <id>` 领取。
 
 - `pay` / `contractor`：认定完成或接单方胜，按成功规则付款。
 - `refund` / `owner`：认定失效或创建方胜，按失败/退款规则处理。

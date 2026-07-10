@@ -29,11 +29,10 @@ import javax.net.ssl.HttpsURLConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 
 public class Metrics {
 
-    private final Plugin plugin;
+    private final ContractPlugin plugin;
 
     private final MetricsBase metricsBase;
 
@@ -44,7 +43,7 @@ public class Metrics {
      * @param serviceId The id of the service. It can be found at <a
      *     href="https://bstats.org/what-is-my-plugin-id">What is my plugin id?</a>
      */
-    public Metrics(Plugin plugin, int serviceId) {
+    public Metrics(ContractPlugin plugin, int serviceId) {
         this.plugin = plugin;
         // Get the config file
         File bStatsFolder = new File(plugin.getDataFolder().getParentFile(), "bStats");
@@ -77,11 +76,6 @@ public class Metrics {
         boolean logErrors = config.getBoolean("logFailedRequests", false);
         boolean logSentData = config.getBoolean("logSentData", false);
         boolean logResponseStatusText = config.getBoolean("logResponseStatusText", false);
-        boolean isFolia = false;
-        try {
-            isFolia = Class.forName("io.papermc.paper.threadedregions.RegionizedServer") != null;
-        } catch (Exception e) {
-        }
         metricsBase =
                 new // See https://github.com/Bastian/bstats-metrics/pull/126
                         // See https://github.com/Bastian/bstats-metrics/pull/126
@@ -97,9 +91,7 @@ public class Metrics {
                         enabled,
                         this::appendPlatformData,
                         this::appendServiceData,
-                        isFolia
-                                ? null
-                                : submitDataTask -> Bukkit.getScheduler().runTask(plugin, submitDataTask),
+                        this::runServerTask,
                         plugin::isEnabled,
                         (message, error) -> this.plugin.getLogger().log(Level.WARNING, message, error),
                         (message) -> this.plugin.getLogger().log(Level.INFO, message),
@@ -107,6 +99,10 @@ public class Metrics {
                         logSentData,
                         logResponseStatusText,
                         false);
+    }
+
+    private void runServerTask(Runnable task) {
+        plugin.scheduler().runGlobal(task);
     }
 
     /** Shuts down the underlying scheduler service. */

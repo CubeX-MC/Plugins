@@ -1,6 +1,8 @@
 package org.cubexmc.contract.storage;
 
 import org.cubexmc.contract.model.Contract;
+import org.cubexmc.contract.model.ContractObjective;
+import org.cubexmc.contract.model.ObjectiveType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -92,4 +94,25 @@ class ContractStorageTest {
         storage.load();
         assertTrue(storage.all().isEmpty());
     }
+
+    @Test
+    void savesAndReloadsServiceObjective() throws IOException {
+        ContractStorage storage = newStorage();
+        Contract contract = Contract.createService(UUID.randomUUID().toString(), UUID.randomUUID(), "Owner",
+            "Kill zombies", "description", new BigDecimal("500.00"), new BigDecimal("20.00"),
+            new BigDecimal("5"), 1000L, 2000L, ContractObjective.of(ObjectiveType.KILL_ENTITY, "zombie", 10));
+        contract.objective().addProgress(4);
+        storage.put(contract);
+        storage.save();
+
+        ContractStorage reloaded = newStorage();
+        reloaded.load();
+
+        Contract loaded = reloaded.all().get(0);
+        assertEquals(ObjectiveType.KILL_ENTITY, loaded.objective().type());
+        assertEquals("ZOMBIE", loaded.objective().target());
+        assertEquals(10, loaded.objective().required());
+        assertEquals(4, loaded.objective().progress());
+    }
+
 }

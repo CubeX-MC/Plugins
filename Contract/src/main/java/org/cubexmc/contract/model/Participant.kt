@@ -31,8 +31,19 @@ class Participant(
 
     fun stake(): List<Asset> = Collections.unmodifiableList(ArrayList(stake))
 
+    fun stake(stake: List<Asset>) {
+        this.stake.clear()
+        this.stake.addAll(stake)
+    }
+
+    fun addStake(asset: Asset) {
+        stake.add(asset)
+    }
+
     fun moneyStake(): BigDecimal =
         stake.filter { it.isMoney() }.map { it.amount() }.fold(BigDecimal.ZERO) { left, right -> left.add(right) }
+
+    fun itemStakeCount(): Int = stake.count { it.kind() == AssetKind.ITEM }
 
     fun toMap(): Map<String, Any?> {
         val map = LinkedHashMap<String, Any?>()

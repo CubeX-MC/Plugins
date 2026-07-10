@@ -20,10 +20,23 @@ class EconomyService(private val plugin: ContractPlugin) {
         return true
     }
 
-    fun has(player: Player, amount: BigDecimal): Boolean =
-        economy?.has(player, amount.toDouble()) == true
+    fun has(player: Player, amount: BigDecimal): Boolean {
+        if (amount.signum() < 0) {
+            return false
+        }
+        if (amount.signum() == 0) {
+            return true
+        }
+        return economy?.has(player, amount.toDouble()) == true
+    }
 
     fun withdraw(player: Player, amount: BigDecimal): TransactionResult {
+        if (amount.signum() < 0) {
+            return TransactionResult.fail("amount must not be negative")
+        }
+        if (amount.signum() == 0) {
+            return TransactionResult.ok()
+        }
         val activeEconomy = economy ?: return TransactionResult.fail("Vault economy is not available")
         val response = activeEconomy.withdrawPlayer(player, amount.toDouble())
         if (!response.transactionSuccess()) {
@@ -33,6 +46,12 @@ class EconomyService(private val plugin: ContractPlugin) {
     }
 
     fun deposit(playerUuid: UUID, amount: BigDecimal): TransactionResult {
+        if (amount.signum() < 0) {
+            return TransactionResult.fail("amount must not be negative")
+        }
+        if (amount.signum() == 0) {
+            return TransactionResult.ok()
+        }
         val activeEconomy = economy ?: return TransactionResult.fail("Vault economy is not available")
         val player = Bukkit.getOfflinePlayer(playerUuid)
         val response = activeEconomy.depositPlayer(player, amount.toDouble())

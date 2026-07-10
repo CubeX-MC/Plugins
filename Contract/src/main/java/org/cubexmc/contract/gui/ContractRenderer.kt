@@ -5,8 +5,10 @@ import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.Contract
+import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
 import org.cubexmc.contract.model.ContractType
+import org.cubexmc.contract.model.ObjectiveType
 import org.cubexmc.contract.model.ParticipantRole
 import org.cubexmc.contract.util.Text
 import java.math.BigDecimal
@@ -25,21 +27,12 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
 
     fun contractItem(contract: Contract, actionLabel: String?, progressLabel: String? = null): ItemStack {
         val lore = ArrayList<String>()
-        lore.add(Text.color("&#CFD8DCID: &#FFE066#${contract.shortId()}"))
-        lore.add(Text.color("&#CFD8DC类型: &#FFFFFF${plugin.lang().type(contract.type())}"))
-        lore.add(Text.color("&#CFD8DC状态: &#FFFFFF${plugin.lang().status(contract.status())}"))
-        lore.add(Text.color("&#CFD8DC阶段: &#FFFFFF${stageName(contract.status())}"))
-        if (!progressLabel.isNullOrBlank()) {
-            lore.add(Text.color("&#CFD8DC下一步: &#FFFFFF$progressLabel"))
+        lore.add(Text.color("&#CFD8DC描述: &#FFFFFF${ContractTerms.preview(contract.description())}"))
+        lore.add(Text.color("&#CFD8DC奖励: &#69DB7C${rewardSummary(contract)}"))
+        val objective = contract.objective()
+        if (objective != null) {
+            lore.add(Text.color("&#CFD8DC任务要求: &#FFFFFF${objectiveSummary(objective, false)}"))
         }
-        lore.add(Text.color("&#CFD8DC发起: &#FFFFFF${contract.ownerName()}"))
-        lore.add(Text.color("&#CFD8DC发起方信誉: &#FFFFFF${repSummary(contract.ownerUuid())}"))
-        lore.add(Text.color("&#CFD8DC对方: &#FFFFFF${contract.contractorName() ?: "无"}"))
-        lore.add(Text.color("&#CFD8DC金额: &#69DB7C${plugin.economy().format(contract.reward())}"))
-        lore.add(Text.color("&#CFD8DC接单截止: &#FFFFFF${DATE_FORMAT.format(Instant.ofEpochMilli(contract.expiresAt()))}"))
-        lore.add("")
-        if (actionLabel != null) lore.add(Text.color("&#E63946▶ $actionLabel"))
-        lore.add(Text.color("&#FFE066点击查看详情"))
         return named(materialFor(contract.type(), contract.status()), "&#F4D03F${contract.title()}", lore)
     }
 
@@ -48,7 +41,7 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         lore.add(Text.color("&#CFD8DC类型: &#FFFFFF${plugin.lang().type(contract.type())}"))
         lore.add(Text.color("&#CFD8DC状态: &#FFFFFF${plugin.lang().status(contract.status())}"))
         for (participant in contract.participants()) {
-            lore.add(Text.color("&#CFD8DC${plugin.lang().role(participant.role())}: &#FFFFFF${participant.displayName() ?: "无"} &#69DB7C${plugin.economy().format(participant.moneyStake())}"))
+            lore.add(Text.color("&#CFD8DC${plugin.lang().role(participant.role())}: &#FFFFFF${participant.displayName() ?: "无"} &#69DB7C${stakeSummary(participant)}"))
             val uuid = participant.uuid()
             if (uuid != null) {
                 lore.add(Text.color("&#CFD8DC   信誉: &#FFFFFF${repSummary(uuid)}"))
@@ -59,6 +52,19 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
             lore.add(Text.color("&#CFD8DC仲裁者: &#FFFFFF${arbiter.displayName()} &#CFD8DC(${if (contract.arbiterAccepted()) "已接受" else "待接受"})"))
         }
         lore.add(Text.color("&#CFD8DC佣金率: &#FFE066${contract.commissionPercent().toPlainString()}%"))
+        val objective = contract.objective()
+        if (objective != null) {
+            lore.add(Text.color("&#CFD8DC验收方式: &#69DB7C系统验收"))
+            lore.add(Text.color("&#CFD8DC目标: &#FFFFFF${objectiveSummary(objective, true)}"))
+        } else if (contract.type() == ContractType.SERVICE) {
+            lore.add(Text.color("&#CFD8DC验收方式: &#FFFFFF人工验收"))
+        }
+        if (contract.hasDeliveryItems()) {
+            lore.add(Text.color("&#CFD8DC合同暂存: &#FFFFFF${contract.deliveryItemCount()} 个交付物品"))
+        }
+        if (contract.hasRewardItems()) {
+            lore.add(Text.color("&#CFD8DC奖励暂存: &#FFFFFF${contract.rewardItemCount()} 个物品"))
+        }
         lore.add(Text.color("&#CFD8DC接单截止: &#FFFFFF${DATE_FORMAT.format(Instant.ofEpochMilli(contract.expiresAt()))}"))
         lore.add("")
         lore.add(Text.color("&#F1F5F9${contract.description()}"))
@@ -80,10 +86,24 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         lines.add("&#CFD8DC有效期: &#FFFFFF${draft.days()?.let { "$it 天" } ?: "未填"}")
         if (draft.type() == ContractType.SERVICE) {
             val fee = plugin.config.getDouble("economy.creation-fee", 20.0)
-            lines.add("&#CFD8DC奖金托管: &#69DB7C${valueOr(num(draft.amount()))}")
+            lines.add("&#CFD8DC验收方式: &#FFFFFF${if (draft.systemVerified()) "系统验收" else "人工验收"}")
+            if (draft.systemVerified()) {
+                val type = draft.objectiveType()
+                lines.add("&#CFD8DC系统目标: &#FFFFFF${if (type == null) "未选" else objectiveTypeLabel(type)} ${draftObjectiveTarget(type, draft.objectiveTarget())} x${draft.objectiveRequired() ?: "未填"}")
+                lines.add("&#E63946目标达成后系统会自动付款。")
+            }
+            if (draft.itemReward()) {
+                lines.add("&#CFD8DC奖励托管: &#69DB7C主手物品")
+            } else {
+                lines.add("&#CFD8DC奖金托管: &#69DB7C${valueOr(num(draft.amount()))}")
+            }
             lines.add("&#CFD8DC创建费: &#FFE066${trimNumber(fee)} &#CFD8DC(普通取消不退)")
             val amount = draft.amount()
-            if (amount != null) lines.add("&#CFD8DC签署后共扣除: &#E63946${trimNumber(amount + fee)}")
+            if (draft.itemReward()) {
+                lines.add("&#CFD8DC签署后扣除: &#E63946${trimNumber(fee)} &#CFD8DC并托管主手物品")
+            } else if (amount != null) {
+                lines.add("&#CFD8DC签署后共扣除: &#E63946${trimNumber(amount + fee)}")
+            }
         } else if (draft.type() == ContractType.WAGER) {
             lines.add("&#CFD8DC我的押注: &#69DB7C${valueOr(num(draft.amount()))}")
             lines.add("&#CFD8DC对方需匹配等额押注。")
@@ -129,6 +149,59 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
     private fun valueOr(value: String?): String = if (value.isNullOrBlank()) "未填" else value
 
     private fun num(value: Double?): String? = value?.let { trimNumber(it) }
+
+    private fun rewardSummary(contract: Contract): String {
+        val parts = ArrayList<String>()
+        if (contract.reward().signum() > 0) {
+            parts.add(plugin.economy().format(contract.reward()))
+        }
+        if (contract.hasRewardItems()) {
+            parts.add("${contract.rewardItemCount()} 个物品")
+        }
+        return if (parts.isEmpty()) plugin.economy().format(BigDecimal.ZERO) else parts.joinToString(" + ")
+    }
+
+    private fun stakeSummary(participant: org.cubexmc.contract.model.Participant): String {
+        val parts = ArrayList<String>()
+        val money = participant.moneyStake()
+        if (money.signum() > 0) {
+            parts.add(plugin.economy().format(money))
+        }
+        if (participant.itemStakeCount() > 0) {
+            parts.add("${participant.itemStakeCount()} 项物品")
+        }
+        return if (parts.isEmpty()) plugin.economy().format(BigDecimal.ZERO) else parts.joinToString(" + ")
+    }
+
+    private fun objectiveSummary(objective: ContractObjective, includeProgress: Boolean): String {
+        val target = if (objective.type() == ObjectiveType.DELIVER_MONEY) "默认货币" else objective.target()
+        val count = if (includeProgress) objective.progressText() else "x${objective.required()}"
+        return "${objectiveTypeLabel(objective.type())} $target $count"
+    }
+
+    private fun draftObjectiveTarget(type: ObjectiveType?, target: String?): String =
+        if (type == ObjectiveType.DELIVER_MONEY) "默认货币" else valueOr(target)
+
+    private fun objectiveTypeLabel(type: ObjectiveType): String =
+        when (type) {
+            ObjectiveType.CRAFT_ITEM -> "合成物品"
+            ObjectiveType.BLOCK_BREAK -> "挖掘方块"
+            ObjectiveType.FISH -> "钓鱼"
+            ObjectiveType.BLOCK_PLACE -> "放置方块"
+            ObjectiveType.KILL_ENTITY -> "击杀生物"
+            ObjectiveType.KILL_PLAYER -> "击杀玩家"
+            ObjectiveType.CONSUME_ITEM -> "消耗物品"
+            ObjectiveType.DELIVER_ITEM -> "提交物品"
+            ObjectiveType.ENCHANT_ITEM -> "附魔物品"
+            ObjectiveType.SHEAR -> "使用剪刀"
+            ObjectiveType.BREED -> "繁殖动物"
+            ObjectiveType.TAME -> "驯服动物"
+            ObjectiveType.CHAT -> "发送聊天"
+            ObjectiveType.BLOCK_INTERACT -> "交互方块"
+            ObjectiveType.RUN_COMMAND -> "执行指令"
+            ObjectiveType.USE_ITEM -> "使用物品"
+            ObjectiveType.DELIVER_MONEY -> "提交货币"
+        }
 
     private fun stageName(status: ContractStatus): String =
         when (status) {

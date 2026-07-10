@@ -1,0 +1,230 @@
+templates-version: 1
+
+templates:
+  mini_kingdom:
+    name: "小人国"
+    description: "玩家进入后缩小，禁飞、禁隐身、禁 PVP。"
+    mode:
+      type: free_event
+    flags:
+      pvp:
+        value: deny
+      fly:
+        value: deny
+      vanish:
+        value: deny
+    effects:
+      - type: scale
+        value: 0.35
+        scope: while_inside
+    triggers:
+      on_enter:
+        - name: "入场提示"
+          then:
+            - type: title
+              title: "&a小人国"
+              subtitle: "&7离开区域后自动恢复"
+
+  event_plaza:
+    name: "活动广场"
+    description: "轻量活动区域，默认禁 PVP 和禁飞。"
+    mode:
+      type: free_event
+    flags:
+      pvp:
+        value: deny
+      fly:
+        value: deny
+
+  run_race:
+    name: "跑步赛道"
+    description: "跑步/跑酷比赛。管理者需要在 GUI 中设置起点、终点和检查点。"
+    mode:
+      type: run_race
+      min-players: 1
+      start-mode: vote
+      require-start: true
+      radius: 2.5
+      vehicle: none
+      start: ""
+      finish: ""
+      checkpoints: ""
+      checkpoint-vehicles: ""
+    flags:
+      pvp:
+        value: deny
+      fly:
+        value: deny
+    triggers:
+      on_finish:
+        - name: "完赛提示"
+          then:
+            - type: broadcast
+              text: "&6{player} 完成比赛，名次 #{rank}，用时 {race_time_ms}ms。"
+
+  boat_race:
+    name: "划船赛道"
+    description: "划船比赛。参赛者必须坐在船上才会记录检查点和终点。"
+    mode:
+      type: boat_race
+      min-players: 1
+      start-mode: vote
+      require-start: true
+      radius: 3.0
+      vehicle: boat
+      start: ""
+      finish: ""
+      checkpoints: ""
+      checkpoint-vehicles: ""
+    flags:
+      pvp:
+        value: deny
+      fly:
+        value: deny
+    triggers:
+      on_finish:
+        - name: "完赛提示"
+          then:
+            - type: broadcast
+              text: "&6{player} 划船到达终点，名次 #{rank}。"
+
+  horse_race:
+    name: "骑马赛道"
+    description: "骑马比赛。参赛者必须骑马才会记录检查点和终点。"
+    mode:
+      type: horse_race
+      min-players: 1
+      start-mode: judge
+      require-start: true
+      radius: 3.0
+      vehicle: horse
+      start: ""
+      finish: ""
+      checkpoints: ""
+      checkpoint-vehicles: ""
+      judges: ""
+    flags:
+      pvp:
+        value: deny
+      fly:
+        value: deny
+    triggers:
+      on_finish:
+        - name: "完赛提示"
+          then:
+            - type: broadcast
+              text: "&6{player} 骑马到达终点，名次 #{rank}。"
+
+  dual_pvp:
+    name: "双人决斗场"
+    description: "2 名玩家进入后全员确认开始，开战时扣押原装备并发放指定装备。"
+    mode:
+      type: dual_pvp
+      min-players: 2
+      max-players: 2
+      require-ready: true
+      replace-gear: true
+      kit: "IRON_SWORD:1,BOW:1,ARROW:16,COOKED_BEEF:8"
+      armor: "IRON_BOOTS:1,IRON_LEGGINGS:1,IRON_CHESTPLATE:1,IRON_HELMET:1"
+      offhand: "SHIELD:1"
+      respawn: "world,0,80,0"
+    flags:
+      pvp:
+        value: allow
+      item_drop:
+        value: deny
+      fly:
+        value: deny
+    triggers:
+      on_mode_start:
+        - name: "开战提示"
+          then:
+            - type: title
+              title: "&c决斗开始"
+              subtitle: "&7击败对手后会自动恢复装备"
+      on_mode_end:
+        - name: "结束提示"
+          then:
+            - type: message
+              text: "&e决斗结束，装备已恢复。"
+
+  union_war:
+    name: "工会战场"
+    description: "多人进入后全员确认开始，使用指定战斗装备。工会关系判定后续接入 UnionProvider。"
+    mode:
+      type: union_war
+      min-players: 4
+      min-unions: 2
+      require-ready: true
+      replace-gear: true
+      kit: "IRON_SWORD:1,BOW:1,ARROW:32,COOKED_BEEF:16"
+      armor: "IRON_BOOTS:1,IRON_LEGGINGS:1,IRON_CHESTPLATE:1,IRON_HELMET:1"
+      offhand: "SHIELD:1"
+      respawn: "world,0,80,0"
+      reward-source: "contract"
+      reward-contract: ""
+    flags:
+      pvp:
+        value: allow
+      item_drop:
+        value: deny
+      fly:
+        value: deny
+    triggers:
+      on_mode_start:
+        - name: "工会战开战"
+          then:
+            - type: broadcast
+              text: "&c工会战开始！代表你的工会活到最后。"
+      on_mode_end:
+        - name: "工会战结束"
+          then:
+            - type: broadcast
+              text: "&e工会战结束，装备已恢复。"
+
+  hide_and_seek:
+    name: "藏猫猫场地"
+    description: "回合制小游戏。玩家进入后 ready，开局自动分配寻找者和隐藏者。寻找者攻击隐藏者即找到对方，不造成真实伤害。"
+    mode:
+      type: hide_and_seek
+      min-players: 2
+      max-players: 12
+      start-mode: vote
+      vote-start-percent: 1.0
+      seekers: 1
+      hide-seconds: 30
+      round-seconds: 300
+      found-becomes-seeker: true
+      replace-gear: false
+      respawn: "world,0,80,0"
+    flags:
+      pvp:
+        value: allow
+      item_drop:
+        value: deny
+      fly:
+        value: deny
+      vanish:
+        value: deny
+    triggers:
+      on_mode_start:
+        - name: "小游戏开始"
+          then:
+            - type: title
+              title: "&a藏猫猫开始"
+              subtitle: "&7寻找者稍后释放"
+      on_role_assigned:
+        - name: "身份已分配"
+          then:
+            - type: message
+              text: "&e你的身份已经分配，请查看聊天提示。"
+      on_found:
+        - name: "玩家被找到"
+          then:
+            - type: broadcast
+              text: "&6{player} 被找到了。"
+      on_mode_end:
+        - name: "小游戏结束"
+          then:
+            - type: message
+              text: "&e小游戏结束，临时状态已恢复。"

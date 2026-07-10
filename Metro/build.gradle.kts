@@ -2,7 +2,7 @@ import com.github.jengelman.gradle.plugins.shadow.transformers.ServiceFileTransf
 
 plugins { id("cubex-kotlin-plugin") }
 
-version = "1.1.7"
+version = "1.1.8"
 description = "metro"
 
 dependencies {

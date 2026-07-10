@@ -11,7 +11,6 @@ import io.papermc.paper.registry.data.dialog.input.DialogInput
 import io.papermc.paper.registry.data.dialog.type.DialogType
 import net.kyori.adventure.text.event.ClickCallback
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
-import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.ContractType
@@ -35,13 +34,13 @@ class DialogInputService(private val plugin: ContractPlugin) {
             comp(Text.color("&#69DB7C签署执行")),
             comp(Text.color("&#CFD8DC点击立即签署并执行")),
             BUTTON_WIDTH,
-            DialogAction.customClick(DialogActionCallback { _, _ -> runMain(onConfirm) }, clickOptions()),
+            DialogAction.customClick(DialogActionCallback { _, _ -> runAtPlayer(player, onConfirm) }, clickOptions()),
         )
         val no = ActionButton.create(
             comp(Text.color("&#E63946取消")),
             null,
             BUTTON_WIDTH,
-            DialogAction.customClick(DialogActionCallback { _, _ -> runMain(onCancel) }, clickOptions()),
+            DialogAction.customClick(DialogActionCallback { _, _ -> runAtPlayer(player, onCancel) }, clickOptions()),
         )
         val base = DialogBase.builder(comp(Text.color("&#F4D03F$title")))
             .canCloseWithEscape(true)
@@ -55,7 +54,7 @@ class DialogInputService(private val plugin: ContractPlugin) {
      * Native create form. Reads the response back into [draft] (parsing numbers leniently) and then
      * calls [onSubmit] — which validates and either re-shows the form or moves to the confirmation.
      */
-    fun createForm(player: Player, draft: CreateDraft, onSubmit: () -> Unit) {
+    fun createForm(player: Player, draft: CreateDraft, onSubmit: () -> Unit, onCancel: () -> Unit) {
         val maxDescription = plugin.config.getInt("limits.max-description-length", 500)
         val inputs = ArrayList<DialogInput>()
         inputs.add(textInput("title", "&#FFE066标题", draft.title(), 64))
@@ -75,7 +74,13 @@ class DialogInputService(private val plugin: ContractPlugin) {
             comp(Text.color("&#69DB7C预览并签署")),
             comp(Text.color("&#CFD8DC进入签署确认")),
             FORM_BUTTON_WIDTH,
-            DialogAction.customClick(DialogActionCallback { response, _ -> applyAndSubmit(draft, response, onSubmit) }, clickOptions()),
+            DialogAction.customClick(DialogActionCallback { response, _ -> applyAndSubmit(player, draft, response, onSubmit) }, clickOptions()),
+        )
+        val cancel = ActionButton.create(
+            comp(Text.color("&#E63946放弃创建")),
+            comp(Text.color("&#CFD8DC删除当前草稿并返回合同大厅")),
+            FORM_BUTTON_WIDTH,
+            DialogAction.customClick(DialogActionCallback { _, _ -> runAtPlayer(player, onCancel) }, clickOptions()),
         )
         val base = DialogBase.builder(comp(Text.color("&#F4D03F创建合同 · ${plugin.lang().type(draft.type())}")))
             .canCloseWithEscape(true)
@@ -83,10 +88,10 @@ class DialogInputService(private val plugin: ContractPlugin) {
             .body(body)
             .inputs(inputs)
             .build()
-        player.showDialog(Dialog.create { factory -> factory.empty().base(base).type(DialogType.notice(submit)) })
+        player.showDialog(Dialog.create { factory -> factory.empty().base(base).type(DialogType.confirmation(submit, cancel)) })
     }
 
-    private fun applyAndSubmit(draft: CreateDraft, response: DialogResponseView, onSubmit: () -> Unit) {
+    private fun applyAndSubmit(player: Player, draft: CreateDraft, response: DialogResponseView, onSubmit: () -> Unit) {
         val title = response.getText("title")
         val description = response.getText("desc")
         val counterparty = if (draft.needsCounterparty()) response.getText("counterparty") else null
@@ -94,13 +99,13 @@ class DialogInputService(private val plugin: ContractPlugin) {
         val mediator = response.getText("mediator")
         val stake = if (draft.needsPartnerStake()) response.getText("stake") else null
         val days = response.getText("days")
-        runMain {
+        runAtPlayer(player) {
             draft.title(blankToNull(Text.stripControl(title ?: "")))
             draft.description(blankToNull(Text.stripControl(description ?: "")))
             if (draft.needsCounterparty()) draft.counterparty(blankToNull(counterparty?.trim()))
             draft.mediator(blankToNull(mediator?.trim()))
-            draft.amount(parsePositive(amount))
-            if (draft.needsPartnerStake()) draft.partnerStake(parsePositive(stake))
+            draft.amount(parseNonNegative(amount))
+            if (draft.needsPartnerStake()) draft.partnerStake(parseNonNegative(stake))
             draft.days(days?.trim()?.toIntOrNull())
             onSubmit()
         }
@@ -120,8 +125,8 @@ class DialogInputService(private val plugin: ContractPlugin) {
 
     private fun clickOptions(): ClickCallback.Options = ClickCallback.Options.builder().build()
 
-    private fun runMain(block: () -> Unit) {
-        Bukkit.getScheduler().runTask(plugin, Runnable { block() })
+    private fun runAtPlayer(player: Player, block: () -> Unit) {
+        plugin.scheduler().runAtEntity(player, Runnable { block() })
     }
 
     private fun blankToNull(value: String?): String? = if (value.isNullOrBlank()) null else value
@@ -130,9 +135,9 @@ class DialogInputService(private val plugin: ContractPlugin) {
         if (it == Math.rint(it)) it.toLong().toString() else BigDecimal.valueOf(it).stripTrailingZeros().toPlainString()
     }
 
-    private fun parsePositive(text: String?): Double? {
+    private fun parseNonNegative(text: String?): Double? {
         val value = text?.trim()?.toDoubleOrNull() ?: return null
-        return if (value > 0 && value.isFinite()) value else null
+        return if (value >= 0 && value.isFinite()) value else null
     }
 
     private companion object {

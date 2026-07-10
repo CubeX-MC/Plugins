@@ -1,8 +1,10 @@
 package org.cubexmc.contract.gui;
 
 import org.cubexmc.contract.model.ContractType;
+import org.cubexmc.contract.model.ObjectiveType;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -20,6 +22,27 @@ class CreateDraftTest {
         draft.title("Build a wall");
         draft.days(2);
         draft.amount(500.0);
+        assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
+        assertTrue(draft.isReady(MIN, MAX, MIN_DAYS, MAX_DAYS));
+    }
+
+    @Test
+    void serviceDraftAllowsZeroAmountWhenMinimumIsZero() {
+        CreateDraft draft = new CreateDraft(ContractType.SERVICE);
+        draft.title("Selling shulker boxes");
+        draft.days(2);
+        draft.amount(0.0);
+        assertNull(draft.validate(0.0, MAX, MIN_DAYS, MAX_DAYS));
+        assertTrue(draft.isReady(0.0, MAX, MIN_DAYS, MAX_DAYS));
+    }
+
+    @Test
+    void serviceItemRewardDoesNotRequireMoneyAmount() {
+        CreateDraft draft = new CreateDraft(ContractType.SERVICE);
+        draft.title("Trade diamonds");
+        draft.days(2);
+        draft.itemReward(true);
+
         assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
         assertTrue(draft.isReady(MIN, MAX, MIN_DAYS, MAX_DAYS));
     }
@@ -86,5 +109,50 @@ class CreateDraftTest {
         CreateDraft draft = new CreateDraft(ContractType.SERVICE);
         assertFalse(draft.needsCounterparty());
         assertFalse(draft.mediatorRequired());
+    }
+
+    @Test
+    void systemVerifiedServiceRequiresObjectiveDetails() {
+        CreateDraft draft = new CreateDraft(ContractType.SERVICE);
+        draft.title("Kill zombies");
+        draft.days(2);
+        draft.amount(500.0);
+        draft.objectiveType(ObjectiveType.KILL_ENTITY);
+
+        assertNotNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
+
+        draft.objectiveTarget("ZOMBIE");
+        draft.objectiveRequired(0);
+        assertNotNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
+
+        draft.objectiveRequired(10);
+        assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
+        assertTrue(draft.systemVerified());
+    }
+
+    @Test
+    void systemVerifiedServiceCanUseAnyChatTarget() {
+        CreateDraft draft = new CreateDraft(ContractType.SERVICE);
+        draft.title("Say hello");
+        draft.days(2);
+        draft.amount(500.0);
+        draft.objectiveType(ObjectiveType.CHAT);
+        draft.objectiveTarget(null);
+        draft.objectiveRequired(1);
+
+        assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
+    }
+
+    @Test
+    void systemVerifiedServiceCanDeliverMoney() {
+        CreateDraft draft = new CreateDraft(ContractType.SERVICE);
+        draft.title("Pay for item");
+        draft.days(2);
+        draft.itemReward(true);
+        draft.objectiveType(ObjectiveType.DELIVER_MONEY);
+        draft.objectiveRequired(250);
+
+        assertEquals("MONEY", draft.objectiveTarget());
+        assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
     }
 }

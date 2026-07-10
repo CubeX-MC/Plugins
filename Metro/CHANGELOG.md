@@ -1,7 +1,13 @@
 # Changelog
 
-## 1.1.7 (unreleased)
+## 1.1.8 (2026-07-10)
 
+- **Train display**: improve circular-line station planning, folded terminal
+  display, scoreboard rendering, and hex color handling for titles/action bars.
+- **Portals**: simplify portals to a one-way destination model; remove the
+  deprecated bidirectional `portal link` command and linked-portal list text.
+- **Kotlin migration**: continue the Metro Kotlin migration across API,
+  config/manager/service, train, lifecycle, and utility code paths.
 - **Spatial**: fix `Range3D.contains` half-open interval bug (mismatch with
   Bukkit `BoundingBox`); remove `Range3D` dependency from `Stop.java`
 - **Docs**: add JavaDoc to `Range3D`, `Point3D`, `Octree`; add `@since`

@@ -2,6 +2,7 @@ name: Contract
 version: ${project.version}
 main: org.cubexmc.contract.ContractPlugin
 api-version: '1.18'
+folia-supported: true
 author: CubeX-MC
 description: Player-to-player contract board with Vault-backed escrow.
 # Vault is required for the economy API; soft-depend on common providers so Contract enables AFTER the
@@ -27,7 +28,10 @@ permissions:
     description: Accept open contracts.
   contract.submit:
     default: true
-    description: Submit accepted contracts for owner approval.
+    description: Submit accepted contracts for owner approval or deliver system objective assets.
+  contract.claim:
+    default: true
+    description: Claim delivery or reward items stored in contracts.
   contract.approve:
     default: true
     description: Approve submitted contracts you own.

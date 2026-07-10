@@ -1,0 +1,37 @@
+lang-version: 1
+
+prefix: "&#69DB7C[Regions] "
+help: |
+  &#69DB7C/regions gui &#CFD8DC- Open the Regions management GUI
+  &#69DB7C/regions list &#CFD8DC- List regions
+  &#69DB7C/regions create <id> <name> &#CFD8DC- Create a region
+  &#69DB7C/regions bind <id> cuboid|lands ... &#CFD8DC- Bind a region source
+  &#69DB7C/regions mode set <id> dual_pvp|union_war|run_race|boat_race|horse_race|hide_and_seek ... &#CFD8DC- Set gameplay mode
+  &#69DB7C/regions game <id> ready/start/status/end &#CFD8DC- Ready, judge-start, inspect, or end a game
+  &#69DB7C/regions flag set <id> <flag> <value> &#CFD8DC- Set a rule flag
+  &#69DB7C/regions effect add <id> <effect> [args] &#CFD8DC- Add a scoped effect
+  &#69DB7C/regions validate [id] &#CFD8DC- Validate configuration
+  &#69DB7C/regions inspect <player> &#CFD8DC- Inspect player region state
+  &#69DB7C/regions cleanup <player> &#CFD8DC- Cleanup player region state
+  &#69DB7C/regions reload &#CFD8DC- Reload configuration
+help-player: "&#CFD8DCEnter a configured land or venue to experience Regions. Combat, race, and minigame venues will prompt you to use &#69DB7C/regions game <region> ready &#CFD8DCwhen confirmation is needed."
+reloaded: "&#69DB7CRegions reloaded."
+no-permission: "&#E63946You do not have permission."
+player-only: "&#E63946Only players can use this command."
+invalid-usage: "&#FFE066Usage: {usage}"
+not-found: "&#E63946Region not found: {id}"
+player-not-found: "&#E63946Online player not found: {player}"
+list-empty: "&#CFD8DCNo regions are configured yet."
+list-header: "&#69DB7CConfigured regions ({count}):"
+list-line: "&#CFD8DC- &#FFE066{id} &#CFD8DC{enabled} &#FFFFFF{name} &#90A4AE[source={source}, mode={mode}]"
+enabled: "&#69DB7Cenabled"
+disabled: "&#90A4AEdisabled"
+validate-ok: "&#69DB7CRegion configuration is valid."
+validate-header: "&#FFE066Region validation issues ({count}):"
+validate-line: "&#CFD8DC- &#FFE066{id} &#E63946{severity} &#FFFFFF{message}"
+inspect-header: "&#69DB7CRegions state for {player}:"
+inspect-empty: "&#CFD8DCNo active region sessions."
+inspect-line: "&#CFD8DC- &#FFE066{region} &#90A4AEentered at {entered}"
+cleanup-done: "&#69DB7CCleaned {player}'s region state ({count} sessions)."
+doctor-header: "&#69DB7CRegions doctor:"
+doctor-line: "&#CFD8DC- {message}"

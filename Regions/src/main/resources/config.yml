@@ -1,0 +1,43 @@
+config-version: 1
+language: zh_CN
+
+integrations:
+  union-provider: lands
+  lands:
+    enabled: true
+    required-for-startup: false
+  rulegems:
+    enabled: true
+  placeholderapi:
+    enabled: true
+
+safety:
+  watchdog-interval-seconds: 3
+  cleanup-on-death: true
+  cleanup-on-quit: true
+  cleanup-on-reload: true
+  deny-unsafe-player-op-actions: true
+  max-actions-per-trigger: 16
+  max-regions-per-player: 5
+
+effects:
+  refresh-interval-ticks: 60
+  default-duration-ticks: 400
+  scale:
+    min: 0.1
+    max: 4.0
+    require-native-support: true
+
+vanish:
+  # Regions only suppresses vanilla invisibility by default. These keys are used for diagnostics when
+  # an external vanish plugin marks a player as vanished.
+  metadata-keys:
+    - vanished
+    - vanish
+    - invisible
+
+commands:
+  root: regions
+  aliases:
+    - region
+    - venue

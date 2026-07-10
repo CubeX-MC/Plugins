@@ -1,6 +1,5 @@
 package org.cubexmc.contract.gui
 
-import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -52,11 +51,11 @@ class ChatInputService(private val plugin: ContractPlugin) : Listener {
         prompts[playerId] = prompt
         player.closeInventory()
         player.sendMessage(message)
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+        plugin.scheduler().runAtEntityLater(player, Runnable {
             val current = prompts[playerId]
             if (current === prompt && System.currentTimeMillis() >= prompt.expiresAt) {
                 prompts.remove(playerId)
-                if (Bukkit.getPlayer(playerId) != null) {
+                if (player.isOnline) {
                     prompt.callback(ChatOutcome.TimedOut)
                 }
             }
@@ -77,7 +76,7 @@ class ChatInputService(private val plugin: ContractPlugin) : Listener {
         val prompt = prompts.remove(playerId) ?: return
         event.isCancelled = true
         val message = event.message
-        Bukkit.getScheduler().runTask(plugin, Runnable {
+        plugin.scheduler().runAtEntity(event.player, Runnable {
             if (System.currentTimeMillis() >= prompt.expiresAt) {
                 prompt.callback(ChatOutcome.TimedOut)
                 return@Runnable

@@ -20,22 +20,20 @@ dependencies {
     compileOnly(CubexDeps.paperApi("1.21.11-R0.1-SNAPSHOT"))
     compileOnly(CubexDeps.vault)
     implementation(project(":modules:cubex-core"))
+    implementation(project(":modules:cubex-scheduler"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
+    implementation("com.tcoded:FoliaLib:0.5.1")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation(CubexDeps.mockitoCore)
 }
 
 tasks.shadowJar {
     archiveBaseName.set("contract")
-    dependencies {
-        include(project(":modules:cubex-core"))
-        include(project(":modules:cubex-config"))
-        include(project(":modules:cubex-i18n"))
-        include(dependency("org.jetbrains.kotlin:.*:.*"))
-    }
     // Adventure (net.kyori) is provided by the Paper server at runtime; do not bundle or relocate it —
     // the Dialog API exchanges the server's own Adventure types with us.
+    exclude("net/kyori/**")
+    relocate("com.tcoded.folialib", "${CubexRelocations.libsNamespace(project.name)}.folialib")
 }
 
 tasks.processResources {
