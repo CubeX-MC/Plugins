@@ -1,8 +1,7 @@
 name: Mirror to plugin repos
 
-# 把 monorepo 各插件子目录 subtree-split 后推送到对应独立 repo 的 monorepo-sync 分支。
-# 仅写各 repo 的 monorepo-sync,绝不触碰其默认分支。
-# 需要仓库 secret MIRROR_TOKEN(对 8 个目标 repo 有 push 权限的 PAT);未配置时优雅跳过。
+# 把 monorepo 各插件子目录 subtree-split 后推送到对应独立 repo 的 main 分支。
+# 需要仓库 secret MIRROR_TOKEN(对目标 repo 有 push 权限的 PAT);未配置时优雅跳过。
 
 on:
   push:
@@ -18,7 +17,7 @@ concurrency:
 
 jobs:
   mirror:
-    name: Subtree-split mirror
+    name: Subtree-split mirror to main
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (full history)
@@ -29,7 +28,7 @@ jobs:
           # 覆盖掉 URL 里嵌的 MIRROR_TOKEN,导致推送其它 repo 被 403 拒绝。
           persist-credentials: false
 
-      - name: Split and push to monorepo-sync
+      - name: Split and push to plugin main
         env:
           MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
         shell: bash
@@ -43,19 +42,19 @@ jobs:
           git config user.name "cubex-mirror-bot"
           git config user.email "actions@users.noreply.github.com"
 
-          # prefix(本地目录) 与 owner/repo 映射(注意:EcoBalancer 在个人账号)
+          # prefix(本地目录) 与 owner/repo 映射
           prefixes=(BookLite FAWEReplacer MountLicense Contract EcoBalancer RuleGems Metro Railway Clarity)
-          repos=(CubeX-MC/BookLite CubeX-MC/FAWEReplacer CubeX-MC/MountLicense CubeX-MC/Contract angushushu/EcoBalancer CubeX-MC/RuleGems CubeX-MC/Metro CubeX-MC/Railway CubeX-MC/Clarity)
+          repos=(CubeX-MC/BookLite CubeX-MC/FAWEReplace CubeX-MC/MountLicense CubeX-MC/Contract CubeX-MC/EcoBalancer CubeX-MC/RuleGems CubeX-MC/Metro CubeX-MC/Railway CubeX-MC/Clarity)
 
           failed=0
           for i in "${!prefixes[@]}"; do
             p="${prefixes[$i]}"
             repo="${repos[$i]}"
-            echo "::group::$p -> $repo (monorepo-sync)"
+            echo "::group::$p -> $repo (main)"
             sha="$(git subtree split --prefix="$p")"
             url="https://x-access-token:${MIRROR_TOKEN}@github.com/${repo}.git"
-            # 仅 fast-forward 推送到 monorepo-sync;失败(如非 FF)记录但继续其余,绝不 force
-            if git push "$url" "${sha}:refs/heads/monorepo-sync"; then
+            # 仅 fast-forward 推送到 main;失败(如非 FF 或分支保护)记录但继续其余,绝不 force
+            if git push "$url" "${sha}:refs/heads/main"; then
               echo "ok: $p -> $repo @ ${sha}"
             else
               echo "::error::push 失败(可能非 fast-forward 或权限不足):$p -> $repo"
