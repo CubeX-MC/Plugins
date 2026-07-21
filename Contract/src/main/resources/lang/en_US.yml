@@ -60,6 +60,7 @@ messages:
   invalid-number: "<prefix><#E63946>Invalid number."
   invalid-usage: "<prefix><#FFE066>Usage: <usage>"
   create-success: "<prefix><#69DB7C>Contract posted: <#FFE066>#<id> <#F1F5F9>escrowed <#69DB7C><amount><#F1F5F9>."
+  batch-create-success: "<prefix><#69DB7C>Posted <#FFE066><count> <#69DB7C>service contracts. First contract: <#FFE066>#<id><#69DB7C>."
   wager-create-success: "<prefix><#69DB7C>Wager opened for <#FFE066><opponent><#69DB7C>: <#FFE066>#<id> <#F1F5F9>stake <#69DB7C><stake><#F1F5F9>."
   partner-create-success: "<prefix><#69DB7C>Partnership invite sent to <#FFE066><partner><#69DB7C>: <#FFE066>#<id> <#F1F5F9>your stake <#69DB7C><stake><#F1F5F9>."
   resolve-success: "<prefix><#69DB7C>Contract <#FFE066>#<id> <#69DB7C>resolved for side <#FFE066><winner><#69DB7C>."
@@ -106,7 +107,8 @@ messages:
     <#F4D03F>==== Contract ====
     <#FFE066>/contract <#F1F5F9>- Open the board
     <#FFE066>/contract service \<reward|item> \<days> \<title>|\<description> <#F1F5F9>- Post a service contract; item escrows the main-hand item as reward
-    <#CFD8DC>Optional: <#FFE066>/contract service \<reward|item> \<days> --mediator \<player> \<title>|\<description>
+    <#CFD8DC>Batch: <#FFE066>/contract service \<reward|item> \<days> --count \<amount> --repeat \<unlimited|once|cooldown> [--cooldown \<hours>] \<title>|\<description>
+    <#CFD8DC>Optional: <#FFE066>--mediator \<player>
     <#CFD8DC>System verified: <#FFE066>/contract service \<reward|item> \<days> --objective \<type> \<target> \<amount> \<title>|\<description>
     <#CFD8DC>Objective types: <#FFE066>craft_item/block_break/fish/block_place/kill_entity/kill_player/consume_item/deliver_item/deliver_money/enchant_item/shear/breed/tame/chat/block_interact/run_command/use_item
     <#FFE066>/contract wager \<opponent> \<stake> \<days> \<arbiter> \<title>|\<description> <#F1F5F9>- Open a wager

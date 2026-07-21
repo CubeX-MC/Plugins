@@ -51,7 +51,7 @@ line:
   help_trust: "<gold>/m line trust \\<hat_id> \\<oyuncu> <white>- Hat yöneticisi ekle"
   help_untrust: "<gold>/m line untrust \\<hat_id> \\<oyuncu> <white>- Hat yöneticisini kaldır"
   help_owner: "<gold>/m line owner \\<hat_id> \\<oyuncu> <white>- Hat sahipliğini devret"
-  help_clonereverse: "<gold>/m line clonereverse \\<kaynak_id> \\<yeni_id> [sonek] <white>- Hattı tersine klonla"
+  help_clonereverse: "<gold>/m line clonereverse \\<kaynak_id> \\<yeni_id> [sonek] <white>- Hattı ve durakları ters sıra ve kalkış yönüyle klonla"
   help_setprice: "<gold>/m line setprice \\<hat_id> \\<fiyat> <white>- Geleneksel sabit bilet fiyatını ayarla\n<gold>/m line setprice \\<hat_id> flat|distance|interval \\<temel> [birimBaşına] [maks] <white>- Gelişmiş fiyatlandırma\n<gold>/m line setprice reset \\<hat_id> <white>- Geleneksel fiyatlandırmaya sıfırla"
   help_recordroute: "<gold>/m line recordroute \\<hat_id> <white>- Çevrimiçi haritalar ve ray koruma için rota noktalarını kaydet veya kaydet"
   help_clearroute: "<gold>/m line clearroute \\<hat_id> confirm <white>- Kaydedilmiş rota noktalarını temizle"

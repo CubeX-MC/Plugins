@@ -20,6 +20,10 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 tasks.named<ShadowJar>("shadowJar") {
-    exclude("kotlin/reflect/**")
+    // Keep the lightweight reflection interfaces shipped by kotlin-stdlib
+    // (KClass/KFunction/etc.); Kotlin callable references require them even
+    // when the full kotlin-reflect implementation is not used.
+    exclude("kotlin/reflect/full/**")
+    exclude("kotlin/reflect/jvm/**")
     relocate("kotlin", "${CubexRelocations.libsNamespace(project.name)}.kotlin")
 }

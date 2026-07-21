@@ -28,6 +28,14 @@ public class MetroMainCommand {
     @Command("m|metro")
     @CommandDescription("Metro Main Command")
     public void root(CommandSender sender) {
+        if (sender instanceof Player player) {
+            if (!player.hasPermission("metro.gui")) {
+                player.sendMessage(plugin.getLanguageManager().getMessage("plugin.no_permission"));
+                return;
+            }
+            gui(player);
+            return;
+        }
         help(sender);
     }
 
@@ -79,9 +87,6 @@ public class MetroMainCommand {
         stopManager.reload();
         if (plugin.getPortalManager() != null) {
             plugin.getPortalManager().load();
-        }
-        if (plugin.getRailProtectionManager() != null) {
-            plugin.getRailProtectionManager().rebuildAll();
         }
         plugin.getLanguageManager().loadLanguages();
 

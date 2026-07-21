@@ -51,7 +51,7 @@ line:
   help_trust: "<gold>/m line trust \\<路線ID> \\<玩家> <white>- 授予路線管理權限"
   help_untrust: "<gold>/m line untrust \\<路線ID> \\<玩家> <white>- 移除路線管理權限"
   help_owner: "<gold>/m line owner \\<路線ID> \\<玩家> <white>- 轉移路線所有權"
-  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- 反向克隆路線"
+  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- 反向克隆路線，並反轉新停靠點的發車朝向"
   help_setprice: "<gold>/m line setprice \\<路線ID> \\<價格> <white>- 設定傳統固定票價\n<gold>/m line setprice \\<路線ID> flat|distance|interval \\<基礎> [每單位] [最大值] <white>- 設定進階計價\n<gold>/m line setprice reset \\<路線ID> <white>- 重置為傳統計價"
   help_recordroute: "<gold>/m line recordroute \\<路線ID> <white>- 記錄或儲存路線軌跡點，用於線上地圖與鐵軌保護"
   help_clearroute: "<gold>/m line clearroute \\<路線ID> confirm <white>- 清除路線已記錄的軌跡點"

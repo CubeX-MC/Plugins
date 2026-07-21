@@ -50,6 +50,8 @@ jobs:
             !Metro/build/libs/*-plain.jar
             Railway/build/libs/*.jar
             !Railway/build/libs/*-plain.jar
+            Regions/build/libs/*.jar
+            !Regions/build/libs/*-plain.jar
 
   plugin-build:
     name: Build ${{ matrix.plugin }}
@@ -67,6 +69,7 @@ jobs:
           - Metro
           - Railway
           - Clarity
+          - Regions
 
     steps:
       - name: Checkout

@@ -2,6 +2,7 @@ package org.cubexmc.regions.integration
 
 import org.bukkit.Location
 import org.cubexmc.regions.model.ExternalRegion
+import org.cubexmc.regions.model.RegionGeometry
 import org.cubexmc.regions.model.RegionSourceRef
 import java.util.UUID
 
@@ -11,4 +12,7 @@ interface RegionSource {
     fun resolve(ref: RegionSourceRef): ExternalRegion?
     fun contains(ref: RegionSourceRef, location: Location): Boolean
     fun getOwnedRegions(playerId: UUID): List<ExternalRegion>
+    fun geometry(ref: RegionSourceRef): RegionGeometry? = null
+    fun ownerId(ref: RegionSourceRef): UUID? = null
+    fun isOwner(ref: RegionSourceRef, playerId: UUID): Boolean
 }

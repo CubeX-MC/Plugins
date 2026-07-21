@@ -8,12 +8,15 @@ import java.util.Locale
 
 class RegionFlagService(private val plugin: RegionsPlugin) {
     fun isDenied(player: Player, key: String): Boolean =
-        resolveFlag(player, key)?.value?.equals("deny", ignoreCase = true) == true
+        !player.hasPermission("regions.bypass.flags") &&
+            resolveFlag(player, key)?.value?.equals("deny", ignoreCase = true) == true
 
     fun isAllowed(player: Player, key: String): Boolean =
-        resolveFlag(player, key)?.value?.equals("allow", ignoreCase = true) == true
+        player.hasPermission("regions.bypass.flags") ||
+            resolveFlag(player, key)?.value?.equals("allow", ignoreCase = true) == true
 
     fun isCommandBlocked(player: Player, rootLabel: String): Boolean {
+        if (player.hasPermission("regions.bypass.flags")) return false
         val flag = resolveFlag(player, "commands") ?: return false
         val mode = flag.values["mode"]?.lowercase(Locale.ROOT) ?: flag.value.lowercase(Locale.ROOT)
         val values = splitList(flag.values["values"] ?: flag.values["commands"] ?: "")
@@ -26,21 +29,22 @@ class RegionFlagService(private val plugin: RegionsPlugin) {
     }
 
     private fun resolveFlag(player: Player, key: String): FlagConfig? {
-        val regions = activeRegions(player)
-        for (region in regions) {
-            val flag = region.flags[key] ?: region.flags[key.lowercase(Locale.ROOT)] ?: continue
-            if (flag.value.equals("pass", ignoreCase = true)) {
-                continue
-            }
-            return flag
-        }
-        return null
+        plugin.trials().activeDraft(player.uniqueId)
+            ?.flags
+            ?.entries
+            ?.firstOrNull { it.key.equals(key, ignoreCase = true) }
+            ?.value
+            ?.takeUnless { it.value.equals("pass", ignoreCase = true) }
+            ?.let { return it }
+        return plugin.overlaps().resolve(activeRegions(player))
+            .flags[key.lowercase(Locale.ROOT)]
+            ?.config
     }
 
     private fun activeRegions(player: Player): List<RegionDefinition> =
         plugin.sessions().activeSessions(player.uniqueId)
             .mapNotNull { plugin.regions().find(it.regionId) }
-            .sortedWith(compareByDescending<RegionDefinition> { it.priority }.thenBy { it.id })
+            .sortedWith(RegionOverlapResolver.REGION_ORDER)
 
     private fun splitList(value: String): Set<String> =
         value

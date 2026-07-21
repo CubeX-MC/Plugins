@@ -1,11 +1,8 @@
 package org.cubexmc.regions.service
 
-import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.effect.ScopedEffectService
-import org.cubexmc.regions.model.EffectConfig
-import org.cubexmc.regions.model.EffectScope
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionSession
 import java.util.UUID
@@ -16,8 +13,9 @@ class RegionSessionService(
     private val effects: ScopedEffectService,
 ) {
     private val sessionsByPlayer: ConcurrentHashMap<UUID, MutableList<RegionSession>> = ConcurrentHashMap()
+    private val effectSignatures: ConcurrentHashMap<UUID, String> = ConcurrentHashMap()
 
-    fun enter(player: Player, region: RegionDefinition): RegionSession {
+    fun enter(player: Player, region: RegionDefinition, modeActive: Boolean = true): RegionSession {
         val sessions = sessionsByPlayer.computeIfAbsent(player.uniqueId) { java.util.Collections.synchronizedList(ArrayList()) }
         var created = false
         val session = synchronized(sessions) {
@@ -26,6 +24,7 @@ class RegionSessionService(
                 return@synchronized existing
             }
             val newSession = RegionSession(UUID.randomUUID(), player.uniqueId, region.id, System.currentTimeMillis())
+            newSession.metadata[MODE_ACTIVE_METADATA] = modeActive.toString()
             sessions.add(newSession)
             created = true
             newSession
@@ -33,16 +32,55 @@ class RegionSessionService(
         if (!created) {
             return session
         }
-        for (effect in region.effects) {
-            effects.apply(player, region, effect)
-        }
-        if (region.flags["vanish"]?.value.equals("deny", ignoreCase = true)) {
-            effects.apply(player, region, EffectConfig("invisibility_suppression", EffectScope.WHILE_INSIDE))
-        }
-        plugin.combatModes().onEnter(player, region)
-        plugin.raceModes().onEnter(player, region)
-        plugin.roundModes().onEnter(player, region)
+        if (modeActive) activateMode(player, region)
         return session
+    }
+
+    fun reconcileEffects(player: Player, activeRegions: Collection<RegionDefinition>) {
+        val resolution = plugin.overlaps().resolve(activeRegions)
+        val signature = resolution.effects.joinToString("|") { it.identity }
+        if (effectSignatures[player.uniqueId] == signature) return
+        effects.cleanupDeclaredEffects(player, "overlap-resolution-changed")
+        val byId = activeRegions.associateBy { it.id }
+        var appliedAll = true
+        for (resolved in resolution.effects) {
+            val region = byId[resolved.sourceRegionId] ?: continue
+            if (!effects.applyDeclared(player, region, resolved.config).success) {
+                appliedAll = false
+                break
+            }
+        }
+        if (!appliedAll) {
+            effects.cleanupDeclaredEffects(player, "overlap-apply-failed")
+            effectSignatures.remove(player.uniqueId)
+            plugin.logger.warning(
+                "Unable to apply the complete resolved effect set for ${player.name}; " +
+                    "declared region effects were rolled back",
+            )
+            return
+        }
+        if (signature.isEmpty()) effectSignatures.remove(player.uniqueId)
+        else effectSignatures[player.uniqueId] = signature
+    }
+
+    fun reconcileModeOwner(player: Player, activeRegions: Collection<RegionDefinition>, primaryModeRegionId: String?) {
+        val byId = activeRegions.associateBy { it.id }
+        val sessions = activeSessions(player.uniqueId)
+        for (session in sessions) {
+            val region = byId[session.regionId] ?: continue
+            val active = session.metadata[MODE_ACTIVE_METADATA]?.toBooleanStrictOrNull() ?: true
+            if (active && session.regionId != primaryModeRegionId) {
+                deactivateMode(player, region.id, "overlap-primary-changed")
+                session.metadata[MODE_ACTIVE_METADATA] = false.toString()
+            }
+        }
+        val primary = primaryModeRegionId?.let { byId[it] } ?: return
+        val session = activeSession(player.uniqueId, primary.id) ?: return
+        val active = session.metadata[MODE_ACTIVE_METADATA]?.toBooleanStrictOrNull() ?: false
+        if (!active) {
+            activateMode(player, primary)
+            session.metadata[MODE_ACTIVE_METADATA] = true.toString()
+        }
     }
 
     fun leave(player: Player, regionId: String, reason: String): Int {
@@ -55,9 +93,9 @@ class RegionSessionService(
             }
             matches
         }
-        plugin.combatModes().onLeave(player, regionId, reason)
-        plugin.raceModes().onLeave(player, regionId, reason)
-        plugin.roundModes().onLeave(player, regionId, reason)
+        if (removed.any { it.metadata[MODE_ACTIVE_METADATA] != false.toString() }) {
+            deactivateMode(player, regionId, reason)
+        }
         val leaseCount = effects.cleanupRegion(player, regionId, reason)
         return removed.size + leaseCount
     }
@@ -65,27 +103,62 @@ class RegionSessionService(
     fun cleanup(player: Player, reason: String): Int {
         val removed = sessionsByPlayer.remove(player.uniqueId)?.let { sessions -> synchronized(sessions) { sessions.toList() } } ?: emptyList()
         for (session in removed) {
-            plugin.combatModes().onLeave(player, session.regionId, reason)
-            plugin.raceModes().onLeave(player, session.regionId, reason)
-            plugin.roundModes().onLeave(player, session.regionId, reason)
+            if (session.metadata[MODE_ACTIVE_METADATA] != false.toString()) {
+                deactivateMode(player, session.regionId, reason)
+            }
         }
         val sessionCount = removed.size
+        effectSignatures.remove(player.uniqueId)
         val leaseCount = effects.cleanupPlayer(player, reason)
         return sessionCount + leaseCount
     }
 
-    fun cleanupAll(reason: String): Int {
-        val online = Bukkit.getOnlinePlayers().toList()
+    fun cleanupAll(reason: String, shuttingDown: Boolean = false): Int {
+        val online = plugin.server.onlinePlayers.toList()
         var count = online.sumOf { activeSessions(it.uniqueId).size }
         for (player in online) {
-            plugin.regionScheduler().runAtEntity(player, Runnable {
+            if (!plugin.regionScheduler().isFolia) {
                 cleanup(player, reason)
-            })
+            } else if (!shuttingDown) {
+                plugin.regionScheduler().runAtEntity(player, Runnable {
+                    cleanup(player, reason)
+                })
+            }
         }
         val onlineIds = online.map { it.uniqueId }.toSet()
         val offline = sessionsByPlayer.keys.filter { !onlineIds.contains(it) }
         for (playerId in offline) {
             count += sessionsByPlayer.remove(playerId)?.let { sessions -> synchronized(sessions) { sessions.size } } ?: 0
+            effectSignatures.remove(playerId)
+        }
+        if (shuttingDown && plugin.regionScheduler().isFolia) {
+            sessionsByPlayer.clear()
+            effectSignatures.clear()
+        }
+        return count
+    }
+
+    fun cleanupRegionAll(regionId: String, reason: String): Int {
+        val online = plugin.server.onlinePlayers.associateBy { it.uniqueId }
+        var count = 0
+        for ((playerId, sessions) in sessionsByPlayer.entries.toList()) {
+            val hasRegion = synchronized(sessions) { sessions.any { it.regionId == regionId } }
+            if (!hasRegion) continue
+            val player = online[playerId]
+            if (player != null) {
+                count += synchronized(sessions) { sessions.count { it.regionId == regionId } }
+                plugin.regionScheduler().runAtEntity(player, Runnable {
+                    leave(player, regionId, reason)
+                })
+            } else {
+                count += synchronized(sessions) {
+                    val before = sessions.size
+                    sessions.removeIf { it.regionId == regionId }
+                    before - sessions.size
+                }
+                if (sessions.isEmpty()) sessionsByPlayer.remove(playerId, sessions)
+                effectSignatures.remove(playerId)
+            }
         }
         return count
     }
@@ -112,13 +185,30 @@ class RegionSessionService(
     }
 
     fun watchdog() {
-        val online = Bukkit.getOnlinePlayers().map { it.uniqueId }.toSet()
+        val online = plugin.server.onlinePlayers.map { it.uniqueId }.toSet()
         val offline = sessionsByPlayer.keys.filter { !online.contains(it) }
         for (playerId in offline) {
             sessionsByPlayer.remove(playerId)
+            effectSignatures.remove(playerId)
         }
         if (offline.isNotEmpty()) {
             plugin.logger.fine("Regions watchdog cleared ${offline.size} offline player session bucket(s).")
         }
+    }
+
+    private fun activateMode(player: Player, region: RegionDefinition) {
+        plugin.combatModes().onEnter(player, region)
+        plugin.raceModes().onEnter(player, region)
+        plugin.roundModes().onEnter(player, region)
+    }
+
+    private fun deactivateMode(player: Player, regionId: String, reason: String) {
+        plugin.combatModes().onLeave(player, regionId, reason)
+        plugin.raceModes().onLeave(player, regionId, reason)
+        plugin.roundModes().onLeave(player, regionId, reason)
+    }
+
+    private companion object {
+        const val MODE_ACTIVE_METADATA = "overlap-mode-active"
     }
 }

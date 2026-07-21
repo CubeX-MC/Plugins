@@ -4,6 +4,8 @@ import org.cubexmc.contract.model.ContractStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Covers the crash-recovery decision for lingering write-ahead withdraw entries (H3). */
@@ -54,5 +56,36 @@ class ContractServiceRecoveryTest {
         assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.CANCELLED, null, now, 3, 3));
         assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.COMPLETED, fiveDaysAgo, now, 0, 3));
         assertFalse(ContractService.shouldPurgeFinalContract(ContractStatus.CANCELLED, fiveDaysAgo, now, 3, 0));
+    }
+
+    @Test
+    void batchOpenLimitAccountsForEveryNewContract() {
+        assertFalse(ContractService.exceedsOpenLimit(1, 2, 3));
+        assertTrue(ContractService.exceedsOpenLimit(2, 2, 3));
+        assertTrue(ContractService.exceedsOpenLimit(3, 1, 3));
+    }
+
+    @Test
+    void onlyMultipleContractsRequireBatchPermission() {
+        assertFalse(ContractService.requiresBatchPermission(1));
+        assertTrue(ContractService.requiresBatchPermission(2));
+        assertTrue(ContractService.requiresBatchPermission(64));
+    }
+
+    @Test
+    void itemRewardsMustSplitEvenlyAcrossBatch() {
+        assertEquals(16, ContractService.perContractItemAmount(64, 4));
+        assertEquals(64, ContractService.perContractItemAmount(64, 1));
+        assertNull(ContractService.perContractItemAmount(63, 4));
+        assertNull(ContractService.perContractItemAmount(1, 0));
+    }
+
+    @Test
+    void disputesCannotBeOpenedOrRestoredFromDisputedOrFinalStates() {
+        assertTrue(ContractService.canInitiatePlayerDispute(ContractStatus.OPEN));
+        assertTrue(ContractService.isRestorableDisputeStatus(ContractStatus.SUBMITTED));
+        assertFalse(ContractService.canInitiatePlayerDispute(ContractStatus.DISPUTED));
+        assertFalse(ContractService.isRestorableDisputeStatus(ContractStatus.DISPUTED));
+        assertFalse(ContractService.isRestorableDisputeStatus(ContractStatus.COMPLETED));
     }
 }

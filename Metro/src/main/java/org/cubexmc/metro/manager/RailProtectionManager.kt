@@ -1,7 +1,11 @@
 package org.cubexmc.metro.manager
 
 import java.util.EnumSet
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.logging.Level
 import org.bukkit.Bukkit
+import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
@@ -17,6 +21,8 @@ import org.cubexmc.metro.model.Line
 import org.cubexmc.metro.model.RoutePoint
 import org.cubexmc.metro.util.MetroConstants
 import org.cubexmc.metro.util.OwnershipUtil
+import org.cubexmc.metro.util.SchedulerUtil
+import org.cubexmc.metro.util.VersionUtil
 
 /**
  * Builds an in-memory rail protection index from recorded route points.
@@ -25,22 +31,77 @@ class RailProtectionManager(private val plugin: Metro) : Listener {
     private val lineToBlocks: MutableMap<String, MutableSet<BlockKey>> = HashMap()
     private val blockToLines: MutableMap<BlockKey, MutableSet<String>> = HashMap()
     private val lineToStats: MutableMap<String, ProtectionIndexStats> = HashMap()
+    private val lineRevisions: MutableMap<String, Long> = HashMap()
+    private val folia = VersionUtil.isFolia()
+    private var nextRevision = 0L
 
-    @Synchronized
     fun rebuildAll() {
-        lineToBlocks.clear()
-        blockToLines.clear()
-        lineToStats.clear()
+        val desiredLines = LinkedHashMap<String, ProtectedLineSnapshot?>()
         for (line in plugin.lineManager.getAllLines()) {
-            rebuildLineLocked(line)
+            desiredLines[line.id] = snapshotProtectedLine(line)
         }
+
+        if (!folia) {
+            val results = desiredLines.values.filterNotNull().associate { snapshot ->
+                snapshot.id to scanLineSynchronously(snapshot)
+            }
+            synchronized(this) {
+                clearIndexLocked()
+                for (result in results.values) {
+                    addLineResultLocked(result)
+                }
+            }
+            return
+        }
+
+        val expectedRevisions = LinkedHashMap<String, Long>()
+        synchronized(this) {
+            val knownLineIds = HashSet(lineRevisions.keys)
+            knownLineIds.addAll(lineToBlocks.keys)
+            knownLineIds.addAll(lineToStats.keys)
+            for (lineId in knownLineIds) {
+                if (!desiredLines.containsKey(lineId)) {
+                    issueRevisionLocked(lineId)
+                    removeLineLocked(lineId)
+                }
+            }
+            for ((lineId, snapshot) in desiredLines) {
+                val revision = issueRevisionLocked(lineId)
+                if (snapshot == null) {
+                    removeLineLocked(lineId)
+                } else {
+                    expectedRevisions[lineId] = revision
+                }
+            }
+        }
+
+        if (expectedRevisions.isEmpty()) {
+            return
+        }
+        rebuildOnFolia(desiredLines.values.filterNotNull(), expectedRevisions)
     }
 
-    @Synchronized
     fun rebuildLine(lineId: String) {
-        removeLineLocked(lineId)
-        val line = plugin.lineManager.getLine(lineId)
-        rebuildLineLocked(line)
+        val snapshot = snapshotProtectedLine(plugin.lineManager.getLine(lineId))
+        if (!folia) {
+            val result = snapshot?.let(::scanLineSynchronously)
+            synchronized(this) {
+                replaceLineLocked(lineId, result)
+            }
+            return
+        }
+
+        val revision = synchronized(this) {
+            val issuedRevision = issueRevisionLocked(lineId)
+            if (snapshot == null) {
+                removeLineLocked(lineId)
+            }
+            issuedRevision
+        }
+        if (snapshot == null) {
+            return
+        }
+        rebuildOnFolia(listOf(snapshot), mapOf(lineId to revision))
     }
 
     @Synchronized
@@ -50,20 +111,283 @@ class RailProtectionManager(private val plugin: Metro) : Listener {
     fun getProtectionIndexStats(lineId: String): ProtectionIndexStats =
         lineToStats[lineId] ?: ProtectionIndexStats.empty()
 
-    private fun rebuildLineLocked(line: Line?) {
+    private fun rebuildOnFolia(
+        snapshots: List<ProtectedLineSnapshot>,
+        expectedRevisions: Map<String, Long>,
+    ) {
+        val rebuildFuture = try {
+            scanLinesOnRegions(snapshots)
+        } catch (throwable: Throwable) {
+            CompletableFuture.failedFuture(throwable)
+        }
+        rebuildFuture.whenComplete { results, failure ->
+            if (failure != null) {
+                plugin.logger.log(
+                    Level.SEVERE,
+                    "Failed to rebuild the Folia rail protection index; the existing index remains unchanged.",
+                    unwrapCompletionFailure(failure),
+                )
+                return@whenComplete
+            }
+            synchronized(this) {
+                for ((lineId, expectedRevision) in expectedRevisions) {
+                    if (lineRevisions[lineId] != expectedRevision) {
+                        continue
+                    }
+                    replaceLineLocked(lineId, results[lineId])
+                }
+            }
+        }
+    }
+
+    private fun scanLinesOnRegions(
+        snapshots: List<ProtectedLineSnapshot>,
+    ): CompletableFuture<Map<String, LineIndexResult>> {
+        val chunkScans = LinkedHashMap<ChunkKey, ChunkScan>()
+        val worldCache = HashMap<String, World?>()
+        val plans = snapshots.map { snapshot ->
+            prepareRegionScan(snapshot, chunkScans) { worldName ->
+                if (!worldCache.containsKey(worldName)) {
+                    worldCache[worldName] = Bukkit.getWorld(worldName)
+                }
+                worldCache[worldName]
+            }
+        }
+        val discoveredRails = ConcurrentHashMap.newKeySet<BlockKey>()
+        val scanFutures = chunkScans.values.map { scan -> scheduleChunkScan(scan, discoveredRails) }
+        return CompletableFuture.allOf(*scanFutures.toTypedArray()).thenApply {
+            plans.associate { plan -> plan.snapshot.id to finishRegionScan(plan, discoveredRails) }
+        }
+    }
+
+    private fun prepareRegionScan(
+        snapshot: ProtectedLineSnapshot,
+        chunkScans: MutableMap<ChunkKey, ChunkScan>,
+        worldLookup: (String) -> World?,
+    ): LineScanPlan {
+        val builder = ProtectionIndexBuilder(snapshot.worldName)
+        val pendingSamples = ArrayList<PendingSample>()
+        for (point in sampleRoutePoints(snapshot.routePoints)) {
+            builder.sample(point)
+            if (builder.isWorldMismatch(point)) {
+                builder.skippedWorldMismatch()
+                continue
+            }
+            val world = worldLookup(point.worldName())
+            if (world == null) {
+                builder.skippedMissingWorld()
+                continue
+            }
+            val candidates = candidateBlocks(world.name, point)
+            pendingSamples.add(PendingSample(point, candidates))
+            for (candidate in candidates) {
+                val chunkKey = ChunkKey(candidate.worldName, candidate.x shr 4, candidate.z shr 4)
+                chunkScans.computeIfAbsent(chunkKey) { ChunkScan(world) }.blocks.add(candidate)
+            }
+        }
+        return LineScanPlan(snapshot, builder, pendingSamples)
+    }
+
+    private fun scheduleChunkScan(
+        scan: ChunkScan,
+        discoveredRails: MutableSet<BlockKey>,
+    ): CompletableFuture<Void> {
+        val completion = CompletableFuture<Void>()
+        val anchor = scan.blocks.first()
+        val location = Location(scan.world, anchor.x + 0.5, anchor.y.toDouble(), anchor.z + 0.5)
+        try {
+            SchedulerUtil.regionRun(
+                plugin,
+                location,
+                Runnable {
+                    try {
+                        for (blockKey in scan.blocks) {
+                            val material = scan.world.getBlockAt(blockKey.x, blockKey.y, blockKey.z).type
+                            if (RAIL_MATERIALS.contains(material)) {
+                                discoveredRails.add(blockKey)
+                            }
+                        }
+                        completion.complete(null)
+                    } catch (throwable: Throwable) {
+                        completion.completeExceptionally(throwable)
+                    }
+                },
+                0L,
+                -1L,
+            )
+        } catch (throwable: Throwable) {
+            completion.completeExceptionally(throwable)
+        }
+        return completion
+    }
+
+    private fun finishRegionScan(plan: LineScanPlan, discoveredRails: Set<BlockKey>): LineIndexResult {
+        val blocks = HashSet<BlockKey>()
+        for (sample in plan.pendingSamples) {
+            val nearestRail = findNearestRail(sample.point, sample.candidates, discoveredRails)
+            if (nearestRail == null) {
+                plan.builder.skippedNoRail()
+            } else {
+                blocks.add(nearestRail)
+            }
+        }
+        return LineIndexResult(plan.snapshot.id, blocks, plan.builder.build(blocks.size))
+    }
+
+    private fun scanLineSynchronously(snapshot: ProtectedLineSnapshot): LineIndexResult {
+        val builder = ProtectionIndexBuilder(snapshot.worldName)
+        val blocks = HashSet<BlockKey>()
+        for (point in sampleRoutePoints(snapshot.routePoints)) {
+            builder.sample(point)
+            if (builder.isWorldMismatch(point)) {
+                builder.skippedWorldMismatch()
+                continue
+            }
+            val world = Bukkit.getWorld(point.worldName())
+            if (world == null) {
+                builder.skippedMissingWorld()
+                continue
+            }
+            val nearestRail = findNearestRail(world, point)
+            if (nearestRail == null) {
+                builder.skippedNoRail()
+            } else {
+                blocks.add(nearestRail)
+            }
+        }
+        return LineIndexResult(snapshot.id, blocks, builder.build(blocks.size))
+    }
+
+    private fun sampleRoutePoints(routePoints: List<RoutePoint>): List<RoutePoint> {
+        if (routePoints.isEmpty()) {
+            return emptyList()
+        }
+        val samples = ArrayList<RoutePoint>()
+        for (index in routePoints.indices) {
+            samples.add(routePoints[index])
+            if (index + 1 < routePoints.size) {
+                interpolateSegment(samples, routePoints[index], routePoints[index + 1])
+            }
+        }
+        return samples
+    }
+
+    private fun interpolateSegment(samples: MutableList<RoutePoint>, from: RoutePoint, to: RoutePoint) {
+        if (from.worldName() != to.worldName()) {
+            return
+        }
+        val dx = to.x() - from.x()
+        val dy = to.y() - from.y()
+        val dz = to.z() - from.z()
+        val distance = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+        val sampleCount = kotlin.math.max(1, kotlin.math.ceil(distance / INTERPOLATION_STEP).toInt())
+        for (index in 1 until sampleCount) {
+            val ratio = index.toDouble() / sampleCount
+            samples.add(
+                RoutePoint(
+                    from.worldName(),
+                    from.x() + dx * ratio,
+                    from.y() + dy * ratio,
+                    from.z() + dz * ratio,
+                ),
+            )
+        }
+    }
+
+    private fun candidateBlocks(worldName: String, point: RoutePoint): List<BlockKey> {
+        val baseX = kotlin.math.floor(point.x()).toInt()
+        val baseY = kotlin.math.floor(point.y()).toInt()
+        val baseZ = kotlin.math.floor(point.z()).toInt()
+        val candidates = ArrayList<BlockKey>(18)
+        for (dy in intArrayOf(0, -1)) {
+            for (dx in -1..1) {
+                for (dz in -1..1) {
+                    candidates.add(BlockKey(worldName, baseX + dx, baseY + dy, baseZ + dz))
+                }
+            }
+        }
+        return candidates
+    }
+
+    private fun findNearestRail(world: World, point: RoutePoint): BlockKey? {
+        val candidates = candidateBlocks(world.name, point)
+        var best: BlockKey? = null
+        var bestDistance = Double.MAX_VALUE
+        for (candidate in candidates) {
+            val block = world.getBlockAt(candidate.x, candidate.y, candidate.z)
+            if (!isRail(block)) {
+                continue
+            }
+            val distance = distanceSquaredToBlockCenter(point, candidate.x, candidate.y, candidate.z)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = candidate
+            }
+        }
+        return best
+    }
+
+    private fun findNearestRail(
+        point: RoutePoint,
+        candidates: List<BlockKey>,
+        discoveredRails: Set<BlockKey>,
+    ): BlockKey? {
+        var best: BlockKey? = null
+        var bestDistance = Double.MAX_VALUE
+        for (candidate in candidates) {
+            if (!discoveredRails.contains(candidate)) {
+                continue
+            }
+            val distance = distanceSquaredToBlockCenter(point, candidate.x, candidate.y, candidate.z)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = candidate
+            }
+        }
+        return best
+    }
+
+    private fun distanceSquaredToBlockCenter(point: RoutePoint, x: Int, y: Int, z: Int): Double {
+        val dx = point.x() - (x + 0.5)
+        val dy = point.y() - (y + 0.5)
+        val dz = point.z() - (z + 0.5)
+        return dx * dx + dy * dy + dz * dz
+    }
+
+    private fun snapshotProtectedLine(line: Line?): ProtectedLineSnapshot? {
         if (line == null || !line.isRailProtected) {
+            return null
+        }
+        return ProtectedLineSnapshot(line.id, line.worldName, line.routePoints)
+    }
+
+    private fun issueRevisionLocked(lineId: String): Long {
+        val revision = ++nextRevision
+        lineRevisions[lineId] = revision
+        return revision
+    }
+
+    private fun clearIndexLocked() {
+        lineToBlocks.clear()
+        blockToLines.clear()
+        lineToStats.clear()
+    }
+
+    private fun replaceLineLocked(lineId: String, result: LineIndexResult?) {
+        removeLineLocked(lineId)
+        if (result != null) {
+            addLineResultLocked(result)
+        }
+    }
+
+    private fun addLineResultLocked(result: LineIndexResult) {
+        lineToStats[result.lineId] = result.stats
+        if (result.blocks.isEmpty()) {
             return
         }
-        val builder = ProtectionIndexBuilder(line.worldName)
-        val blocks = collectRailBlocks(line.routePoints, builder)
-        val stats = builder.build(blocks.size)
-        lineToStats[line.id] = stats
-        if (blocks.isEmpty()) {
-            return
-        }
-        lineToBlocks[line.id] = blocks.toMutableSet()
-        for (block in blocks) {
-            blockToLines.computeIfAbsent(block) { HashSet() }.add(line.id)
+        lineToBlocks[result.lineId] = result.blocks.toMutableSet()
+        for (block in result.blocks) {
+            blockToLines.computeIfAbsent(block) { HashSet() }.add(result.lineId)
         }
     }
 
@@ -79,103 +403,7 @@ class RailProtectionManager(private val plugin: Metro) : Listener {
         }
     }
 
-    private fun collectRailBlocks(routePoints: List<RoutePoint>?, builder: ProtectionIndexBuilder): Set<BlockKey> {
-        if (routePoints == null || routePoints.isEmpty()) {
-            return emptySet()
-        }
-        val blocks = HashSet<BlockKey>()
-        val points = ArrayList(routePoints)
-        for (index in points.indices) {
-            addNearestRail(blocks, points[index], builder)
-            if (index + 1 < points.size) {
-                interpolateSegment(blocks, points[index], points[index + 1], builder)
-            }
-        }
-        return blocks
-    }
-
-    private fun interpolateSegment(blocks: MutableSet<BlockKey>, from: RoutePoint?, to: RoutePoint?, builder: ProtectionIndexBuilder) {
-        if (from == null || to == null || from.worldName() != to.worldName()) {
-            return
-        }
-        val dx = to.x() - from.x()
-        val dy = to.y() - from.y()
-        val dz = to.z() - from.z()
-        val distance = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
-        val samples = kotlin.math.max(1, kotlin.math.ceil(distance / INTERPOLATION_STEP).toInt())
-        for (index in 1 until samples) {
-            val ratio = index.toDouble() / samples
-            addNearestRail(
-                blocks,
-                RoutePoint(
-                    from.worldName(),
-                    from.x() + dx * ratio,
-                    from.y() + dy * ratio,
-                    from.z() + dz * ratio,
-                ),
-                builder,
-            )
-        }
-    }
-
-    private fun addNearestRail(blocks: MutableSet<BlockKey>, point: RoutePoint?, builder: ProtectionIndexBuilder) {
-        builder.sample(point)
-        if (point == null) {
-            return
-        }
-        if (builder.isWorldMismatch(point)) {
-            builder.skippedWorldMismatch()
-            return
-        }
-        val world = Bukkit.getWorld(point.worldName())
-        if (world == null) {
-            builder.skippedMissingWorld()
-            return
-        }
-        val nearestRail = findNearestRail(point)
-        if (nearestRail != null) {
-            blocks.add(nearestRail)
-        } else {
-            builder.skippedNoRail()
-        }
-    }
-
-    private fun findNearestRail(point: RoutePoint): BlockKey? {
-        val world: World = Bukkit.getWorld(point.worldName()) ?: return null
-
-        val baseX = kotlin.math.floor(point.x()).toInt()
-        val baseY = kotlin.math.floor(point.y()).toInt()
-        val baseZ = kotlin.math.floor(point.z()).toInt()
-        var best: BlockKey? = null
-        var bestDistance = Double.MAX_VALUE
-
-        for (dy in intArrayOf(0, -1)) {
-            for (dx in -1..1) {
-                for (dz in -1..1) {
-                    val x = baseX + dx
-                    val y = baseY + dy
-                    val z = baseZ + dz
-                    val block = world.getBlockAt(x, y, z)
-                    if (!isRail(block)) {
-                        continue
-                    }
-                    val distance = distanceSquaredToBlockCenter(point, x, y, z)
-                    if (distance < bestDistance) {
-                        bestDistance = distance
-                        best = BlockKey(world.name, x, y, z)
-                    }
-                }
-            }
-        }
-        return best
-    }
-
-    private fun distanceSquaredToBlockCenter(point: RoutePoint, x: Int, y: Int, z: Int): Double {
-        val dx = point.x() - (x + 0.5)
-        val dy = point.y() - (y + 0.5)
-        val dz = point.z() - (z + 0.5)
-        return dx * dx + dy * dy + dz * dz
-    }
+    private fun unwrapCompletionFailure(failure: Throwable): Throwable = failure.cause ?: failure
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
@@ -300,11 +528,45 @@ class RailProtectionManager(private val plugin: Metro) : Listener {
             )
     }
 
+    private data class ProtectedLineSnapshot(
+        val id: String,
+        val worldName: String?,
+        val routePoints: List<RoutePoint>,
+    )
+
+    private data class LineIndexResult(
+        val lineId: String,
+        val blocks: Set<BlockKey>,
+        val stats: ProtectionIndexStats,
+    )
+
+    private data class LineScanPlan(
+        val snapshot: ProtectedLineSnapshot,
+        val builder: ProtectionIndexBuilder,
+        val pendingSamples: List<PendingSample>,
+    )
+
+    private data class PendingSample(
+        val point: RoutePoint,
+        val candidates: List<BlockKey>,
+    )
+
+    private data class ChunkKey(
+        val worldName: String,
+        val chunkX: Int,
+        val chunkZ: Int,
+    )
+
+    private data class ChunkScan(
+        val world: World,
+        val blocks: MutableSet<BlockKey> = LinkedHashSet(),
+    )
+
     private data class BlockKey(
-        private val worldName: String,
-        private val x: Int,
-        private val y: Int,
-        private val z: Int,
+        val worldName: String,
+        val x: Int,
+        val y: Int,
+        val z: Int,
     ) {
         companion object {
             fun fromBlock(block: Block): BlockKey =

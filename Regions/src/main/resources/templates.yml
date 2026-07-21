@@ -45,6 +45,7 @@ templates:
       start-mode: vote
       require-start: true
       radius: 2.5
+      timeout-seconds: 300
       vehicle: none
       start: ""
       finish: ""
@@ -71,6 +72,7 @@ templates:
       start-mode: vote
       require-start: true
       radius: 3.0
+      timeout-seconds: 300
       vehicle: boat
       start: ""
       finish: ""
@@ -97,6 +99,7 @@ templates:
       start-mode: judge
       require-start: true
       radius: 3.0
+      timeout-seconds: 300
       vehicle: horse
       start: ""
       finish: ""

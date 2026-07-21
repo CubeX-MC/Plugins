@@ -22,6 +22,7 @@ import org.cubexmc.regions.model.RegionTrigger
 class PlayerLifecycleListener(private val plugin: RegionsPlugin) : Listener {
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
+        plugin.effects().restoreIfPending(event.player, "join-recovery")
         plugin.combatModes().restoreIfPending(event.player, "join-recovery")
         plugin.roundModes().restoreIfPending(event.player, "join-recovery")
     }
@@ -96,6 +97,7 @@ class PlayerLifecycleListener(private val plugin: RegionsPlugin) : Listener {
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
+        plugin.trials().stop(event.player, "quit")
         if (plugin.config.getBoolean("safety.cleanup-on-quit", true)) {
             plugin.sessions().cleanup(event.player, "quit")
         }
@@ -103,6 +105,7 @@ class PlayerLifecycleListener(private val plugin: RegionsPlugin) : Listener {
 
     @EventHandler
     fun onKick(event: PlayerKickEvent) {
+        plugin.trials().stop(event.player, "kick")
         if (plugin.config.getBoolean("safety.cleanup-on-quit", true)) {
             plugin.sessions().cleanup(event.player, "kick")
         }
@@ -110,6 +113,7 @@ class PlayerLifecycleListener(private val plugin: RegionsPlugin) : Listener {
 
     @EventHandler
     fun onDeath(event: PlayerDeathEvent) {
+        plugin.trials().stop(event.entity, "death")
         val combatHandled = plugin.combatModes().onDeath(event)
         val roundHandled = plugin.roundModes().onDeath(event)
         for (session in plugin.sessions().activeSessions(event.entity.uniqueId)) {

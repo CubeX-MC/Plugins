@@ -15,8 +15,10 @@ import org.cubexmc.contract.config.LanguageManager
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.gui.ContractGui
 import org.cubexmc.contract.listener.ObjectiveListener
+import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.service.ContractService
 import org.cubexmc.contract.storage.ContractStorage
+import org.cubexmc.contract.storage.BatchAcceptanceStore
 import org.cubexmc.contract.storage.EventLog
 import org.cubexmc.contract.storage.PendingTransactionStore
 import org.cubexmc.contract.storage.ReputationStore
@@ -30,6 +32,7 @@ class ContractPlugin : CubexPlugin() {
     private var economyService: EconomyService? = null
     private var contractStorage: ContractStorage? = null
     private var reputationStore: ReputationStore? = null
+    private var batchAcceptanceStore: BatchAcceptanceStore? = null
     private var pendingStore: PendingTransactionStore? = null
     private var eventLog: EventLog? = null
     private var contractService: ContractService? = null
@@ -75,9 +78,14 @@ class ContractPlugin : CubexPlugin() {
         reputation().load()
         bind(Runnable { reputationStore?.flushIfDirty() })
 
+        batchAcceptanceStore = BatchAcceptanceStore(this)
+        batchAcceptances().load()
+        reconcileBatchAcceptances()
+        bind(Runnable { batchAcceptanceStore?.flushIfDirty() })
+
         pendingStore = PendingTransactionStore(this)
         eventLog = EventLog(this)
-        contractService = ContractService(this, storage(), economy(), pending(), eventLog())
+        contractService = ContractService(this, storage(), economy(), pending(), eventLog(), batchAcceptances())
         contracts().recoverPendingTransactions()
         contractGui = ContractGui(this)
         val closeContractGui = Runnable {
@@ -110,6 +118,7 @@ class ContractPlugin : CubexPlugin() {
         var canReloadData = true
         try {
             storage().flushIfDirty()
+            batchAcceptances().flushIfDirty()
         } catch (ex: IOException) {
             canReloadData = false
             logger.warning(
@@ -128,6 +137,8 @@ class ContractPlugin : CubexPlugin() {
         if (canReloadData) {
             try {
                 storage().load()
+                batchAcceptances().load()
+                reconcileBatchAcceptances()
             } catch (ex: RuntimeException) {
                 logger.severe("Reload: contract data unreadable (${ex.message}); keeping current in-memory contracts.")
             }
@@ -142,6 +153,9 @@ class ContractPlugin : CubexPlugin() {
 
     fun reputation(): ReputationStore = reputationStore ?: throw IllegalStateException("reputationStore not initialized")
 
+    fun batchAcceptances(): BatchAcceptanceStore =
+        batchAcceptanceStore ?: throw IllegalStateException("batchAcceptanceStore not initialized")
+
     fun contracts(): ContractService = contractService ?: throw IllegalStateException("contractService not initialized")
 
     fun gui(): ContractGui = contractGui ?: throw IllegalStateException("contractGui not initialized")
@@ -151,6 +165,24 @@ class ContractPlugin : CubexPlugin() {
     private fun pending(): PendingTransactionStore = pendingStore ?: throw IllegalStateException("pendingStore not initialized")
 
     private fun eventLog(): EventLog = eventLog ?: throw IllegalStateException("eventLog not initialized")
+
+    private fun reconcileBatchAcceptances() {
+        var recovered = 0
+        for (contract in storage().all()) {
+            val batchId = contract.metadata["batch-id"] ?: continue
+            if (BatchRepeatPolicy.fromStored(contract.metadata["repeat-policy"]) == BatchRepeatPolicy.UNLIMITED) {
+                continue
+            }
+            val contractorUuid = contract.contractorUuid() ?: continue
+            val acceptedAt = contract.acceptedAt() ?: continue
+            if (batchAcceptances().record(batchId, contractorUuid, acceptedAt, contract.id())) {
+                recovered++
+            }
+        }
+        if (recovered > 0) {
+            logger.info("Recovered $recovered batch acceptance history entries from stored contracts.")
+        }
+    }
 
     private fun saveDefaultFiles() {
         resourceFiles?.saveIfMissing(listOf("config.yml", "lang/zh_CN.yml", "lang/en_US.yml"))
@@ -162,9 +194,11 @@ class ContractPlugin : CubexPlugin() {
         migrations.run(
             MigrationPlan.yaml("Contracts config", "config.yml")
                 .versionKey("config-version")
-                .targetVersion(3)
+                .targetVersion(5)
                 .addStep(NoOpMigrationStep(1, 2, "Add Contracts config-version."))
-                .addStep(deadlineHoursToDaysStep()),
+                .addStep(deadlineHoursToDaysStep())
+                .addStep(batchContractLimitStep())
+                .addStep(repeatCooldownLimitStep()),
         )
         migrateLang(migrations, "zh_CN")
         migrateLang(migrations, "en_US")
@@ -214,6 +248,36 @@ class ContractPlugin : CubexPlugin() {
                 logger.warning("Contract flush failed: ${ex.message}")
             }
         }, periodTicks, periodTicks)
+    }
+
+    /** v3 -> v4: expose the maximum number of SERVICE contracts created in one batch. */
+    private fun batchContractLimitStep(): MigrationStep = object : MigrationStep {
+        override fun fromVersion(): Int = 3
+
+        override fun toVersion(): Int = 4
+
+        override fun description(): String = "Add the SERVICE batch creation limit."
+
+        override fun migrate(context: MigrationContext) {
+            if (!context.yaml().contains("limits.max-batch-contracts")) {
+                context.yaml()["limits.max-batch-contracts"] = 64
+            }
+        }
+    }
+
+    /** v4 -> v5: bound the cooldown configured for repeatable SERVICE batches. */
+    private fun repeatCooldownLimitStep(): MigrationStep = object : MigrationStep {
+        override fun fromVersion(): Int = 4
+
+        override fun toVersion(): Int = 5
+
+        override fun description(): String = "Add the SERVICE batch repeat cooldown limit."
+
+        override fun migrate(context: MigrationContext) {
+            if (!context.yaml().contains("limits.max-repeat-cooldown-hours")) {
+                context.yaml()["limits.max-repeat-cooldown-hours"] = 8760
+            }
+        }
     }
 
     private fun scheduleCleanup() {

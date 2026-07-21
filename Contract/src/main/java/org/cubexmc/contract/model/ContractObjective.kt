@@ -42,10 +42,13 @@ class ContractObjective(
     }
 
     fun matches(signalTarget: String): Boolean {
-        val wanted = normalize(target)
-        if (wanted == ANY) {
+        if (target.equals(ANY, ignoreCase = true)) {
             return true
         }
+        if (type == ObjectiveType.CHAT) {
+            return target.trim() == signalTarget.trim()
+        }
+        val wanted = normalize(target)
         val signal = normalize(signalTarget)
         return when (type) {
             ObjectiveType.RUN_COMMAND -> signal == wanted || signal.startsWith("$wanted ")
@@ -90,6 +93,7 @@ class ContractObjective(
                 return ANY
             }
             return when {
+                type == ObjectiveType.CHAT -> trimmed
                 type == ObjectiveType.RUN_COMMAND -> trimmed.lowercase(Locale.ROOT)
                 type.materialTarget() -> Material.matchMaterial(trimmed)?.name ?: trimmed.uppercase(Locale.ROOT)
                 else -> trimmed.uppercase(Locale.ROOT)

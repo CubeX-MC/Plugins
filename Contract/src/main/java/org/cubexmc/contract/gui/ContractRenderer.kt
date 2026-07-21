@@ -5,6 +5,7 @@ import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.Contract
+import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
 import org.cubexmc.contract.model.ContractType
@@ -59,6 +60,7 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         } else if (contract.type() == ContractType.SERVICE) {
             lore.add(Text.color("&#CFD8DC验收方式: &#FFFFFF人工验收"))
         }
+        batchRepeatSummary(contract)?.let { lore.add(Text.color("&#CFD8DC重复接取: &#FFFFFF$it")) }
         if (contract.hasDeliveryItems()) {
             lore.add(Text.color("&#CFD8DC合同暂存: &#FFFFFF${contract.deliveryItemCount()} 个交付物品"))
         }
@@ -86,6 +88,11 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         lines.add("&#CFD8DC有效期: &#FFFFFF${draft.days()?.let { "$it 天" } ?: "未填"}")
         if (draft.type() == ContractType.SERVICE) {
             val fee = plugin.config.getDouble("economy.creation-fee", 20.0)
+            val contractCount = draft.contractCount()
+            lines.add("&#CFD8DC发布份数: &#FFFFFF$contractCount")
+            if (contractCount > 1) {
+                lines.add("&#CFD8DC重复接取: &#FFFFFF${batchRepeatSummary(draft.repeatPolicy(), draft.repeatCooldownHours())}")
+            }
             lines.add("&#CFD8DC验收方式: &#FFFFFF${if (draft.systemVerified()) "系统验收" else "人工验收"}")
             if (draft.systemVerified()) {
                 val type = draft.objectiveType()
@@ -93,16 +100,16 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
                 lines.add("&#E63946目标达成后系统会自动付款。")
             }
             if (draft.itemReward()) {
-                lines.add("&#CFD8DC奖励托管: &#69DB7C主手物品")
+                lines.add("&#CFD8DC奖励托管: &#69DB7C主手整组平均分配到 $contractCount 份")
             } else {
-                lines.add("&#CFD8DC奖金托管: &#69DB7C${valueOr(num(draft.amount()))}")
+                lines.add("&#CFD8DC每份奖金: &#69DB7C${valueOr(num(draft.amount()))}")
             }
-            lines.add("&#CFD8DC创建费: &#FFE066${trimNumber(fee)} &#CFD8DC(普通取消不退)")
+            lines.add("&#CFD8DC每份创建费: &#FFE066${trimNumber(fee)} &#CFD8DC(普通取消不退)")
             val amount = draft.amount()
             if (draft.itemReward()) {
-                lines.add("&#CFD8DC签署后扣除: &#E63946${trimNumber(fee)} &#CFD8DC并托管主手物品")
+                lines.add("&#CFD8DC签署后共扣除: &#E63946${trimNumber(fee * contractCount)} &#CFD8DC并托管主手整组物品")
             } else if (amount != null) {
-                lines.add("&#CFD8DC签署后共扣除: &#E63946${trimNumber(amount + fee)}")
+                lines.add("&#CFD8DC签署后共扣除: &#E63946${trimNumber((amount + fee) * contractCount)}")
             }
         } else if (draft.type() == ContractType.WAGER) {
             lines.add("&#CFD8DC我的押注: &#69DB7C${valueOr(num(draft.amount()))}")
@@ -178,6 +185,22 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         val count = if (includeProgress) objective.progressText() else "x${objective.required()}"
         return "${objectiveTypeLabel(objective.type())} $target $count"
     }
+
+    private fun batchRepeatSummary(contract: Contract): String? {
+        if (contract.metadata["batch-id"].isNullOrBlank()) {
+            return null
+        }
+        val policy = BatchRepeatPolicy.fromStored(contract.metadata["repeat-policy"])
+        val cooldownHours = contract.metadata["repeat-cooldown-hours"]?.toIntOrNull() ?: 24
+        return batchRepeatSummary(policy, cooldownHours)
+    }
+
+    private fun batchRepeatSummary(policy: BatchRepeatPolicy, cooldownHours: Int): String =
+        when (policy) {
+            BatchRepeatPolicy.UNLIMITED -> "不限制"
+            BatchRepeatPolicy.ONCE -> "每名玩家仅一次"
+            BatchRepeatPolicy.COOLDOWN -> "每 $cooldownHours 小时可接一次,且同时只能进行一份"
+        }
 
     private fun draftObjectiveTarget(type: ObjectiveType?, target: String?): String =
         if (type == ObjectiveType.DELIVER_MONEY) "默认货币" else valueOr(target)

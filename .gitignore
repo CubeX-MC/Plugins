@@ -33,4 +33,5 @@ Thumbs.db
 **/nul
 **/dependency-reduced-pom.xml
 lite-configs/
+.landsapi-src/
 .agent/

@@ -51,6 +51,11 @@ class ReputationStore {
         mutate(uuid, name).disputed++
     }
 
+    fun recordDisputeWithdrawn(uuid: UUID, name: String?) {
+        val record = mutate(uuid, name)
+        record.disputed = maxOf(0, record.disputed - 1)
+    }
+
     /** Updates each human party when a contract reaches a terminal state. */
     fun recordSettlement(contract: Contract, status: ContractStatus) {
         when (status) {

@@ -1,17 +1,11 @@
 name: Regions
 version: ${project.version}
 main: org.cubexmc.regions.RegionsPlugin
-api-version: '1.18'
+api-version: '1.21.11'
 folia-supported: true
 author: CubeX-MC
 description: Region-powered venue framework for RuleGems rulers and server events.
-softdepend: [Lands, Residence, WorldGuard, RuleGems, Vault, PlaceholderAPI, LuckPerms]
-
-commands:
-  regions:
-    description: Regions root command.
-    aliases: [region, venue]
-    usage: /regions help
+softdepend: [Lands, RuleGems]
 
 permissions:
   regions.use:
@@ -19,18 +13,27 @@ permissions:
     description: Use basic Regions commands.
   regions.admin:
     default: op
-    description: Full Regions administration.
+    description: RuleGems ruler access; Region ownership is still required.
     children:
-      regions.reload: true
       regions.region.create: true
       regions.region.edit: true
       regions.region.remove: true
       regions.region.enable: true
       regions.region.bind: true
       regions.template.apply: true
+      regions.validate: true
+      regions.region.publish: true
+      regions.region.rollback: true
+      regions.region.archive: true
+  regions.superadmin:
+    default: op
+    description: Emergency global Regions administration and ownership bypass.
+    children:
+      regions.reload: true
       regions.inspect: true
       regions.cleanup: true
-      regions.validate: true
+      regions.bypass.limit: true
+      regions.bypass.flags: true
   regions.reload:
     default: op
     description: Reload Regions.
@@ -49,6 +52,15 @@ permissions:
   regions.region.bind:
     default: op
     description: Bind external region sources.
+  regions.region.publish:
+    default: op
+    description: Publish or withdraw owned Region drafts.
+  regions.region.rollback:
+    default: op
+    description: View and restore owned Region revisions.
+  regions.region.archive:
+    default: op
+    description: Archive owned Regions.
   regions.template.apply:
     default: op
     description: Apply Region templates.

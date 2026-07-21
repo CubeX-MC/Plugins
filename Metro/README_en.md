@@ -11,6 +11,8 @@ Metro is a Minecraft subway transit plugin. Administrators can create automated 
 
 Supports Paper 1.18+ and Folia.
 
+Run `/m` or `/metro` to open the management GUI directly. Use `/m help` for command help.
+
 ## Features
 
 - **Multi-line Network** — Create multiple routes with stops and transfers

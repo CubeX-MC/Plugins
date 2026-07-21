@@ -60,6 +60,7 @@ messages:
   invalid-number: "<prefix><#E63946>数字格式不正确。"
   invalid-usage: "<prefix><#FFE066>用法: <usage>"
   create-success: "<prefix><#69DB7C>合同已发布: <#FFE066>#<id> <#F1F5F9>已托管 <#69DB7C><amount><#F1F5F9>。"
+  batch-create-success: "<prefix><#69DB7C>已批量发布 <#FFE066><count> <#69DB7C>份委托，首份合同: <#FFE066>#<id><#69DB7C>。"
   wager-create-success: "<prefix><#69DB7C>对赌已开,等待 <#FFE066><opponent><#69DB7C> 接受: <#FFE066>#<id> <#F1F5F9>押注 <#69DB7C><stake><#F1F5F9>。"
   partner-create-success: "<prefix><#69DB7C>合作邀请已发,等待 <#FFE066><partner><#69DB7C> 接受: <#FFE066>#<id> <#F1F5F9>你押 <#69DB7C><stake><#F1F5F9>。"
   resolve-success: "<prefix><#69DB7C>合同 <#FFE066>#<id> <#69DB7C>已裁决,胜方 <#FFE066><winner><#69DB7C>。"
@@ -106,7 +107,8 @@ messages:
     <#F4D03F>==== Contract ====
     <#FFE066>/contract <#F1F5F9>- 打开合同大厅
     <#FFE066>/contract service \<奖金|item> \<天> \<标题>|\<描述> <#F1F5F9>- 发布雇佣合同，item 表示托管主手物品作为奖励
-    <#CFD8DC>可选: <#FFE066>/contract service \<奖金|item> \<天> --mediator \<中间人> \<标题>|\<描述>
+    <#CFD8DC>批量: <#FFE066>/contract service \<奖金|item> \<天> --count \<份数> --repeat \<unlimited|once|cooldown> [--cooldown \<小时>] \<标题>|\<描述>
+    <#CFD8DC>可选: <#FFE066>--mediator \<中间人>
     <#CFD8DC>系统验收: <#FFE066>/contract service \<奖金|item> \<天> --objective \<类型> \<目标> \<数量> \<标题>|\<描述>
     <#CFD8DC>目标类型: <#FFE066>craft_item/block_break/fish/block_place/kill_entity/kill_player/consume_item/deliver_item/deliver_money/enchant_item/shear/breed/tame/chat/block_interact/run_command/use_item
     <#FFE066>/contract wager \<对方> \<押注> \<天> \<仲裁> \<标题>|\<描述> <#F1F5F9>- 发起对赌

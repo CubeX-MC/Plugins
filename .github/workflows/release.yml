@@ -59,6 +59,9 @@ jobs:
             railway)
               project="Railway"
               ;;
+            regions|region)
+              project="Regions"
+              ;;
             *)
               echo "Unsupported release tag prefix: $prefix" >&2
               exit 1

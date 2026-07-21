@@ -1,6 +1,5 @@
 package org.cubexmc.regions.mode
 
-import org.bukkit.Bukkit
 import org.bukkit.GameMode
 import org.bukkit.Location
 import org.bukkit.Material
@@ -9,13 +8,16 @@ import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.regions.RegionsPlugin
+import org.cubexmc.regions.config.sendLegacyMessage
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionTrigger
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 class CombatModeService(private val plugin: RegionsPlugin) {
     private val states: ConcurrentHashMap<String, CombatState> = ConcurrentHashMap()
+    private val endingRegions: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val pendingRespawnRestores: ConcurrentHashMap<UUID, GearSnapshot> = ConcurrentHashMap()
     private val gearStore = CombatGearStore(plugin)
 
@@ -27,14 +29,18 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         if (!isCombatMode(region)) {
             return
         }
+        if (endingRegions.contains(region.id)) {
+            player.sendLegacyMessage("§e${region.name} 正在恢复上一局，请稍后重新进入。")
+            return
+        }
         val state = state(region)
         if (state.active) {
-            player.sendMessage("§e${region.name} 的战斗已经开始，你不会加入当前局。")
+            player.sendLegacyMessage("§e${region.name} 的战斗已经开始，你不会加入当前局。")
             return
         }
         val maxPlayers = maxPlayers(region)
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
-            player.sendMessage("§c${region.name} 当前人数已满。")
+            player.sendLegacyMessage("§c${region.name} 当前人数已满。")
             return
         }
         state.players.add(player.uniqueId)
@@ -66,22 +72,22 @@ class CombatModeService(private val plugin: RegionsPlugin) {
     fun ready(player: Player, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isCombatMode(region)) {
-            player.sendMessage("§c这个区域不是对战模式。")
+            player.sendLegacyMessage("§c这个区域不是对战模式。")
             return true
         }
         val state = state(region)
         if (!state.players.contains(player.uniqueId)) {
-            player.sendMessage("§c你不在这个场地内。")
+            player.sendLegacyMessage("§c你不在这个场地内。")
             return true
         }
         if (state.active) {
-            player.sendMessage("§e战斗已经开始。")
+            player.sendLegacyMessage("§e战斗已经开始。")
             return true
         }
         state.ready.add(player.uniqueId)
         broadcast(state, "§a${player.name} 已确认开始 (${state.ready.size}/${state.players.size})")
         if (!canPromptReady(region, state)) {
-            player.sendMessage(startRequirementMessage(region, state))
+            player.sendLegacyMessage(startRequirementMessage(region, state))
             return true
         }
         if (state.ready.containsAll(state.players)) {
@@ -109,7 +115,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         }
         state.players.remove(player.uniqueId)
         state.ready.remove(player.uniqueId)
-        player.sendMessage("§e你已被移出本局战斗，复活后会恢复入场前状态。")
+        player.sendLegacyMessage("§e你已被移出本局战斗，复活后会恢复入场前状态。")
         maybeEndAfterRosterChange(state, "death")
         return true
     }
@@ -120,23 +126,29 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         snapshot.respawn?.let { event.respawnLocation = it }
     }
 
-    fun cleanupAll(reason: String) {
+    fun cleanupAll(reason: String, shuttingDown: Boolean = false) {
+        val immediate = !plugin.regionScheduler().isFolia
         for (regionId in states.keys.toList()) {
-            end(regionId, reason)
+            end(regionId, reason, immediate = immediate, restorePlayers = !shuttingDown || immediate)
         }
         for ((playerId, snapshot) in pendingRespawnRestores.toMap()) {
-            val player = Bukkit.getPlayer(playerId) ?: continue
-            plugin.regionScheduler().runAtEntity(player, Runnable {
+            val player = plugin.server.getPlayer(playerId) ?: continue
+            val restore = Runnable {
                 restoreSnapshot(player, snapshot)
                 pendingRespawnRestores.remove(playerId)
-            })
+            }
+            if (immediate) restore.run()
+            else if (!shuttingDown) plugin.regionScheduler().runAtEntity(player, restore)
         }
         for (playerId in gearStore.allPlayerIds()) {
-            val player = Bukkit.getPlayer(playerId) ?: continue
-            plugin.regionScheduler().runAtEntity(player, Runnable {
+            val player = plugin.server.getPlayer(playerId) ?: continue
+            val restore = Runnable {
                 restoreStored(player, "cleanup-all:$reason")
-            })
+            }
+            if (immediate) restore.run()
+            else if (!shuttingDown) plugin.regionScheduler().runAtEntity(player, restore)
         }
+        if (shuttingDown) pendingRespawnRestores.clear()
     }
 
     fun restoreIfPending(player: Player, reason: String): Boolean =
@@ -158,37 +170,80 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         state.prompted = false
         val replaceGear = shouldReplaceGear(region)
         for (playerId in state.players.toList()) {
-            val player = Bukkit.getPlayer(playerId) ?: continue
+            val player = plugin.server.getPlayer(playerId) ?: continue
             plugin.regionScheduler().runAtEntity(player, Runnable {
-                if (replaceGear && !state.gear.containsKey(playerId)) {
-                    val snapshot = GearSnapshot.capture(player, outsideLocation(region))
-                    val previous = state.gear.putIfAbsent(playerId, snapshot)
-                    if (previous == null) {
-                        gearStore.put(playerId, region.id, snapshot)
-                        applyKit(player, region)
-                    }
+                if (states[region.id] !== state || !state.active || !state.players.contains(playerId)) {
+                    return@Runnable
                 }
-                player.sendMessage("§c战斗开始！")
-                plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
+                runCatching {
+                    if (replaceGear && !state.gear.containsKey(playerId)) {
+                        val snapshot = GearSnapshot.capture(player, outsideLocation(region))
+                        val previous = state.gear.putIfAbsent(playerId, snapshot)
+                        if (previous == null) {
+                            gearStore.put(playerId, region.id, snapshot)
+                            applyKit(player, region)
+                        }
+                    }
+                    player.sendLegacyMessage("§c战斗开始！")
+                    plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
+                }.onFailure { error ->
+                    plugin.logger.severe("Failed to start combat ${region.id} for ${player.name}: ${error.message}")
+                    end(region.id, "start-failed")
+                }
             })
         }
     }
 
-    private fun end(regionId: String, reason: String) {
+    private fun end(
+        regionId: String,
+        reason: String,
+        immediate: Boolean = !plugin.regionScheduler().isFolia,
+        restorePlayers: Boolean = true,
+    ) {
         val state = states[regionId] ?: return
         state.active = false
+        endingRegions.add(regionId)
+        states.remove(regionId, state)
         val region = plugin.regions().find(regionId)
-        for (playerId in state.players.toList()) {
-            val player = Bukkit.getPlayer(playerId) ?: continue
-            plugin.regionScheduler().runAtEntity(player, Runnable {
-                if (region != null) {
-                    plugin.triggers().fire(RegionTrigger.ON_MODE_END, player, region)
+        plugin.audit().record(
+            null,
+            regionId,
+            "mode.combat.end",
+            reason,
+            mapOf(
+                "revision" to (region?.publishedRevision?.toString() ?: "unknown"),
+                "participants" to state.players.size.toString(),
+                "mode" to (region?.mode?.type ?: "unknown"),
+            ),
+        )
+        if (restorePlayers) {
+            val players = (state.players + state.gear.keys).toSet()
+                .mapNotNull { plugin.server.getPlayer(it) }
+            val remaining = AtomicInteger(players.size)
+            if (players.isEmpty()) endingRegions.remove(regionId)
+            for (player in players) {
+                val restore = Runnable {
+                    try {
+                        if (region != null) {
+                            plugin.triggers().fire(RegionTrigger.ON_MODE_END, player, region)
+                        }
+                        plugin.effects().cleanupModeEffects(player, regionId, "mode-end:$reason")
+                        restoreGear(player, state, teleportOut = true, reason = reason)
+                        player.sendLegacyMessage("§e战斗结束。")
+                    } finally {
+                        if (remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
+                    }
                 }
-                restoreGear(player, state, teleportOut = true, reason = reason)
-                player.sendMessage("§e战斗结束。")
-            })
+                runCatching {
+                    if (immediate) restore.run() else plugin.regionScheduler().runAtEntity(player, restore)
+                }.onFailure {
+                    plugin.logger.severe("Failed to schedule combat cleanup for ${player.name} in $regionId: ${it.message}")
+                    if (!immediate && remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
+                }
+            }
+        } else {
+            endingRegions.remove(regionId)
         }
-        states.remove(regionId)
     }
 
     private fun restoreGear(player: Player, state: CombatState, teleportOut: Boolean, reason: String) {
@@ -315,9 +370,9 @@ class CombatModeService(private val plugin: RegionsPlugin) {
 
     private fun broadcast(state: CombatState, message: String) {
         for (playerId in state.players) {
-            val player = Bukkit.getPlayer(playerId) ?: continue
+            val player = plugin.server.getPlayer(playerId) ?: continue
             plugin.regionScheduler().runAtEntity(player, Runnable {
-                player.sendMessage(message)
+                player.sendLegacyMessage(message)
             })
         }
     }
@@ -351,7 +406,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         if (parts.size < 4) {
             return null
         }
-        val world = Bukkit.getWorld(parts[0].trim()) ?: return null
+        val world = plugin.server.getWorld(parts[0].trim()) ?: return null
         val x = parts[1].trim().toDoubleOrNull() ?: return null
         val y = parts[2].trim().toDoubleOrNull() ?: return null
         val z = parts[3].trim().toDoubleOrNull() ?: return null

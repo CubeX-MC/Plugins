@@ -7,6 +7,7 @@ import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.Contract
+import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
 import org.cubexmc.contract.model.ObjectiveType
@@ -225,7 +226,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 4) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--count <份数>] [--repeat <unlimited|once|cooldown>] [--cooldown <小时>] [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
             return true
         }
         val itemReward = args[1].equals("item", ignoreCase = true)
@@ -235,25 +236,48 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             send(sender, plugin.lang().message("invalid-number"))
             return true
         }
-        val text = parseContractText(args, 3, true, true)
+        val text = parseContractText(args, 3, true, true, true)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--count <份数>] [--repeat <unlimited|once|cooldown>] [--cooldown <小时>] [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
             return true
         }
         val result =
             if (itemReward) {
-                plugin.contracts().createWithItemReward(player, days, text.title(), text.description(), text.mediatorName(), text.objective())
+                plugin.contracts().createWithItemReward(
+                    player,
+                    days,
+                    text.title(),
+                    text.description(),
+                    text.mediatorName(),
+                    text.objective(),
+                    text.contractCount(),
+                    text.repeatPolicy(),
+                    text.repeatCooldownHours(),
+                )
             } else {
-                plugin.contracts().create(player, reward, days, text.title(), text.description(), text.mediatorName(), text.objective())
+                plugin.contracts().create(
+                    player,
+                    reward,
+                    days,
+                    text.title(),
+                    text.description(),
+                    text.mediatorName(),
+                    text.objective(),
+                    text.contractCount(),
+                    text.repeatPolicy(),
+                    text.repeatCooldownHours(),
+                )
             }
         if (!result.success()) {
             send(sender, plugin.lang().message("cannot-create", mapOf("reason" to result.reason())))
             return true
         }
         val contract = result.contract() ?: throw NullPointerException("contract")
-        send(sender, plugin.lang().message("create-success", mapOf(
+        val successKey = if (text.contractCount() > 1) "batch-create-success" else "create-success"
+        send(sender, plugin.lang().message(successKey, mapOf(
             "id" to contract.shortId(),
             "amount" to rewardSummary(contract),
+            "count" to text.contractCount().toString(),
         )))
         return true
     }
@@ -547,11 +571,28 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         if (objective != null) {
             send(sender, Text.color("&#69DB7C系统目标: &#FFFFFF${objective.type().name} ${objective.target()} ${objective.progressText()}"))
         }
+        batchRepeatSummary(contract)?.let { summary ->
+            send(sender, Text.color("&#69DB7C重复接取: &#FFFFFF$summary"))
+        }
         if (contract.hasDeliveryItems()) {
             send(sender, Text.color("&#69DB7C合同暂存: &#FFFFFF${contract.deliveryItemCount()} 个交付物品"))
         }
         if (contract.hasRewardItems()) {
             send(sender, Text.color("&#69DB7C奖励暂存: &#FFFFFF${contract.rewardItemCount()} 个物品"))
+        }
+    }
+
+    private fun batchRepeatSummary(contract: Contract): String? {
+        if (contract.metadata["batch-id"].isNullOrBlank()) {
+            return null
+        }
+        return when (BatchRepeatPolicy.fromStored(contract.metadata["repeat-policy"])) {
+            BatchRepeatPolicy.UNLIMITED -> "不限制"
+            BatchRepeatPolicy.ONCE -> "每名玩家仅一次，且同时只能进行一份"
+            BatchRepeatPolicy.COOLDOWN -> {
+                val hours = contract.metadata["repeat-cooldown-hours"]?.toIntOrNull() ?: DEFAULT_REPEAT_COOLDOWN_HOURS
+                "每 $hours 小时可接一次，且同时只能进行一份"
+            }
         }
     }
 
@@ -708,12 +749,21 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         return builder.toString()
     }
 
-    private fun parseContractText(args: Array<String>, start: Int, allowMediator: Boolean, allowObjective: Boolean = false): ContractText? {
+    private fun parseContractText(
+        args: Array<String>,
+        start: Int,
+        allowMediator: Boolean,
+        allowObjective: Boolean = false,
+        allowCount: Boolean = false,
+    ): ContractText? {
         if (start >= args.size) {
             return null
         }
         var mediatorName: String? = null
         var objective: ContractObjective? = null
+        var contractCount = 1
+        var repeatPolicy = BatchRepeatPolicy.ONCE
+        var repeatCooldownHours = DEFAULT_REPEAT_COOLDOWN_HOURS
         var textStart = start
         while (textStart < args.size) {
             if (allowMediator && isMediatorFlag(args[textStart])) {
@@ -734,6 +784,30 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
                 textStart += 4
                 continue
             }
+            if (allowCount && isCountFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                contractCount = parseInt(args[textStart + 1]) ?: return null
+                textStart += 2
+                continue
+            }
+            if (allowCount && isRepeatFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                repeatPolicy = parseBatchRepeatPolicy(args[textStart + 1]) ?: return null
+                textStart += 2
+                continue
+            }
+            if (allowCount && isCooldownFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                repeatCooldownHours = parseInt(args[textStart + 1]) ?: return null
+                textStart += 2
+                continue
+            }
             break
         }
         val rest = join(args, textStart)
@@ -742,14 +816,36 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val splitIndex = rest.indexOf('|')
         if (splitIndex < 0) {
-            return ContractText(rest, "", mediatorName, objective)
+            return ContractText(rest, "", mediatorName, objective, contractCount, repeatPolicy, repeatCooldownHours)
         }
-        return ContractText(rest.substring(0, splitIndex), rest.substring(splitIndex + 1), mediatorName, objective)
+        return ContractText(
+            rest.substring(0, splitIndex),
+            rest.substring(splitIndex + 1),
+            mediatorName,
+            objective,
+            contractCount,
+            repeatPolicy,
+            repeatCooldownHours,
+        )
     }
 
     private fun isMediatorFlag(arg: String): Boolean = arg.equals("--mediator", ignoreCase = true) || arg.equals("-m", ignoreCase = true)
 
     private fun isObjectiveFlag(arg: String): Boolean = arg.equals("--objective", ignoreCase = true) || arg.equals("-o", ignoreCase = true)
+
+    private fun isCountFlag(arg: String): Boolean = arg.equals("--count", ignoreCase = true) || arg.equals("-n", ignoreCase = true)
+
+    private fun isRepeatFlag(arg: String): Boolean = arg.equals("--repeat", ignoreCase = true)
+
+    private fun isCooldownFlag(arg: String): Boolean = arg.equals("--cooldown", ignoreCase = true)
+
+    private fun parseBatchRepeatPolicy(input: String): BatchRepeatPolicy? =
+        when (input.lowercase(Locale.ROOT)) {
+            "unlimited", "none", "off" -> BatchRepeatPolicy.UNLIMITED
+            "once", "single" -> BatchRepeatPolicy.ONCE
+            "cooldown", "interval" -> BatchRepeatPolicy.COOLDOWN
+            else -> null
+        }
 
     private fun parseObjectiveType(input: String): ObjectiveType? =
         when (input.lowercase(Locale.ROOT)) {
@@ -799,7 +895,14 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "list", "all", "my", "rep", "info", "accept", "submit", "claim", "approve", "cancel", "dispute", "withdraw", "admin", "help"), args[0])
         }
         if (args.size == 4 && args[0].equals("service", ignoreCase = true)) {
-            return startsWith(listOf("--mediator", "--objective"), args[3])
+            val flags = ArrayList(listOf("--mediator", "--objective"))
+            if (sender.hasPermission(BATCH_CREATE_PERMISSION)) {
+                flags.addAll(0, listOf("--count", "--repeat", "--cooldown"))
+            }
+            return startsWith(flags, args[3])
+        }
+        if (args.size >= 5 && args[0].equals("service", ignoreCase = true) && args[args.size - 2].equals("--repeat", ignoreCase = true)) {
+            return startsWith(listOf("unlimited", "once", "cooldown"), args.last())
         }
         if (args.size >= 5 && args[0].equals("service", ignoreCase = true) && args[args.size - 2].equals("--objective", ignoreCase = true)) {
             return startsWith(ObjectiveType.entries.map { it.name.lowercase(Locale.ROOT) }, args.last())
@@ -845,14 +948,22 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         private val description: String,
         private val mediatorName: String?,
         private val objective: ContractObjective?,
+        private val contractCount: Int,
+        private val repeatPolicy: BatchRepeatPolicy,
+        private val repeatCooldownHours: Int,
     ) {
         fun title(): String = title
         fun description(): String = description
         fun mediatorName(): String? = mediatorName
         fun objective(): ContractObjective? = objective
+        fun contractCount(): Int = contractCount
+        fun repeatPolicy(): BatchRepeatPolicy = repeatPolicy
+        fun repeatCooldownHours(): Int = repeatCooldownHours
     }
 
     companion object {
+        private const val BATCH_CREATE_PERMISSION = "contract.create.batch"
+        private const val DEFAULT_REPEAT_COOLDOWN_HOURS = 24
         private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT)
             .withZone(ZoneId.systemDefault())
     }

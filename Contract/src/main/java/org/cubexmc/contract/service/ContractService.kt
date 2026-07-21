@@ -9,6 +9,7 @@ import org.bukkit.persistence.PersistentDataType
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.model.Asset
+import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
@@ -20,6 +21,7 @@ import org.cubexmc.contract.model.PayoutCondition
 import org.cubexmc.contract.model.PayoutRecipient
 import org.cubexmc.contract.model.PayoutRule
 import org.cubexmc.contract.storage.ContractStorage
+import org.cubexmc.contract.storage.BatchAcceptanceStore
 import org.cubexmc.contract.storage.EventLog
 import org.cubexmc.contract.storage.PendingTransactionStore
 import org.cubexmc.contract.util.Text
@@ -38,6 +40,7 @@ class ContractService(
     private val economy: EconomyService,
     private val pending: PendingTransactionStore,
     private val eventLog: EventLog,
+    private val batchAcceptances: BatchAcceptanceStore,
 ) {
     private fun logEvent(contract: Contract, time: Long, type: String, detail: String) {
         contract.addEvent(time, type, detail)
@@ -67,7 +70,57 @@ class ContractService(
         description: String,
         mediatorName: String?,
         objective: ContractObjective?,
-    ): ServiceResult = create(owner, rewardDouble, days, title, description, mediatorName, objective, emptyList(), false)
+    ): ServiceResult = create(owner, rewardDouble, days, title, description, mediatorName, objective, 1)
+
+    @Synchronized
+    fun create(
+        owner: Player,
+        rewardDouble: Double,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+        objective: ContractObjective?,
+        contractCount: Int,
+    ): ServiceResult = create(
+        owner,
+        rewardDouble,
+        days,
+        title,
+        description,
+        mediatorName,
+        objective,
+        contractCount,
+        defaultRepeatPolicy(contractCount),
+        DEFAULT_REPEAT_COOLDOWN_HOURS,
+    )
+
+    @Synchronized
+    fun create(
+        owner: Player,
+        rewardDouble: Double,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+        objective: ContractObjective?,
+        contractCount: Int,
+        repeatPolicy: BatchRepeatPolicy,
+        repeatCooldownHours: Int,
+    ): ServiceResult = createBatch(
+        owner,
+        rewardDouble,
+        days,
+        title,
+        description,
+        mediatorName,
+        objective,
+        emptyList(),
+        false,
+        contractCount,
+        repeatPolicy,
+        repeatCooldownHours,
+    )
 
     @Synchronized
     fun createWithItemReward(
@@ -77,6 +130,40 @@ class ContractService(
         description: String,
         mediatorName: String?,
         objective: ContractObjective?,
+    ): ServiceResult = createWithItemReward(owner, days, title, description, mediatorName, objective, 1)
+
+    @Synchronized
+    fun createWithItemReward(
+        owner: Player,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+        objective: ContractObjective?,
+        contractCount: Int,
+    ): ServiceResult = createWithItemReward(
+        owner,
+        days,
+        title,
+        description,
+        mediatorName,
+        objective,
+        contractCount,
+        defaultRepeatPolicy(contractCount),
+        DEFAULT_REPEAT_COOLDOWN_HOURS,
+    )
+
+    @Synchronized
+    fun createWithItemReward(
+        owner: Player,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+        objective: ContractObjective?,
+        contractCount: Int,
+        repeatPolicy: BatchRepeatPolicy,
+        repeatCooldownHours: Int,
     ): ServiceResult {
         val hand = owner.inventory.itemInMainHand
         if (hand.type == Material.AIR || hand.amount <= 0) {
@@ -85,10 +172,27 @@ class ContractService(
         if (isRuleGemItem(hand)) {
             return ServiceResult.fail("为避免宝石状态异常,合同暂不托管 RuleGems 宝石物品")
         }
-        return create(owner, 0.0, days, title, description, mediatorName, objective, listOf(hand.clone()), true)
+        val perContractAmount = perContractItemAmount(hand.amount, contractCount)
+            ?: return ServiceResult.fail("主手物品数量 ${hand.amount} 必须能被发布份数 $contractCount 整除")
+        val rewardItem = hand.clone()
+        rewardItem.amount = perContractAmount
+        return createBatch(
+            owner,
+            0.0,
+            days,
+            title,
+            description,
+            mediatorName,
+            objective,
+            listOf(rewardItem),
+            true,
+            contractCount,
+            repeatPolicy,
+            repeatCooldownHours,
+        )
     }
 
-    private fun create(
+    private fun createBatch(
         owner: Player,
         rewardDouble: Double,
         days: Int,
@@ -98,6 +202,9 @@ class ContractService(
         objective: ContractObjective?,
         rewardItems: List<ItemStack>,
         itemReward: Boolean,
+        contractCount: Int,
+        repeatPolicy: BatchRepeatPolicy,
+        repeatCooldownHours: Int,
     ): ServiceResult {
         if (!rewardDouble.isFinite()) {
             return ServiceResult.fail("奖金必须是有效数字")
@@ -130,6 +237,18 @@ class ContractService(
         if (itemReward && rewardItems.isEmpty()) {
             return ServiceResult.fail("物品奖励不能为空")
         }
+        val maxBatchContracts = plugin.config.getInt("limits.max-batch-contracts", 64).coerceAtLeast(1)
+        if (contractCount < 1 || contractCount > maxBatchContracts) {
+            return ServiceResult.fail("发布份数必须在 1 到 $maxBatchContracts 之间")
+        }
+        if (requiresBatchPermission(contractCount) && !owner.hasPermission(BATCH_CREATE_PERMISSION)) {
+            return ServiceResult.fail("你没有批量发布委托的权限")
+        }
+        val effectiveRepeatPolicy = if (contractCount > 1) repeatPolicy else BatchRepeatPolicy.UNLIMITED
+        val maxRepeatCooldownHours = plugin.config.getInt("limits.max-repeat-cooldown-hours", 8760).coerceAtLeast(1)
+        if (effectiveRepeatPolicy == BatchRepeatPolicy.COOLDOWN && repeatCooldownHours !in 1..maxRepeatCooldownHours) {
+            return ServiceResult.fail("重复接取冷却必须在 1 到 $maxRepeatCooldownHours 小时之间")
+        }
         val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
         val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
         if (days < minDays || days > maxDays) {
@@ -140,8 +259,8 @@ class ContractService(
             .filter { contract -> contract.ownerUuid() == owner.uniqueId }
             .filter { contract -> contract.status().countsAsOwnerActive() }
             .count()
-        if (openCount >= openLimit && !owner.hasPermission("contract.bypass.limit")) {
-            return ServiceResult.fail("你的公开或待处理合同数量已达上限 $openLimit")
+        if (exceedsOpenLimit(openCount, contractCount, openLimit) && !owner.hasPermission("contract.bypass.limit")) {
+            return ServiceResult.fail("发布后公开或待处理合同将超过上限 $openLimit")
         }
         val mediator = resolveOptionalMediator(mediatorName, owner.uniqueId)
         if (!mediator.success()) {
@@ -155,14 +274,16 @@ class ContractService(
                 BigDecimal.valueOf(plugin.config.getDouble("economy.creation-fee", 20.0))
                     .setScale(2, RoundingMode.HALF_UP)
             }
-        val totalCost = reward.add(creationFee)
+        val totalReward = reward.multiply(BigDecimal.valueOf(contractCount.toLong()))
+        val totalCost = reward.add(creationFee).multiply(BigDecimal.valueOf(contractCount.toLong()))
         if (!economy.has(owner, totalCost)) {
             return ServiceResult.fail("余额不足，需要 ${economy.format(totalCost)}")
         }
 
-        val contractId = UUID.randomUUID().toString()
+        val contractIds = List(contractCount) { UUID.randomUUID().toString() }
+        val pendingPurpose = if (contractCount == 1) "contract-create" else "contract-batch-create"
         val pendingId = try {
-            pending.beginWithdraw(owner.uniqueId, totalCost, "contract-create", contractId)
+            pending.beginWithdraw(owner.uniqueId, totalCost, pendingPurpose, contractIds.first())
         } catch (ex: IOException) {
             return ServiceResult.fail("无法写入待办事务日志: ${ex.message}")
         }
@@ -183,27 +304,41 @@ class ContractService(
         val commissionPercent = clampCommissionPercent(
             plugin.config.getDouble("economy.completion-commission-percent", 5.0),
         )
-        val contract = Contract.createService(
-            contractId,
-            owner.uniqueId,
-            owner.name,
-            cleanTitle,
-            cleanDescription,
-            reward,
-            rewardItems,
-            creationFee,
-            commissionPercent,
-            now,
-            expiresAt,
-            objective,
-        )
-        applyOptionalMediator(contract, mediator)
+        val batchId = if (contractCount > 1) UUID.randomUUID().toString() else null
+        val contracts = contractIds.mapIndexed { index, contractId ->
+            val objectiveCopy = objective?.let { ContractObjective.of(it.type(), it.target(), it.required()) }
+            val contract = Contract.createService(
+                contractId,
+                owner.uniqueId,
+                owner.name,
+                cleanTitle,
+                cleanDescription,
+                reward,
+                rewardItems.map { it.clone() },
+                creationFee,
+                commissionPercent,
+                now,
+                expiresAt,
+                objectiveCopy,
+            )
+            applyOptionalMediator(contract, mediator)
+            if (batchId != null) {
+                contract.metadata["batch-id"] = batchId
+                contract.metadata["batch-index"] = (index + 1).toString()
+                contract.metadata["batch-size"] = contractCount.toString()
+                contract.metadata["repeat-policy"] = effectiveRepeatPolicy.name
+                if (effectiveRepeatPolicy == BatchRepeatPolicy.COOLDOWN) {
+                    contract.metadata["repeat-cooldown-hours"] = repeatCooldownHours.toString()
+                }
+            }
+            contract
+        }
 
         try {
-            storage.put(contract)
+            contracts.forEach(storage::put)
             storage.save()
         } catch (ex: IOException) {
-            storage.remove(contract.id())
+            contracts.forEach { storage.remove(it.id()) }
             if (handBefore != null) {
                 owner.inventory.setItemInMainHand(handBefore)
                 owner.updateInventory()
@@ -213,16 +348,19 @@ class ContractService(
         }
 
         val escrowDetail = if (itemReward) "${rewardItems.sumOf { it.amount }} reward items" else reward.toPlainString()
-        eventLog.append(
-            contract.id(),
-            "CREATED",
-            "${owner.name} created the contract and escrowed $escrowDetail",
-        )
-        if (mediator.present()) {
-            eventLog.append(contract.id(), "MEDIATOR_ASSIGNED", "${mediator.name()} assigned as optional mediator")
+        for (contract in contracts) {
+            eventLog.append(
+                contract.id(),
+                "CREATED",
+                "${owner.name} created the contract and escrowed $escrowDetail" +
+                    if (batchId == null) "" else " as batch $batchId",
+            )
+            if (mediator.present()) {
+                eventLog.append(contract.id(), "MEDIATOR_ASSIGNED", "${mediator.name()} assigned as optional mediator")
+            }
         }
         tryClearPending(pendingId)
-        return ServiceResult.ok(contract, reward)
+        return ServiceResult.ok(contracts.first(), totalReward)
     }
 
     private fun resolveOptionalMediator(mediatorName: String?, vararg excluded: UUID): MediatorSpec {
@@ -383,10 +521,11 @@ class ContractService(
         }
 
     private fun acceptService(contractor: Player, contract: Contract): ServiceResult {
+        val now = System.currentTimeMillis()
         if (contract.status() != ContractStatus.OPEN) {
             return ServiceResult.fail("合同当前不可接取")
         }
-        if (contract.isExpired(System.currentTimeMillis())) {
+        if (contract.isExpired(now)) {
             return rejectExpiredAcceptance(contract)
         }
         if (contract.ownerUuid() == contractor.uniqueId) {
@@ -394,6 +533,10 @@ class ContractService(
         }
         if (isAssignedArbiter(contractor, contract)) {
             return ServiceResult.fail("中间人不能接取自己负责裁决的合同")
+        }
+        val repeatFailure = checkBatchRepeat(contractor, contract, now)
+        if (repeatFailure != null) {
+            return ServiceResult.fail(repeatFailure)
         }
         val limit = plugin.config.getInt("limits.max-active-accepted-contracts", 3)
         val activeAccepted = storage.all().stream()
@@ -403,13 +546,57 @@ class ContractService(
         if (activeAccepted >= limit && !contractor.hasPermission("contract.bypass.limit")) {
             return ServiceResult.fail("你的接单数量已达上限 $limit")
         }
-        val now = System.currentTimeMillis()
         contract.contractorUuid(contractor.uniqueId)
         contract.contractorName(contractor.name)
         contract.acceptedAt(now)
         contract.status(ContractStatus.IN_PROGRESS)
+        val batchId = contract.metadata["batch-id"]
+        val repeatPolicy = BatchRepeatPolicy.fromStored(contract.metadata["repeat-policy"])
+        if (!batchId.isNullOrBlank() && repeatPolicy != BatchRepeatPolicy.UNLIMITED) {
+            batchAcceptances.record(batchId, contractor.uniqueId, now, contract.id())
+        }
         logEvent(contract, now, "ACCEPTED", "${contractor.name} accepted the contract")
         return dirty(contract)
+    }
+
+    private fun checkBatchRepeat(contractor: Player, contract: Contract, now: Long): String? {
+        val batchId = contract.metadata["batch-id"] ?: return null
+        val policy = BatchRepeatPolicy.fromStored(contract.metadata["repeat-policy"])
+        if (policy == BatchRepeatPolicy.UNLIMITED || contractor.hasPermission(BATCH_REPEAT_BYPASS_PERMISSION)) {
+            return null
+        }
+        val hasActiveContract = storage.all().any { existing ->
+            existing.id() != contract.id() &&
+                existing.metadata["batch-id"] == batchId &&
+                existing.contractorUuid() == contractor.uniqueId &&
+                existing.status().countsAsContractorActive()
+        }
+        val cooldownHours = contract.metadata["repeat-cooldown-hours"]?.toIntOrNull()
+            ?.coerceAtLeast(1) ?: DEFAULT_REPEAT_COOLDOWN_HOURS
+        val decision = BatchRepeatRules.evaluate(
+            policy,
+            hasActiveContract,
+            batchAcceptances.lastAcceptedAt(batchId, contractor.uniqueId),
+            now,
+            cooldownHours * 60L * 60L * 1000L,
+        )
+        return when (decision.reason) {
+            BatchRepeatRules.BlockReason.ACTIVE_CONTRACT -> "你已经有一份同批次任务正在进行"
+            BatchRepeatRules.BlockReason.ALREADY_ACCEPTED -> "这个批次每名玩家只能接取一次"
+            BatchRepeatRules.BlockReason.COOLDOWN -> "距离再次接取同批次任务还需 ${formatRemainingTime(decision.remainingMillis)}"
+            null -> null
+        }
+    }
+
+    private fun formatRemainingTime(remainingMillis: Long): String {
+        val totalMinutes = ((remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
+        val hours = totalMinutes / 60L
+        val minutes = totalMinutes % 60L
+        return when {
+            hours <= 0L -> "${minutes}分钟"
+            minutes == 0L -> "${hours}小时"
+            else -> "${hours}小时${minutes}分钟"
+        }
     }
 
     private fun acceptWager(player: Player, contract: Contract): ServiceResult {
@@ -1131,7 +1318,10 @@ class ContractService(
         if (isContractor && !plugin.config.getBoolean("disputes.allow-contractor-dispute", true)) {
             return ServiceResult.fail("当前不允许接单者发起争议")
         }
-        if (contract.status().isFinal()) {
+        if (contract.status() == ContractStatus.DISPUTED) {
+            return ServiceResult.fail("合同已经处于争议状态")
+        }
+        if (!canInitiatePlayerDispute(contract.status())) {
             return ServiceResult.fail("已结束的合同不能发起争议")
         }
         val now = System.currentTimeMillis()
@@ -1168,11 +1358,15 @@ class ContractService(
         } catch (ex: IllegalArgumentException) {
             return ServiceResult.fail("无法恢复争议前的状态，请联系管理员")
         }
+        if (!isRestorableDisputeStatus(previous)) {
+            return ServiceResult.fail("争议前状态无效，请联系管理员")
+        }
         val now = System.currentTimeMillis()
         contract.status(previous)
         contract.disputeReason(null)
         contract.metadata.remove("dispute-by")
         contract.metadata.remove("dispute-prev-status")
+        plugin.reputation().recordDisputeWithdrawn(player.uniqueId, player.name)
         logEvent(contract, now, "DISPUTE_WITHDRAWN", "${player.name} withdrew the dispute")
         return dirty(contract)
     }
@@ -1233,6 +1427,8 @@ class ContractService(
             }
         }
         changed += purgeRetiredContracts(now)
+        val retainedBatchIds = storage.all().mapNotNull { it.metadata["batch-id"] }.toSet()
+        batchAcceptances.retainBatches(retainedBatchIds)
         return changed
     }
 
@@ -1291,6 +1487,7 @@ class ContractService(
     fun flushStores() {
         storage.flushIfDirty()
         plugin.reputation().flushIfDirty()
+        batchAcceptances.flushIfDirty()
     }
 
     private fun pay(contract: Contract, eventType: String, detail: String): ServiceResult =
@@ -1615,6 +1812,35 @@ class ContractService(
             }
             return false
         }
+
+        @JvmStatic
+        fun exceedsOpenLimit(openCount: Long, contractCount: Int, openLimit: Int): Boolean =
+            contractCount > 0 && openCount + contractCount.toLong() > openLimit.toLong()
+
+        @JvmStatic
+        fun perContractItemAmount(totalAmount: Int, contractCount: Int): Int? {
+            if (totalAmount <= 0 || contractCount <= 0 || totalAmount % contractCount != 0) {
+                return null
+            }
+            return totalAmount / contractCount
+        }
+
+        @JvmStatic
+        fun canInitiatePlayerDispute(status: ContractStatus): Boolean =
+            status != ContractStatus.DISPUTED && !status.isFinal()
+
+        @JvmStatic
+        fun isRestorableDisputeStatus(status: ContractStatus): Boolean = canInitiatePlayerDispute(status)
+
+        @JvmStatic
+        fun requiresBatchPermission(contractCount: Int): Boolean = contractCount > 1
+
+        private const val BATCH_CREATE_PERMISSION = "contract.create.batch"
+        private const val BATCH_REPEAT_BYPASS_PERMISSION = "contract.bypass.batch-repeat-limit"
+        private const val DEFAULT_REPEAT_COOLDOWN_HOURS = 24
+
+        private fun defaultRepeatPolicy(contractCount: Int): BatchRepeatPolicy =
+            if (contractCount > 1) BatchRepeatPolicy.ONCE else BatchRepeatPolicy.UNLIMITED
 
         @JvmStatic
         fun shouldPurgeFinalContract(

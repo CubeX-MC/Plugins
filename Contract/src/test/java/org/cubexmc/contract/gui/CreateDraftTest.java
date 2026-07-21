@@ -1,5 +1,6 @@
 package org.cubexmc.contract.gui;
 
+import org.cubexmc.contract.model.BatchRepeatPolicy;
 import org.cubexmc.contract.model.ContractType;
 import org.cubexmc.contract.model.ObjectiveType;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,40 @@ class CreateDraftTest {
         draft.amount(500.0);
         assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
         assertTrue(draft.isReady(MIN, MAX, MIN_DAYS, MAX_DAYS));
+    }
+
+    @Test
+    void serviceBatchCountRespectsConfiguredLimit() {
+        CreateDraft draft = new CreateDraft(ContractType.SERVICE);
+        draft.title("Build roads");
+        draft.days(2);
+        draft.amount(500.0);
+
+        assertEquals(1, draft.contractCount());
+        draft.contractCount(64);
+        assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS, 64));
+        draft.contractCount(65);
+        assertNotNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS, 64));
+        draft.contractCount(0);
+        assertNotNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS, 64));
+    }
+
+    @Test
+    void cooldownBatchRespectsConfiguredHourLimit() {
+        CreateDraft draft = new CreateDraft(ContractType.SERVICE);
+        draft.title("Repeatable patrol");
+        draft.days(2);
+        draft.amount(500.0);
+        draft.contractCount(10);
+        draft.repeatPolicy(BatchRepeatPolicy.COOLDOWN);
+
+        assertEquals(BatchRepeatPolicy.ONCE, new CreateDraft(ContractType.SERVICE).repeatPolicy());
+        draft.repeatCooldownHours(0);
+        assertNotNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS, 64, 720));
+        draft.repeatCooldownHours(24);
+        assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS, 64, 720));
+        draft.repeatCooldownHours(721);
+        assertNotNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS, 64, 720));
     }
 
     @Test

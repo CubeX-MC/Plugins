@@ -4,6 +4,7 @@ import org.bukkit.Location
 import org.bukkit.World
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.ExternalRegion
+import org.cubexmc.regions.model.RegionGeometry
 import org.cubexmc.regions.model.RegionSourceRef
 import java.lang.reflect.Method
 import java.util.UUID
@@ -20,16 +21,23 @@ class LandsRegionSource(private val plugin: RegionsPlugin) : RegionSource {
     private var cachedIntegration: Any? = null
     private var warnedUnavailableApi = false
 
-    override fun isAvailable(): Boolean =
-        plugin.server.pluginManager.getPlugin("Lands") != null
+    override fun isAvailable(): Boolean {
+        val available = plugin.config.getBoolean("integrations.lands.enabled", true) &&
+            plugin.server.pluginManager.getPlugin("Lands")?.isEnabled == true
+        if (!available) cachedIntegration = null
+        return available
+    }
 
     override fun resolve(ref: RegionSourceRef): ExternalRegion? {
-        if (!isAvailable()) {
-            return null
-        }
-        val land = ref.values["land"] ?: return null
-        val area = ref.values["area"] ?: "default"
-        return ExternalRegion("$land:$area", "$land/$area", type)
+        val integration = integration() ?: return null
+        val landName = ref.values["land"]?.takeIf { it.isNotBlank() } ?: return null
+        val land = findLand(integration, landName) ?: return null
+        val areaName = ref.values["area"]?.takeIf { it.isNotBlank() } ?: "default"
+        val area = findArea(land, areaName) ?: return null
+        val resolvedLand = stringValue(land, "getName") ?: landName
+        val resolvedArea = areaName(area)
+        val values = linkedMapOf("land" to resolvedLand, "area" to resolvedArea)
+        return ExternalRegion("$resolvedLand:$resolvedArea", "$resolvedLand / $resolvedArea", type, values)
     }
 
     override fun contains(ref: RegionSourceRef, location: Location): Boolean {
@@ -40,20 +48,48 @@ class LandsRegionSource(private val plugin: RegionsPlugin) : RegionSource {
 
     override fun getOwnedRegions(playerId: UUID): List<ExternalRegion> {
         val integration = integration() ?: return emptyList()
-        val landsPlayer = invoke(integration, "getLandsPlayer", playerId)
+        val landsPlayer = invoke(integration, "getLandPlayer", playerId)
+            ?: invoke(integration, "getLandsPlayer", playerId)
             ?: invoke(integration, "getPlayer", playerId)
             ?: return emptyList()
         val lands = invoke(landsPlayer, "getLands") as? Iterable<*> ?: return emptyList()
-        val result = ArrayList<ExternalRegion>()
+        val result = LinkedHashMap<String, ExternalRegion>()
         for (land in lands) {
             if (land == null) {
                 continue
             }
             val landName = stringValue(land, "getName") ?: stringValue(land, "getId") ?: continue
-            result.add(ExternalRegion(landName, landName, type))
+            val areas = invoke(land, "getAllAreas") as? Iterable<*>
+                ?: listOfNotNull(invoke(land, "getDefaultArea"))
+            for (area in areas) {
+                if (area == null) continue
+                val owner = invoke(area, "getOwnerUID") ?: invoke(area, "getOwnerUid") ?: continue
+                if (!owner.toString().equals(playerId.toString(), ignoreCase = true)) continue
+                val areaName = areaName(area)
+                val values = linkedMapOf("land" to landName, "area" to areaName)
+                val option = ExternalRegion("$landName:$areaName", "$landName / $areaName", type, values)
+                result[option.id.lowercase()] = option
+            }
         }
-        return result
+        return result.values.sortedWith(compareBy<ExternalRegion> { it.values["land"] }.thenBy { it.values["area"] })
     }
+
+    override fun ownerId(ref: RegionSourceRef): UUID? {
+        val integration = integration() ?: return null
+        val landName = ref.values["land"]?.takeIf { it.isNotBlank() } ?: return null
+        val land = findLand(integration, landName) ?: return null
+        val areaName = ref.values["area"]?.takeIf { it.isNotBlank() } ?: "default"
+        val area = findArea(land, areaName) ?: return null
+        val owner = invoke(area, "getOwnerUID")
+            ?: invoke(area, "getOwnerUid")
+            ?: return null
+        return when (owner) {
+            is UUID -> owner
+            else -> runCatching { UUID.fromString(owner.toString()) }.getOrNull()
+        }
+    }
+
+    override fun isOwner(ref: RegionSourceRef, playerId: UUID): Boolean = ownerId(ref) == playerId
 
     private fun integration(): Any? {
         if (!isAvailable()) {
@@ -110,6 +146,19 @@ class LandsRegionSource(private val plugin: RegionsPlugin) : RegionSource {
             return areaName.equals(wantedArea, ignoreCase = true)
         }
         return true
+    }
+
+    private fun findLand(integration: Any, landName: String): Any? =
+        invoke(integration, "getLandByName", landName)
+            ?: invoke(integration, "getLand", landName)
+
+    private fun findArea(land: Any, areaName: String): Any? =
+        if (areaName.equals("default", ignoreCase = true)) invoke(land, "getDefaultArea")
+        else invoke(land, "getArea", areaName)
+
+    private fun areaName(area: Any): String {
+        val isDefault = invoke(area, "isDefault") as? Boolean ?: false
+        return if (isDefault) "default" else stringValue(area, "getName") ?: stringValue(area, "getId") ?: "default"
     }
 
     private fun invoke(target: Any, methodName: String, vararg args: Any?): Any? =
@@ -197,4 +246,17 @@ class CuboidRegionSource : RegionSource {
     }
 
     override fun getOwnedRegions(playerId: UUID): List<ExternalRegion> = emptyList()
+
+    override fun geometry(ref: RegionSourceRef): RegionGeometry? {
+        val world = ref.values["world"] ?: return null
+        val minX = ref.values["min-x"]?.toDoubleOrNull() ?: return null
+        val minY = ref.values["min-y"]?.toDoubleOrNull() ?: return null
+        val minZ = ref.values["min-z"]?.toDoubleOrNull() ?: return null
+        val maxX = ref.values["max-x"]?.toDoubleOrNull() ?: return null
+        val maxY = ref.values["max-y"]?.toDoubleOrNull() ?: return null
+        val maxZ = ref.values["max-z"]?.toDoubleOrNull() ?: return null
+        return RegionGeometry(world, minX, minY, minZ, maxX, maxY, maxZ)
+    }
+
+    override fun isOwner(ref: RegionSourceRef, playerId: UUID): Boolean = false
 }

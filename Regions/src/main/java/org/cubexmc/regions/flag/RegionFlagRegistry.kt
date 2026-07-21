@@ -16,11 +16,7 @@ class RegionFlagRegistry {
             "vanish",
             "item_drop",
             "item_pickup",
-            "block_break",
-            "block_place",
-            "vehicle_enter",
             "commands",
-            "teleport_out",
         ).forEach { register(it) }
     }
 

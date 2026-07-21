@@ -1,4 +1,4 @@
-config-version: 3
+config-version: 5
 language: zh_CN
 
 economy:
@@ -17,6 +17,10 @@ disputes:
 
 limits:
   max-open-contracts: 3
+  # 单次最多发布多少份相同的 SERVICE 委托
+  max-batch-contracts: 64
+  # 批量任务“冷却后可重复”模式允许设置的最大冷却小时数
+  max-repeat-cooldown-hours: 8760
   max-active-accepted-contracts: 3
   max-title-length: 80
   max-description-length: 500

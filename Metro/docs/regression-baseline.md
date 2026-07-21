@@ -73,6 +73,15 @@ Build or keep a small regression world with these named scenarios. The IDs below
    `/m portal delete <portal_id>`, and `/m line clearroute <line_id>` warn
    without `confirm` and only mutate when rerun with `confirm`.
 10. Run `/m reload`; verify new config defaults are present and plugin remains functional.
+11. As a player with `metro.gui`, run `/m` and `/metro`; verify both open the
+    same main menu as `/m gui`. Run `/m help`; verify it shows command help.
+    Without `metro.gui`, verify the root command is denied consistently with
+    `/m gui`; from console, verify the root command shows help instead of
+    attempting to open a GUI.
+12. Clone a two-stop line with `/m line clonereverse <source> <new>`; verify the
+    copied line has reversed stop order, each `_rev` stop keeps the same stop
+    point and has its launch yaw rotated by 180 degrees, and the source stops
+    remain unchanged.
 
 ## Scenario Checks
 
@@ -105,6 +114,11 @@ Build or keep a small regression world with these named scenarios. The IDs below
 6. Open a line or stop settings GUI, revoke the player's ownership/admin rights,
    then click a mutating action. Verify the action is denied and no stale GUI
    action mutates line or stop data.
+7. On Folia, keep a protected recorded route enabled in each configured world
+   (including the Nether), restart the server, and verify Metro enables without
+   a thread-check failure.
+8. On Folia, run `/m reload` and verify the completed protection index still
+   blocks the recorded rails without global-thread block-read warnings.
 
 ### Portal Ride
 

@@ -13,8 +13,6 @@ listOf("compileClasspath", "testCompileClasspath", "testRuntimeClasspath").forEa
 
 dependencies {
     compileOnly(CubexDeps.paperApi("1.21.11-R0.1-SNAPSHOT"))
-    compileOnly(CubexDeps.vault)
-    compileOnly(CubexDeps.placeholderApi)
     implementation(project(":modules:cubex-core"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
@@ -25,6 +23,7 @@ dependencies {
 
 tasks.shadowJar {
     archiveBaseName.set("regions")
+    relocate("com.tcoded.folialib", "org.cubexmc.regions.libs.folialib")
     dependencies {
         include(project(":modules:cubex-core"))
         include(project(":modules:cubex-config"))
@@ -42,5 +41,5 @@ tasks.processResources {
 }
 
 tasks.runServer {
-    minecraftVersion("1.21.8")
+    minecraftVersion("1.21.11")
 }

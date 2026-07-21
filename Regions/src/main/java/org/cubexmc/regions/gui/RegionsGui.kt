@@ -1,7 +1,9 @@
 package org.cubexmc.regions.gui
 
 import org.bukkit.Bukkit
-import org.bukkit.ChatColor
+import io.papermc.paper.event.player.AsyncChatEvent
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -9,16 +11,17 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.cubexmc.regions.RegionsPlugin
+import org.cubexmc.regions.config.PaperText
 import org.cubexmc.regions.model.ActionBlockConfig
 import org.cubexmc.regions.model.ActionConfig
 import org.cubexmc.regions.model.EffectConfig
+import org.cubexmc.regions.model.EffectCombination
 import org.cubexmc.regions.model.EffectScope
 import org.cubexmc.regions.model.FlagConfig
 import org.cubexmc.regions.model.ModeConfig
@@ -26,6 +29,8 @@ import org.cubexmc.regions.model.OwnerPolicy
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionSourceRef
 import org.cubexmc.regions.model.RegionTrigger
+import org.cubexmc.regions.model.TriggerExecution
+import org.cubexmc.regions.service.AuthorityDecision
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -34,71 +39,100 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     private val pendingInputs: MutableMap<UUID, PendingInput> = ConcurrentHashMap()
 
     fun openMain(player: Player) {
-        if (!canManage(player)) {
+        if (!canEnterManagement(player)) {
             return
         }
-        val regions = plugin.regions().all().sortedWith(compareByDescending<RegionDefinition> { it.priority }.thenBy { it.id })
-        val inventory = Bukkit.createInventory(RegionsHolder(View.MAIN), 54, "${ChatColor.DARK_GREEN}Regions")
+        val regions = plugin.authority().visibleRegions(player, plugin.regions().all())
+            .map { plugin.publishing().editable(it.id) ?: it }
+            .sortedWith(compareByDescending<RegionDefinition> { it.priority }.thenBy { it.id })
+        val inventory = Bukkit.createInventory(RegionsHolder(View.MAIN), 54, ui("${Ui.DARK_GREEN}Regions"))
         for ((index, region) in regions.take(45).withIndex()) {
             inventory.setItem(index, regionItem(region))
         }
-        inventory.setItem(45, named(Material.WRITABLE_BOOK, "${ChatColor.AQUA}创建区域", listOf(
-            "${ChatColor.GRAY}点击输入区域 ID 和名称。",
-            "${ChatColor.GRAY}默认使用你所在区块作为临时 Cuboid。",
+        inventory.setItem(45, named(Material.WRITABLE_BOOK, "${Ui.AQUA}创建区域", listOf(
+            "${Ui.GRAY}输入区域 ID 和名称后，",
+            "${Ui.GRAY}从你拥有的 Lands area 中安全选择。",
         )))
-        inventory.setItem(47, named(Material.COMPASS, "${ChatColor.GREEN}重载配置", listOf("${ChatColor.GRAY}点击从文件重新载入 regions 配置。")))
-        inventory.setItem(49, named(Material.MAP, "${ChatColor.YELLOW}区域总数: ${regions.size}", listOf(
-            "${ChatColor.GRAY}只有 regions.admin 可以打开此界面。",
+        if (plugin.authority().isSuperAdmin(player)) {
+            inventory.setItem(47, named(Material.COMPASS, "${Ui.GREEN}重载配置", listOf("${Ui.GRAY}点击从文件重新载入 regions 配置。")))
+        }
+        inventory.setItem(49, named(Material.MAP, "${Ui.YELLOW}区域总数: ${regions.size}", listOf(
+            "${Ui.GRAY}这里只显示你当前拥有的场地。",
         )))
-        inventory.setItem(51, named(Material.SPYGLASS, "${ChatColor.AQUA}系统检查", listOf("${ChatColor.GRAY}点击检查当前区域配置。")))
-        inventory.setItem(53, named(Material.BARRIER, "${ChatColor.RED}关闭"))
+        inventory.setItem(51, named(Material.SPYGLASS, "${Ui.AQUA}系统检查", listOf("${Ui.GRAY}点击检查当前区域配置。")))
+        inventory.setItem(53, named(Material.BARRIER, "${Ui.RED}关闭"))
         player.openInventory(inventory)
     }
 
     fun openDetail(player: Player, regionId: String) {
-        if (!canManage(player)) {
-            return
-        }
-        val region = plugin.regions().find(regionId)
+        val region = plugin.publishing().editable(regionId)
         if (region == null) {
             openMain(player)
             return
         }
-        val inventory = Bukkit.createInventory(RegionsHolder(View.DETAIL, region.id), 54, "${ChatColor.DARK_GREEN}Region: ${region.id}")
+        if (!canManageRegion(player, region)) return
+        val inventory = Bukkit.createInventory(RegionsHolder(View.DETAIL, region.id), 54, ui("${Ui.DARK_GREEN}Region: ${region.id}"))
         inventory.setItem(4, regionItem(region))
-        inventory.setItem(10, named(Material.ENDER_EYE, "${ChatColor.AQUA}区域来源", listOf(
-            "${ChatColor.GRAY}${region.source.describe()}",
-            "${ChatColor.DARK_GRAY}点击查看绑定命令。",
+        inventory.setItem(10, named(Material.ENDER_EYE, "${Ui.AQUA}区域来源", listOf(
+            "${Ui.GRAY}${region.source.describe()}",
+            "${Ui.DARK_GRAY}点击查看绑定命令。",
         )))
-        inventory.setItem(12, named(Material.DIAMOND_SWORD, "${ChatColor.AQUA}玩法模式", listOf(
-            "${ChatColor.GRAY}${region.mode?.type ?: "none"}",
-            "${ChatColor.DARK_GRAY}点击设置 free_event / combat / race / round。",
+        inventory.setItem(12, named(Material.DIAMOND_SWORD, "${Ui.AQUA}玩法模式", listOf(
+            "${Ui.GRAY}${region.mode?.type ?: "none"}",
+            "${Ui.DARK_GRAY}点击设置 free_event / combat / race / round。",
         )))
-        inventory.setItem(14, named(Material.OAK_SIGN, "${ChatColor.AQUA}Flags", listOf(
-            "${ChatColor.GRAY}${region.flags.size} 个 flag",
-            "${ChatColor.DARK_GRAY}点击切换常用规则。",
+        inventory.setItem(14, named(Material.OAK_SIGN, "${Ui.AQUA}Flags", listOf(
+            "${Ui.GRAY}${region.flags.size} 个 flag",
+            "${Ui.DARK_GRAY}点击切换常用规则。",
         )))
-        inventory.setItem(16, named(Material.BLAZE_POWDER, "${ChatColor.AQUA}Effects", listOf(
-            "${ChatColor.GRAY}${region.effects.size} 个 effect",
-            "${ChatColor.DARK_GRAY}点击添加或移除常用效果。",
+        inventory.setItem(16, named(Material.BLAZE_POWDER, "${Ui.AQUA}Effects", listOf(
+            "${Ui.GRAY}${region.effects.size} 个 effect",
+            "${Ui.DARK_GRAY}点击添加或移除常用效果。",
         )))
-        inventory.setItem(22, named(Material.COMMAND_BLOCK, "${ChatColor.AQUA}Triggers & Actions", listOf(
-            "${ChatColor.GRAY}${region.triggers.values.sumOf { it.size }} 个 action block",
-            "${ChatColor.DARK_GRAY}点击配置进入/离开/开赛/完赛行为。",
+        inventory.setItem(22, named(Material.COMMAND_BLOCK, "${Ui.AQUA}Triggers & Actions", listOf(
+            "${Ui.GRAY}${region.triggers.values.sumOf { it.size }} 个 action block",
+            "${Ui.DARK_GRAY}点击配置进入/离开/开赛/完赛行为。",
         )))
         inventory.setItem(28, named(
             if (region.enabled) Material.REDSTONE_TORCH else Material.LEVER,
-            if (region.enabled) "${ChatColor.YELLOW}点击禁用" else "${ChatColor.GREEN}点击启用",
+            if (region.enabled) "${Ui.YELLOW}点击禁用" else "${Ui.GREEN}点击启用",
         ))
-        inventory.setItem(30, named(Material.WRITABLE_BOOK, "${ChatColor.AQUA}校验配置"))
-        inventory.setItem(32, named(Material.MILK_BUCKET, "${ChatColor.AQUA}清理我的状态", listOf(
-            "${ChatColor.GRAY}用于测试时立刻移除当前玩家的区域效果。",
+        inventory.setItem(30, named(Material.WRITABLE_BOOK, "${Ui.AQUA}校验配置"))
+        inventory.setItem(32, named(Material.MILK_BUCKET, "${Ui.AQUA}清理我的状态", listOf(
+            "${Ui.GRAY}用于测试时立刻移除当前玩家的区域效果。",
         )))
-        inventory.setItem(36, named(Material.LAVA_BUCKET, "${ChatColor.RED}删除区域", listOf(
-            "${ChatColor.GRAY}点击后需要输入区域 ID 确认。",
-            "${ChatColor.RED}会从 regions.yml 移除此区域配置。",
+        inventory.setItem(36, named(Material.LAVA_BUCKET, "${Ui.RED}删除区域", listOf(
+            "${Ui.GRAY}点击后需要输入区域 ID 确认。",
+            "${Ui.RED}会从 regions.yml 移除此区域配置。",
         )))
-        inventory.setItem(34, named(Material.BARRIER, "${ChatColor.RED}返回"))
+        if (plugin.publishing().draft(region.id) != null) {
+            inventory.setItem(38, named(Material.EMERALD, "${Ui.GREEN}发布草稿", listOf(
+                "${Ui.GRAY}校验通过后切换当前发布版本。",
+                "${Ui.GRAY}当前草稿 revision: ${region.revision}",
+            )))
+        }
+        if (plugin.regions().find(region.id)?.lifecycle == org.cubexmc.regions.model.RegionLifecycle.PUBLISHED) {
+            inventory.setItem(40, named(Material.PAPER, "${Ui.YELLOW}撤回已发布版本", listOf(
+                "${Ui.GRAY}停止场地运行并转回草稿。",
+            )))
+        }
+        inventory.setItem(42, named(Material.BOOK, "${Ui.AQUA}版本历史", listOf(
+            "${Ui.GRAY}${plugin.publishing().history(region.id).size} 个已保存版本。",
+            "${Ui.GRAY}点击在聊天中查看 revision 编号。",
+        )))
+        if (plugin.publishing().draft(region.id) != null) {
+            val trial = plugin.trials().active(player.uniqueId)
+            val active = trial?.regionId == region.id
+            inventory.setItem(44, named(
+                if (active) Material.REDSTONE_BLOCK else Material.SPYGLASS,
+                if (active) "${Ui.RED}结束我的隔离试运行" else "${Ui.AQUA}开始我的隔离试运行",
+                listOf(
+                    "${Ui.GRAY}仅把草稿的 Effect 与 Flag 应用于你自己。",
+                    "${Ui.GRAY}不会启动 Mode、执行 Trigger 或影响其他玩家。",
+                ),
+            ))
+        }
+        inventory.setItem(34, named(Material.BARRIER, "${Ui.RED}返回"))
         player.openInventory(inventory)
     }
 
@@ -107,9 +141,16 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
         val holder = event.inventory.holder as? RegionsHolder ?: return
         event.isCancelled = true
         val player = event.whoClicked as? Player ?: return
-        if (!canManage(player)) {
+        if (!canEnterManagement(player)) {
             player.closeInventory()
             return
+        }
+        holder.regionId?.let { regionId ->
+            val region = plugin.publishing().editable(regionId)
+            if (region == null || !canManageRegion(player, region)) {
+                player.closeInventory()
+                return
+            }
         }
         val slot = event.rawSlot
         if (slot < 0 || slot >= event.inventory.size) {
@@ -123,6 +164,9 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             View.FLAGS -> clickFlags(player, holder.regionId ?: return, slot)
             View.EFFECTS -> clickEffects(player, holder.regionId ?: return, slot)
             View.TRIGGERS -> clickTriggers(player, holder.regionId ?: return, slot)
+            View.PUBLISH_PREVIEW -> clickPublishPreview(player, holder.regionId ?: return, slot)
+            View.OWNED_AREAS -> clickOwnedArea(player, holder, event.currentItem, slot)
+            View.TEMPLATES -> clickTemplate(player, holder, event.currentItem, slot)
         }
     }
 
@@ -135,12 +179,15 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             return promptCreateRegion(player)
         }
         if (slot == 47) {
+            if (!allow(player, plugin.authority().canUseGlobalAdministration(player))) return
             plugin.reloadRegions()
             plugin.lang().sendRaw(player, "§aRegions 配置已重载。")
             return openMain(player)
         }
         if (slot == 51) {
-            val issues = plugin.validation().validateAll(plugin.regions().all())
+            val visible = plugin.authority().visibleRegions(player, plugin.regions().all())
+                .map { plugin.publishing().editable(it.id) ?: it }
+            val issues = plugin.validation().validateAll(visible)
             if (issues.isEmpty()) {
                 plugin.lang().sendRaw(player, "§a没有发现配置问题。")
             } else {
@@ -157,7 +204,7 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     private fun clickDetail(player: Player, regionId: String, slot: Int) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
         when (slot) {
             10 -> openSource(player, region.id)
             12 -> openMode(player, region.id)
@@ -171,38 +218,143 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
                 plugin.lang().send(player, "cleanup-done", mapOf("player" to player.name, "count" to count.toString()))
             }
             36 -> promptDeleteRegion(player, region)
+            38 -> {
+                openPublishPreview(player, region.id)
+            }
+            40 -> {
+                val result = plugin.publishing().withdraw(player, region.id)
+                if (result.success) plugin.lang().sendRaw(player, "§e区域 ${region.id} 已撤回为草稿。")
+                else plugin.lang().sendRaw(player, "§c撤回失败: ${result.reason}")
+                openDetail(player, region.id)
+            }
+            42 -> sendRevisionHistory(player, region)
+            44 -> {
+                val active = plugin.trials().active(player.uniqueId)?.regionId == region.id
+                val result = if (active) plugin.trials().stop(player, "gui-stop") else plugin.trials().start(player, region.id)
+                if (result.success) {
+                    plugin.lang().sendRaw(player, if (active) "§e隔离试运行已结束。" else "§a隔离试运行已开始；只有你会受到草稿 Effect 与 Flag 影响。")
+                } else {
+                    plugin.lang().sendRaw(player, "§c试运行失败: ${result.reason}")
+                }
+                openDetail(player, region.id)
+            }
             34 -> openMain(player)
         }
     }
 
+    private fun openPublishPreview(player: Player, regionId: String) {
+        val draft = plugin.publishing().draft(regionId) ?: return openDetail(player, regionId)
+        val report = plugin.publishing().previewReport(player, regionId) ?: return openDetail(player, regionId)
+        val changes = report.changes
+        val issues = report.issues
+        val errors = issues.count { it.severity == org.cubexmc.regions.model.ValidationSeverity.ERROR }
+        val warnings = issues.size - errors
+        val inventory = Bukkit.createInventory(
+            RegionsHolder(View.PUBLISH_PREVIEW, regionId),
+            54,
+            ui("${Ui.DARK_GREEN}发布预览: $regionId"),
+        )
+        changes.take(36).forEachIndexed { index, change ->
+            val material = when {
+                change.before == null -> Material.LIME_DYE
+                change.after == null -> Material.RED_DYE
+                else -> Material.YELLOW_DYE
+            }
+            inventory.setItem(index, named(material, "${Ui.YELLOW}${change.path}", listOf(
+                "${Ui.RED}原值: ${previewValue(change.before)}",
+                "${Ui.GREEN}新值: ${previewValue(change.after)}",
+            )))
+        }
+        if (changes.isEmpty()) {
+            inventory.setItem(22, named(Material.PAPER, "${Ui.GRAY}配置内容没有变化", listOf(
+                "${Ui.GRAY}仍可重新发布，用于恢复已撤回的相同版本。",
+            )))
+        }
+        inventory.setItem(45, named(Material.BARRIER, "${Ui.RED}返回编辑"))
+        inventory.setItem(46, named(
+            if (report.dependencies.all { it.available }) Material.ENDER_CHEST else Material.TRAPPED_CHEST,
+            if (report.dependencies.all { it.available }) "${Ui.GREEN}依赖已满足" else "${Ui.RED}存在缺失依赖",
+            if (report.dependencies.isEmpty()) {
+                listOf("${Ui.GRAY}此配置没有额外插件依赖。")
+            } else {
+                report.dependencies.map { dependency ->
+                    "${if (dependency.available) Ui.GREEN else Ui.RED}${dependency.id}: ${dependency.detail}"
+                }
+            },
+        ))
+        inventory.setItem(47, named(
+            if (errors > 0) Material.REDSTONE_BLOCK else if (warnings > 0) Material.YELLOW_CONCRETE else Material.LIME_CONCRETE,
+            if (errors > 0) "${Ui.RED}发布被阻止: $errors 个错误" else "${Ui.GREEN}校验通过 · $warnings 个警告",
+            issues.take(5).map { issue ->
+                "${if (issue.severity == org.cubexmc.regions.model.ValidationSeverity.ERROR) Ui.RED else Ui.YELLOW}${issue.message}"
+            } + if (issues.size > 5) listOf("${Ui.GRAY}另有 ${issues.size - 5} 项，使用 /regions validate $regionId 查看。") else emptyList(),
+        ))
+        inventory.setItem(49, named(if (errors > 0) Material.BARRIER else Material.EMERALD_BLOCK, if (errors > 0) "${Ui.RED}修复错误后才能发布" else "${Ui.GREEN}确认发布 revision ${draft.revision}", listOf(
+            "${Ui.GRAY}共 ${changes.size} 项变化。",
+            if (changes.size > 36) "${Ui.YELLOW}界面仅展示前 36 项；完整配置仍会校验。" else "${Ui.GRAY}发布前会再次校验权限、owner 与能力。",
+        )))
+        val resolution = report.resolution
+        val displayedMode = resolution.primaryModeRegion
+            ?: resolution.orderedRegions.firstOrNull { it.mode != null }
+        inventory.setItem(48, named(Material.COMPARATOR, "${Ui.AQUA}最终有效规则", listOf(
+            "${Ui.GRAY}Mode: ${displayedMode?.let { "${it.id}:${it.mode?.type}" } ?: "无"}",
+            "${Ui.GRAY}主 Trigger Region: ${resolution.primaryTriggerRegion?.id ?: "无"}",
+            "${Ui.GRAY}Flags: ${resolution.flags.values.joinToString { "${it.key}=${it.config.value}@${it.sourceRegionId}" }.ifBlank { "无" }}",
+            "${Ui.GRAY}Effects: ${resolution.effects.joinToString { "${it.config.type}@${it.sourceRegionId}" }.ifBlank { "无" }}",
+        )))
+        inventory.setItem(50, named(Material.OBSERVER, "${Ui.YELLOW}确定重叠区域: ${resolution.orderedRegions.size}", resolution.orderedRegions.map {
+            "${Ui.GRAY}${it.id} · priority=${it.priority} · ${it.source.type}"
+        }))
+        player.openInventory(inventory)
+    }
+
+    private fun clickPublishPreview(player: Player, regionId: String, slot: Int) {
+        when (slot) {
+            45 -> openDetail(player, regionId)
+            49 -> {
+                val result = plugin.publishing().publish(player, regionId)
+                if (result.success) plugin.lang().sendRaw(player, "§a区域 $regionId 的草稿已发布。")
+                else plugin.lang().sendRaw(player, "§c发布失败: ${result.reason}")
+                openDetail(player, regionId)
+            }
+        }
+    }
+
+    private fun previewValue(value: String?): String {
+        if (value == null) return "<无>"
+        return if (value.length <= 80) value else value.take(77) + "..."
+    }
+
     private fun openSource(player: Player, regionId: String) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
-        val inventory = Bukkit.createInventory(RegionsHolder(View.SOURCE, region.id), 27, "${ChatColor.DARK_GREEN}Source: ${region.id}")
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
+        val inventory = Bukkit.createInventory(RegionsHolder(View.SOURCE, region.id), 27, ui("${Ui.DARK_GREEN}Source: ${region.id}"))
         inventory.setItem(4, regionItem(region))
-        inventory.setItem(10, named(Material.GRASS_BLOCK, "${ChatColor.AQUA}绑定 Lands 领地", listOf(
-            "${ChatColor.GRAY}点击输入 land 名称，再输入 area。",
-            "${ChatColor.GRAY}当前: ${region.source.describe()}",
+        inventory.setItem(10, named(Material.GRASS_BLOCK, "${Ui.AQUA}绑定 Lands 领地", listOf(
+            "${Ui.GRAY}点击从你当前拥有的 Lands area 中选择。",
+            "${Ui.GRAY}当前: ${region.source.describe()}",
         )))
-        inventory.setItem(12, named(Material.STONE_AXE, "${ChatColor.AQUA}绑定 Cuboid", listOf(
-            "${ChatColor.GRAY}左键: 用当前区块生成 Cuboid。",
-            "${ChatColor.GRAY}右键: 输入 world,minX,minY,minZ,maxX,maxY,maxZ。",
+        if (plugin.authority().isSuperAdmin(player)) {
+            inventory.setItem(12, named(Material.STONE_AXE, "${Ui.AQUA}绑定 Cuboid", listOf(
+                "${Ui.GRAY}左键: 用当前区块生成 Cuboid。",
+                "${Ui.GRAY}右键: 输入 world,minX,minY,minZ,maxX,maxY,maxZ。",
+            )))
+        }
+        inventory.setItem(14, named(Material.NAME_TAG, "${Ui.YELLOW}修改显示名称", listOf(
+            "${Ui.GRAY}当前: ${region.name}",
+            "${Ui.GRAY}点击输入新名称。",
         )))
-        inventory.setItem(14, named(Material.NAME_TAG, "${ChatColor.YELLOW}修改显示名称", listOf(
-            "${ChatColor.GRAY}当前: ${region.name}",
-            "${ChatColor.GRAY}点击输入新名称。",
+        inventory.setItem(16, named(Material.COMPARATOR, "${Ui.YELLOW}优先级: ${region.priority}", listOf(
+            "${Ui.GRAY}左键 +1，右键 -1。",
+            "${Ui.GRAY}重叠区域中高优先级更先处理。",
         )))
-        inventory.setItem(16, named(Material.COMPARATOR, "${ChatColor.YELLOW}优先级: ${region.priority}", listOf(
-            "${ChatColor.GRAY}左键 +1，右键 -1。",
-            "${ChatColor.GRAY}重叠区域中高优先级更先处理。",
-        )))
-        inventory.setItem(22, named(Material.BARRIER, "${ChatColor.RED}返回"))
+        inventory.setItem(22, named(Material.BARRIER, "${Ui.RED}返回"))
         player.openInventory(inventory)
     }
 
     private fun clickSource(player: Player, regionId: String, slot: Int, rightClick: Boolean) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
         when (slot) {
-            10 -> promptBindLands(player, region)
+            10 -> openOwnedAreas(player, OwnedAreaContext(OwnedAreaPurpose.BIND, region.id, region.name))
             12 -> if (rightClick) {
                 promptBindCuboid(player, region)
             } else {
@@ -215,69 +367,83 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     private fun openMode(player: Player, regionId: String) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
         val mode = region.mode ?: ModeConfig("free_event")
-        val inventory = Bukkit.createInventory(RegionsHolder(View.MODE, region.id), 54, "${ChatColor.DARK_GREEN}Mode: ${region.id}")
+        val inventory = Bukkit.createInventory(RegionsHolder(View.MODE, region.id), 54, ui("${Ui.DARK_GREEN}Mode: ${region.id}"))
         inventory.setItem(4, regionItem(region))
         inventory.setItem(10, modeItem("free_event", region.mode?.type))
-        inventory.setItem(11, modeItem("run_race", region.mode?.type, listOf("${ChatColor.GRAY}跑步比赛，参赛者不能骑乘载具。")))
+        inventory.setItem(11, modeItem("run_race", region.mode?.type, listOf("${Ui.GRAY}跑步比赛，参赛者不能骑乘载具。")))
         inventory.setItem(12, modeItem("dual_pvp", region.mode?.type, listOf(
-            "${ChatColor.GRAY}双方或多人进场后确认开始。",
-            "${ChatColor.GRAY}可用命令设置 kit、armor、min-players。",
+            "${Ui.GRAY}双方或多人进场后确认开始。",
+            "${Ui.GRAY}可用命令设置 kit、armor、min-players。",
         )))
-        inventory.setItem(13, modeItem("boat_race", region.mode?.type, listOf("${ChatColor.GRAY}划船比赛，参赛者必须坐在船上。")))
+        inventory.setItem(13, modeItem("boat_race", region.mode?.type, listOf("${Ui.GRAY}划船比赛，参赛者必须坐在船上。")))
         inventory.setItem(14, modeItem("union_war", region.mode?.type, listOf(
-            "${ChatColor.GRAY}读取 UnionProvider 判断工会。",
-            "${ChatColor.GRAY}可用命令设置 min-unions、kit、armor。",
+            "${Ui.GRAY}读取 UnionProvider 判断工会。",
+            "${Ui.GRAY}可用命令设置 min-unions、kit、armor。",
         )))
-        inventory.setItem(15, modeItem("horse_race", region.mode?.type, listOf("${ChatColor.GRAY}骑马比赛，参赛者必须骑马。")))
+        inventory.setItem(15, modeItem("horse_race", region.mode?.type, listOf("${Ui.GRAY}骑马比赛，参赛者必须骑马。")))
         inventory.setItem(16, modeItem("hide_and_seek", region.mode?.type, listOf(
-            "${ChatColor.GRAY}藏猫猫小游戏，自动分配寻找者和隐藏者。",
-            "${ChatColor.GRAY}寻找者攻击隐藏者即可找到对方，不造成伤害。",
+            "${Ui.GRAY}藏猫猫小游戏，自动分配寻找者和隐藏者。",
+            "${Ui.GRAY}寻找者攻击隐藏者即可找到对方，不造成伤害。",
         )))
-        inventory.setItem(19, named(Material.PLAYER_HEAD, "${ChatColor.YELLOW}最小人数: ${mode.values["min-players"] ?: "2"}", listOf("${ChatColor.GRAY}左键 +1，右键 -1。")))
-        inventory.setItem(20, named(Material.SKELETON_SKULL, "${ChatColor.YELLOW}最大人数: ${mode.values["max-players"] ?: "不限"}", listOf("${ChatColor.GRAY}左键 +1，右键 -1。", "${ChatColor.GRAY}降到 0 会移除此限制。")))
-        inventory.setItem(21, named(Material.BELL, "${ChatColor.YELLOW}需要全员确认: ${mode.values["require-ready"] ?: "true"}", listOf("${ChatColor.GRAY}点击切换。")))
-        inventory.setItem(22, named(Material.CHEST, "${ChatColor.YELLOW}替换战斗装备: ${mode.values["replace-gear"] ?: "true"}", listOf("${ChatColor.GRAY}点击切换。")))
-        inventory.setItem(23, named(Material.BEACON, "${ChatColor.YELLOW}最小工会数: ${mode.values["min-unions"] ?: "2"}", listOf("${ChatColor.GRAY}union_war 使用。左键 +1，右键 -1。")))
-        inventory.setItem(24, named(Material.MINECART, "${ChatColor.YELLOW}全局检查方式: ${describeVehicle(mode.values["vehicle"] ?: defaultVehicle(mode.type))}", listOf("${ChatColor.GRAY}点击循环: 步行/任意载具/船/马/矿车/不检查。")))
-        inventory.setItem(25, named(Material.ENDER_PEARL, "${ChatColor.AQUA}复活点设为当前位置", listOf("${ChatColor.GRAY}${formatLocation(player.location)}")))
-        inventory.setItem(26, named(Material.TRIPWIRE_HOOK, "${ChatColor.YELLOW}起点检查方式: ${describeVehicle(mode.values["start-vehicle"] ?: mode.values["vehicle"] ?: defaultVehicle(mode.type))}", listOf("${ChatColor.GRAY}点击循环，覆盖全局检查方式。")))
-        inventory.setItem(28, named(Material.IRON_SWORD, "${ChatColor.AQUA}预设: 铁剑决斗", listOf("${ChatColor.GRAY}铁剑、弓、盾、铁甲、食物。")))
-        inventory.setItem(29, named(Material.BOW, "${ChatColor.AQUA}预设: 弓斗", listOf("${ChatColor.GRAY}弓、箭、木剑、皮甲。")))
-        inventory.setItem(30, named(Material.DIAMOND_SWORD, "${ChatColor.AQUA}预设: 钻石战", listOf("${ChatColor.GRAY}钻石剑、弓、盾、钻石甲。")))
-        inventory.setItem(31, named(Material.BARRIER, "${ChatColor.RED}清除战斗装备预设"))
-        inventory.setItem(32, named(Material.REDSTONE, "${ChatColor.YELLOW}终点检查方式: ${describeVehicle(mode.values["finish-vehicle"] ?: mode.values["vehicle"] ?: defaultVehicle(mode.type))}", listOf("${ChatColor.GRAY}点击循环，覆盖全局检查方式。")))
-        inventory.setItem(33, named(Material.LODESTONE, "${ChatColor.YELLOW}当前复活点", listOf("${ChatColor.GRAY}${mode.values["respawn"] ?: mode.values["outside"] ?: "未设置"}")))
-        inventory.setItem(34, named(Material.LAVA_BUCKET, "${ChatColor.RED}清除复活点"))
-        inventory.setItem(36, named(Material.GREEN_WOOL, "${ChatColor.AQUA}起点设为当前位置", listOf("${ChatColor.GRAY}${mode.values["start"] ?: "未设置"}")))
-        inventory.setItem(37, named(Material.RED_WOOL, "${ChatColor.AQUA}终点设为当前位置", listOf("${ChatColor.GRAY}${mode.values["finish"] ?: "未设置"}")))
-        inventory.setItem(38, named(Material.YELLOW_WOOL, "${ChatColor.AQUA}追加检查点", listOf(
-            "${ChatColor.GRAY}当前: ${checkpointCount(mode.values["checkpoints"])} 个",
-            "${ChatColor.GRAY}本检查点方式: ${describeVehicle(mode.values["vehicle"] ?: defaultVehicle(mode.type))}",
-            "${ChatColor.GRAY}${formatLocation(player.location)}",
+        inventory.setItem(19, named(Material.PLAYER_HEAD, "${Ui.YELLOW}最小人数: ${mode.values["min-players"] ?: "2"}", listOf("${Ui.GRAY}左键 +1，右键 -1。")))
+        inventory.setItem(20, named(Material.SKELETON_SKULL, "${Ui.YELLOW}最大人数: ${mode.values["max-players"] ?: "不限"}", listOf("${Ui.GRAY}左键 +1，右键 -1。", "${Ui.GRAY}降到 0 会移除此限制。")))
+        inventory.setItem(21, named(Material.BELL, "${Ui.YELLOW}需要全员确认: ${mode.values["require-ready"] ?: "true"}", listOf("${Ui.GRAY}点击切换。")))
+        inventory.setItem(22, named(Material.CHEST, "${Ui.YELLOW}替换战斗装备: ${mode.values["replace-gear"] ?: "true"}", listOf("${Ui.GRAY}点击切换。")))
+        inventory.setItem(23, named(Material.BEACON, "${Ui.YELLOW}最小工会数: ${mode.values["min-unions"] ?: "2"}", listOf("${Ui.GRAY}union_war 使用。左键 +1，右键 -1。")))
+        inventory.setItem(24, named(Material.MINECART, "${Ui.YELLOW}全局检查方式: ${describeVehicle(mode.values["vehicle"] ?: defaultVehicle(mode.type))}", listOf("${Ui.GRAY}点击循环: 步行/任意载具/船/马/矿车/不检查。")))
+        inventory.setItem(25, named(Material.ENDER_PEARL, "${Ui.AQUA}复活点设为当前位置", listOf("${Ui.GRAY}${formatLocation(player.location)}")))
+        inventory.setItem(26, named(Material.TRIPWIRE_HOOK, "${Ui.YELLOW}起点检查方式: ${describeVehicle(mode.values["start-vehicle"] ?: mode.values["vehicle"] ?: defaultVehicle(mode.type))}", listOf("${Ui.GRAY}点击循环，覆盖全局检查方式。")))
+        inventory.setItem(28, named(Material.IRON_SWORD, "${Ui.AQUA}预设: 铁剑决斗", listOf("${Ui.GRAY}铁剑、弓、盾、铁甲、食物。")))
+        inventory.setItem(29, named(Material.BOW, "${Ui.AQUA}预设: 弓斗", listOf("${Ui.GRAY}弓、箭、木剑、皮甲。")))
+        inventory.setItem(30, named(Material.DIAMOND_SWORD, "${Ui.AQUA}预设: 钻石战", listOf("${Ui.GRAY}钻石剑、弓、盾、钻石甲。")))
+        inventory.setItem(31, named(Material.BARRIER, "${Ui.RED}清除战斗装备预设"))
+        inventory.setItem(32, named(Material.REDSTONE, "${Ui.YELLOW}终点检查方式: ${describeVehicle(mode.values["finish-vehicle"] ?: mode.values["vehicle"] ?: defaultVehicle(mode.type))}", listOf("${Ui.GRAY}点击循环，覆盖全局检查方式。")))
+        inventory.setItem(33, named(Material.LODESTONE, "${Ui.YELLOW}当前复活点", listOf("${Ui.GRAY}${mode.values["respawn"] ?: mode.values["outside"] ?: "未设置"}")))
+        inventory.setItem(34, named(Material.LAVA_BUCKET, "${Ui.RED}清除复活点"))
+        inventory.setItem(36, named(Material.GREEN_WOOL, "${Ui.AQUA}起点设为当前位置", listOf("${Ui.GRAY}${mode.values["start"] ?: "未设置"}")))
+        inventory.setItem(37, named(Material.RED_WOOL, "${Ui.AQUA}终点设为当前位置", listOf("${Ui.GRAY}${mode.values["finish"] ?: "未设置"}")))
+        inventory.setItem(38, named(Material.YELLOW_WOOL, "${Ui.AQUA}追加检查点", listOf(
+            "${Ui.GRAY}当前: ${checkpointCount(mode.values["checkpoints"])} 个",
+            "${Ui.GRAY}本检查点方式: ${describeVehicle(mode.values["vehicle"] ?: defaultVehicle(mode.type))}",
+            "${Ui.GRAY}${formatLocation(player.location)}",
         )))
-        inventory.setItem(39, named(Material.SHEARS, "${ChatColor.RED}清空检查点"))
-        inventory.setItem(40, named(Material.TARGET, "${ChatColor.YELLOW}必须在起点准备: ${mode.values["require-start"] ?: "true"}", listOf("${ChatColor.GRAY}点击切换。")))
-        inventory.setItem(41, named(Material.ENDER_EYE, "${ChatColor.YELLOW}开赛传送到起点: ${mode.values["teleport-start"] ?: "false"}", listOf("${ChatColor.GRAY}点击切换。")))
-        inventory.setItem(42, named(Material.LEVER, "${ChatColor.YELLOW}开赛方式: ${mode.values["start-mode"] ?: "vote"}", listOf("${ChatColor.GRAY}点击切换 vote / judge。")))
-        inventory.setItem(43, named(Material.SLIME_BALL, "${ChatColor.YELLOW}判定半径: ${mode.values["radius"] ?: "2.5"}", listOf("${ChatColor.GRAY}左键 +1，右键 -1。")))
-        inventory.setItem(44, named(Material.NAME_TAG, "${ChatColor.AQUA}裁判加入/移除自己", listOf("${ChatColor.GRAY}当前: ${mode.values["judges"] ?: "无"}")))
-        inventory.setItem(45, named(Material.ENDER_EYE, "${ChatColor.YELLOW}寻找者数量: ${mode.values["seekers"] ?: "自动"}", listOf("${ChatColor.GRAY}hide_and_seek 使用。左键 +1，右键 -1。")))
-        inventory.setItem(46, named(Material.CLOCK, "${ChatColor.YELLOW}躲藏时间: ${mode.values["hide-seconds"] ?: "30"} 秒", listOf("${ChatColor.GRAY}左键 +10 秒，右键 -10 秒。")))
-        inventory.setItem(47, named(Material.RECOVERY_COMPASS, "${ChatColor.YELLOW}回合时长: ${mode.values["round-seconds"] ?: "300"} 秒", listOf("${ChatColor.GRAY}左键 +60 秒，右键 -60 秒。0 表示不限时。")))
-        inventory.setItem(50, named(Material.PLAYER_HEAD, "${ChatColor.YELLOW}被找到后变寻找者: ${mode.values["found-becomes-seeker"] ?: "true"}", listOf("${ChatColor.GRAY}点击切换。")))
-        inventory.setItem(48, named(Material.PAPER, "${ChatColor.YELLOW}高级参数", listOf(
-            "${ChatColor.GRAY}点击输入 key=value。",
-            "${ChatColor.GRAY}输入 clear <key> 可移除参数。",
+        inventory.setItem(39, named(Material.SHEARS, "${Ui.RED}清空检查点"))
+        inventory.setItem(40, named(Material.TARGET, "${Ui.YELLOW}必须在起点准备: ${mode.values["require-start"] ?: "true"}", listOf("${Ui.GRAY}点击切换。")))
+        inventory.setItem(41, named(Material.ENDER_EYE, "${Ui.YELLOW}开赛传送到起点: ${mode.values["teleport-start"] ?: "false"}", listOf("${Ui.GRAY}点击切换。")))
+        inventory.setItem(42, named(Material.LEVER, "${Ui.YELLOW}开赛方式: ${mode.values["start-mode"] ?: "vote"}", listOf("${Ui.GRAY}点击切换 vote / judge。")))
+        inventory.setItem(43, named(Material.SLIME_BALL, "${Ui.YELLOW}判定半径: ${mode.values["radius"] ?: "2.5"}", listOf("${Ui.GRAY}左键 +1，右键 -1。")))
+        inventory.setItem(44, named(Material.NAME_TAG, "${Ui.AQUA}裁判加入/移除自己", listOf("${Ui.GRAY}当前: ${mode.values["judges"] ?: "无"}")))
+        inventory.setItem(45, named(Material.ENDER_EYE, "${Ui.YELLOW}寻找者数量: ${mode.values["seekers"] ?: "自动"}", listOf("${Ui.GRAY}hide_and_seek 使用。左键 +1，右键 -1。")))
+        inventory.setItem(46, named(Material.CLOCK, "${Ui.YELLOW}躲藏时间: ${mode.values["hide-seconds"] ?: "30"} 秒", listOf("${Ui.GRAY}左键 +10 秒，右键 -10 秒。")))
+        inventory.setItem(47, named(Material.RECOVERY_COMPASS, "${Ui.YELLOW}回合时长: ${mode.values["round-seconds"] ?: "300"} 秒", listOf("${Ui.GRAY}左键 +60 秒，右键 -60 秒。0 表示不限时。")))
+        inventory.setItem(50, named(Material.PLAYER_HEAD, "${Ui.YELLOW}被找到后变寻找者: ${mode.values["found-becomes-seeker"] ?: "true"}", listOf("${Ui.GRAY}点击切换。")))
+        inventory.setItem(51, named(Material.CLOCK, "${Ui.YELLOW}比赛超时: ${mode.values["timeout-seconds"] ?: "300"} 秒", listOf("${Ui.GRAY}赛跑模式使用。左键 +60 秒，右键 -60 秒。", "${Ui.GRAY}最少 60 秒。")))
+        inventory.setItem(48, named(Material.PAPER, "${Ui.YELLOW}高级参数", listOf(
+            "${Ui.GRAY}点击输入 key=value。",
+            "${Ui.GRAY}输入 clear <key> 可移除参数。",
         )))
-        inventory.setItem(49, named(Material.BARRIER, "${ChatColor.RED}返回"))
+        inventory.setItem(49, named(Material.BARRIER, "${Ui.RED}返回"))
+        val allowedSlots = modeConfigurationSlots(mode.type).toMutableSet()
+        if (plugin.authority().isSuperAdmin(player)) allowedSlots.add(48)
+        for (slot in MODE_CONFIGURATION_SLOTS) {
+            if (!allowedSlots.contains(slot)) inventory.setItem(slot, null)
+        }
         player.openInventory(inventory)
     }
 
     private fun clickMode(player: Player, regionId: String, slot: Int, rightClick: Boolean) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
         val mode = region.mode ?: ModeConfig("free_event")
+        if (
+            slot in MODE_CONFIGURATION_SLOTS &&
+            slot != 48 &&
+            !modeConfigurationSlots(mode.type).contains(slot)
+        ) {
+            return
+        }
+        if (slot == 48 && !plugin.authority().isSuperAdmin(player)) return
         when (slot) {
             10, 11, 12, 13, 14, 15, 16 -> {
                 val type = when (slot) {
@@ -354,22 +520,24 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             47 -> saveModeValue(player, region, adjustInt(mode.values, "round-seconds", 300, rightClick, min = 0, removeAtZero = true, step = 60))
             48 -> promptModeValue(player, region)
             50 -> saveModeValue(player, region, toggleBool(mode.values, "found-becomes-seeker", true))
+            51 -> saveModeValue(player, region, adjustInt(mode.values, "timeout-seconds", 300, rightClick, min = 60, step = 60))
             49 -> openDetail(player, regionId)
         }
     }
 
     private fun openFlags(player: Player, regionId: String) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
-        val inventory = Bukkit.createInventory(RegionsHolder(View.FLAGS, region.id), 54, "${ChatColor.DARK_GREEN}Flags: ${region.id}")
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
+        val inventory = Bukkit.createInventory(RegionsHolder(View.FLAGS, region.id), 54, ui("${Ui.DARK_GREEN}Flags: ${region.id}"))
         inventory.setItem(4, regionItem(region))
         for ((slot, flag) in FLAG_SLOTS) {
+            if (!plugin.flags().isRegistered(flag)) continue
             inventory.setItem(slot, flagItem(flag, region.flags[flag]?.value ?: "pass"))
         }
-        inventory.setItem(48, named(Material.PAPER, "${ChatColor.YELLOW}高级参数", listOf(
-            "${ChatColor.GRAY}点击输入 <flag> <值> [key=value...]。",
-            "${ChatColor.GRAY}例如 commands deny blocklist=/spawn,/home。",
+        inventory.setItem(48, named(Material.PAPER, "${Ui.YELLOW}高级参数", listOf(
+            "${Ui.GRAY}点击输入 <flag> <值> [key=value...]。",
+            "${Ui.GRAY}例如 commands blocklist values=/spawn,/home。",
         )))
-        inventory.setItem(49, named(Material.BARRIER, "${ChatColor.RED}返回"))
+        inventory.setItem(49, named(Material.BARRIER, "${Ui.RED}返回"))
         player.openInventory(inventory)
     }
 
@@ -378,7 +546,8 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             return openDetail(player, regionId)
         }
         val flag = FLAG_SLOTS[slot] ?: return
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
+        if (!plugin.flags().isRegistered(flag)) return
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
         if (slot == 48) {
             return promptFlag(player, region)
         }
@@ -393,23 +562,23 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     private fun openEffects(player: Player, regionId: String) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
-        val inventory = Bukkit.createInventory(RegionsHolder(View.EFFECTS, region.id), 54, "${ChatColor.DARK_GREEN}Effects: ${region.id}")
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
+        val inventory = Bukkit.createInventory(RegionsHolder(View.EFFECTS, region.id), 54, ui("${Ui.DARK_GREEN}Effects: ${region.id}"))
         inventory.setItem(4, regionItem(region))
         for ((index, effect) in region.effects.take(27).withIndex()) {
             inventory.setItem(index + 9, effectItem(index, effect))
         }
-        inventory.setItem(37, named(Material.AMETHYST_SHARD, "${ChatColor.AQUA}添加缩放 0.35", listOf("${ChatColor.GRAY}小人国常用 effect。")))
-        inventory.setItem(38, named(Material.ENDER_PEARL, "${ChatColor.AQUA}添加缩放 1.60", listOf("${ChatColor.GRAY}巨人场地常用 effect。")))
-        inventory.setItem(39, named(Material.FEATHER, "${ChatColor.AQUA}允许飞行", listOf("${ChatColor.GRAY}离开区域会还原原状态。")))
-        inventory.setItem(40, named(Material.SUGAR, "${ChatColor.AQUA}速度药水", listOf("${ChatColor.GRAY}potion SPEED amplifier=1。")))
-        inventory.setItem(41, named(Material.GLASS_BOTTLE, "${ChatColor.AQUA}压制隐身", listOf("${ChatColor.GRAY}用于 vanish: deny 场地。")))
-        inventory.setItem(43, named(Material.LAVA_BUCKET, "${ChatColor.RED}清空全部 Effects"))
-        inventory.setItem(48, named(Material.PAPER, "${ChatColor.YELLOW}高级参数", listOf(
-            "${ChatColor.GRAY}点击输入 <effect> [key=value...]。",
-            "${ChatColor.GRAY}例如 scale value=0.5 或 potion effect=JUMP。",
+        inventory.setItem(37, named(Material.AMETHYST_SHARD, "${Ui.AQUA}添加缩放 0.35", listOf("${Ui.GRAY}小人国常用 effect。")))
+        inventory.setItem(38, named(Material.ENDER_PEARL, "${Ui.AQUA}添加缩放 1.60", listOf("${Ui.GRAY}巨人场地常用 effect。")))
+        inventory.setItem(39, named(Material.FEATHER, "${Ui.AQUA}允许飞行", listOf("${Ui.GRAY}离开区域会还原原状态。")))
+        inventory.setItem(40, named(Material.SUGAR, "${Ui.AQUA}速度药水", listOf("${Ui.GRAY}potion SPEED amplifier=1。")))
+        inventory.setItem(41, named(Material.GLASS_BOTTLE, "${Ui.AQUA}压制隐身", listOf("${Ui.GRAY}用于 vanish: deny 场地。")))
+        inventory.setItem(43, named(Material.LAVA_BUCKET, "${Ui.RED}清空全部 Effects"))
+        inventory.setItem(48, named(Material.PAPER, "${Ui.YELLOW}高级参数", listOf(
+            "${Ui.GRAY}点击输入 <effect> [key=value...]。",
+            "${Ui.GRAY}例如 scale value=0.5 或 potion effect=JUMP。",
         )))
-        inventory.setItem(49, named(Material.BARRIER, "${ChatColor.RED}返回"))
+        inventory.setItem(49, named(Material.BARRIER, "${Ui.RED}返回"))
         player.openInventory(inventory)
     }
 
@@ -417,7 +586,7 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
         if (slot == 49) {
             return openDetail(player, regionId)
         }
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
         val effects = ArrayList(region.effects)
         if (slot == 48) {
             return promptEffect(player, region)
@@ -447,39 +616,39 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     private fun openTriggers(player: Player, regionId: String) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
-        val inventory = Bukkit.createInventory(RegionsHolder(View.TRIGGERS, region.id), 54, "${ChatColor.DARK_GREEN}Triggers: ${region.id}")
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
+        val inventory = Bukkit.createInventory(RegionsHolder(View.TRIGGERS, region.id), 54, ui("${Ui.DARK_GREEN}Triggers: ${region.id}"))
         inventory.setItem(4, regionItem(region))
         var slot = 9
         for ((trigger, blocks) in region.triggers) {
             if (slot > 35) {
                 break
             }
-            inventory.setItem(slot, named(Material.COMMAND_BLOCK, "${ChatColor.YELLOW}${trigger.key}: ${blocks.size}", blocks.take(4).map {
-                "${ChatColor.GRAY}${it.name ?: "action"} -> ${it.thenActions.joinToString(", ") { action -> action.type }}"
-            } + listOf("${ChatColor.RED}点击清空这个触发器。")))
+            inventory.setItem(slot, named(Material.COMMAND_BLOCK, "${Ui.YELLOW}${trigger.key}: ${blocks.size}", blocks.take(4).map {
+                "${Ui.GRAY}${it.name ?: "action"} [${it.execution.name.lowercase(Locale.ROOT)}] -> ${it.thenActions.joinToString(", ") { action -> action.type }}"
+            } + listOf("${Ui.RED}点击清空这个触发器。")))
             slot += 1
         }
-        inventory.setItem(37, named(Material.OAK_DOOR, "${ChatColor.AQUA}模板: 进入提示", listOf(
-            "${ChatColor.GRAY}on_enter -> message text=欢迎进入区域",
+        inventory.setItem(37, named(Material.OAK_DOOR, "${Ui.AQUA}模板: 进入提示", listOf(
+            "${Ui.GRAY}on_enter -> message text=欢迎进入区域",
         )))
-        inventory.setItem(38, named(Material.FIREWORK_ROCKET, "${ChatColor.AQUA}模板: 开赛标题", listOf(
-            "${ChatColor.GRAY}on_mode_start -> title title=开始!",
+        inventory.setItem(38, named(Material.FIREWORK_ROCKET, "${Ui.AQUA}模板: 开赛标题", listOf(
+            "${Ui.GRAY}on_mode_start -> title title=开始!",
         )))
-        inventory.setItem(39, named(Material.GOLD_INGOT, "${ChatColor.AQUA}模板: 完赛广播", listOf(
-            "${ChatColor.GRAY}on_finish -> broadcast text={player} 完成比赛",
+        inventory.setItem(39, named(Material.GOLD_INGOT, "${Ui.AQUA}模板: 完赛广播", listOf(
+            "${Ui.GRAY}on_finish -> broadcast text={player} 完成比赛",
         )))
-        inventory.setItem(41, named(Material.PAPER, "${ChatColor.YELLOW}添加 Action", listOf(
-            "${ChatColor.GRAY}输入 <trigger> <action> [key=value...]。",
-            "${ChatColor.GRAY}例如 on_enter message text=欢迎 {player}",
+        inventory.setItem(41, named(Material.PAPER, "${Ui.YELLOW}添加 Action", listOf(
+            "${Ui.GRAY}输入 <trigger> <action> [key=value...]。",
+            "${Ui.GRAY}例如 on_enter message text=欢迎 {player}",
         )))
-        inventory.setItem(43, named(Material.LAVA_BUCKET, "${ChatColor.RED}清空全部 Triggers"))
-        inventory.setItem(49, named(Material.BARRIER, "${ChatColor.RED}返回"))
+        inventory.setItem(43, named(Material.LAVA_BUCKET, "${Ui.RED}清空全部 Triggers"))
+        inventory.setItem(49, named(Material.BARRIER, "${Ui.RED}返回"))
         player.openInventory(inventory)
     }
 
     private fun clickTriggers(player: Player, regionId: String, slot: Int) {
-        val region = plugin.regions().find(regionId) ?: return openMain(player)
+        val region = plugin.publishing().editable(regionId) ?: return openMain(player)
         if (slot == 49) {
             return openDetail(player, regionId)
         }
@@ -508,39 +677,170 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
                 openMain(player)
                 return@promptLine
             }
-            if (plugin.regions().find(id) != null) {
+            if (plugin.publishing().editable(id) != null) {
                 plugin.lang().sendRaw(player, "§c区域 $id 已存在。")
                 openMain(player)
                 return@promptLine
             }
             promptLine(player, "§a请输入区域显示名称。输入 - 使用 ID 作为名称。") { rawName ->
                 val name = rawName.trim().takeUnless { it == "-" || it.isBlank() } ?: id
-                val region = RegionDefinition(
-                    id = id,
-                    name = name,
-                    source = cuboidFromCurrentChunk(player, id),
-                    ownerPolicy = OwnerPolicy.ADMIN,
-                    mode = ModeConfig("free_event"),
-                )
-                saveAndReopen(player, region) { openDetail(player, id) }
+                openOwnedAreas(player, OwnedAreaContext(OwnedAreaPurpose.CREATE, id, name))
             }
         }
     }
 
-    private fun promptBindLands(player: Player, region: RegionDefinition) {
-        promptLine(player, "§a请输入 Lands 领地名称。输入 cancel 取消。") { land ->
-            val landName = land.trim()
-            if (landName.isBlank()) {
-                plugin.lang().sendRaw(player, "§c领地名称不能为空。")
-                openSource(player, region.id)
-                return@promptLine
+    private fun openOwnedAreas(player: Player, context: OwnedAreaContext) {
+        val source = plugin.sources().find("lands")
+        if (source == null || !source.isAvailable()) {
+            plugin.lang().sendRaw(player, "§cLands 当前不可用，无法读取你拥有的 area。")
+            return if (context.purpose == OwnedAreaPurpose.BIND) openSource(player, context.targetId) else openMain(player)
+        }
+        val options = source.getOwnedRegions(player.uniqueId)
+        val pageCount = ((options.size + OWNED_AREA_PAGE_SIZE - 1) / OWNED_AREA_PAGE_SIZE).coerceAtLeast(1)
+        val page = context.page.coerceIn(0, pageCount - 1)
+        val shownContext = context.copy(page = page)
+        val holderRegion = context.targetId.takeIf { context.purpose == OwnedAreaPurpose.BIND }
+        val inventory = Bukkit.createInventory(
+            RegionsHolder(View.OWNED_AREAS, holderRegion, shownContext),
+            54,
+            ui("${Ui.DARK_GREEN}选择 Lands Area ${page + 1}/$pageCount"),
+        )
+        for ((slot, option) in options.drop(page * OWNED_AREA_PAGE_SIZE).take(OWNED_AREA_PAGE_SIZE).withIndex()) {
+            val land = option.values["land"] ?: continue
+            val area = option.values["area"] ?: "default"
+            val item = named(Material.GRASS_BLOCK, "${Ui.GREEN}${option.name}", listOf(
+                "${Ui.GRAY}Land: $land",
+                "${Ui.GRAY}Area: $area",
+                "${Ui.YELLOW}点击选择；保存前会再次检查主人身份。",
+            ))
+            item.itemMeta?.let { meta ->
+                meta.persistentDataContainer.set(landKey(), PersistentDataType.STRING, land)
+                meta.persistentDataContainer.set(areaKey(), PersistentDataType.STRING, area)
+                item.itemMeta = meta
             }
-            promptLine(player, "§a请输入 Lands area 名称。输入 - 使用 default。") { area ->
-                val areaName = area.trim().takeUnless { it == "-" || it.isBlank() } ?: "default"
-                val source = RegionSourceRef("lands", linkedMapOf("land" to landName, "area" to areaName))
-                saveAndReopen(player, region.copy(source = source, ownerPolicy = OwnerPolicy.LANDS_OWNER)) { openSource(player, region.id) }
+            inventory.setItem(slot, item)
+        }
+        if (options.isEmpty()) {
+            inventory.setItem(22, named(Material.BARRIER, "${Ui.RED}没有可用的 Lands area", listOf(
+                "${Ui.GRAY}只有当前主人为你、且你同时拥有统治者权限的 area 才能使用。",
+            )))
+        }
+        if (page > 0) inventory.setItem(45, named(Material.ARROW, "${Ui.YELLOW}上一页"))
+        inventory.setItem(49, named(Material.MAP, "${Ui.AQUA}${options.size} 个可用 area", listOf(
+            "${Ui.GRAY}页面 ${page + 1}/$pageCount",
+        )))
+        if (page + 1 < pageCount) inventory.setItem(53, named(Material.ARROW, "${Ui.YELLOW}下一页"))
+        inventory.setItem(50, named(Material.BARRIER, "${Ui.RED}返回"))
+        player.openInventory(inventory)
+    }
+
+    private fun clickOwnedArea(player: Player, holder: RegionsHolder, item: ItemStack?, slot: Int) {
+        val context = holder.ownedArea ?: return openMain(player)
+        when (slot) {
+            45 -> return openOwnedAreas(player, context.copy(page = context.page - 1))
+            50 -> return if (context.purpose == OwnedAreaPurpose.BIND) openSource(player, context.targetId) else openMain(player)
+            53 -> return openOwnedAreas(player, context.copy(page = context.page + 1))
+        }
+        if (slot !in 0 until OWNED_AREA_PAGE_SIZE) return
+        val meta = item?.itemMeta ?: return
+        val land = meta.persistentDataContainer.get(landKey(), PersistentDataType.STRING) ?: return
+        val area = meta.persistentDataContainer.get(areaKey(), PersistentDataType.STRING) ?: return
+        val ref = RegionSourceRef("lands", linkedMapOf("land" to land, "area" to area))
+        if (!allow(player, plugin.authority().canCreate(player, ref))) {
+            plugin.lang().sendRaw(player, "§e该 area 的主人身份可能刚刚发生变化，列表已刷新。")
+            return openOwnedAreas(player, context)
+        }
+        when (context.purpose) {
+            OwnedAreaPurpose.CREATE -> {
+                if (plugin.publishing().editable(context.targetId) != null) {
+                    plugin.lang().sendRaw(player, "§c区域 ${context.targetId} 已存在，请重新创建。")
+                    return openMain(player)
+                }
+                openTemplates(player, TemplateContext(context.targetId, context.targetName, ref))
+            }
+            OwnedAreaPurpose.BIND -> {
+                val region = plugin.publishing().editable(context.targetId) ?: return openMain(player)
+                saveAndReopen(player, region.copy(source = ref, ownerPolicy = OwnerPolicy.LANDS_OWNER)) {
+                    openSource(player, region.id)
+                }
             }
         }
+    }
+
+    private fun openTemplates(player: Player, context: TemplateContext) {
+        val templates = plugin.templates().all()
+        val pageCount = ((templates.size + TEMPLATE_PAGE_SIZE - 1) / TEMPLATE_PAGE_SIZE).coerceAtLeast(1)
+        val page = context.page.coerceIn(0, pageCount - 1)
+        val shownContext = context.copy(page = page)
+        val inventory = Bukkit.createInventory(
+            RegionsHolder(View.TEMPLATES, ownedArea = null, template = shownContext),
+            54,
+            ui("${Ui.DARK_GREEN}选择场地模板 ${page + 1}/$pageCount"),
+        )
+        for ((slot, template) in templates.drop(page * TEMPLATE_PAGE_SIZE).take(TEMPLATE_PAGE_SIZE).withIndex()) {
+            val triggerCount = template.triggers.values.sumOf { it.size }
+            val lore = ArrayList<String>()
+            lore.add("${Ui.GRAY}${template.description}")
+            lore.add("${Ui.DARK_GRAY}将应用以下配置：")
+            lore.add("${Ui.GRAY}Mode: ${template.mode?.type ?: "none"}")
+            lore.add("${Ui.GRAY}Flags: ${template.flags.keys.joinToString(", ").ifBlank { "无" }}")
+            lore.add("${Ui.GRAY}Effects: ${template.effects.joinToString(", ") { it.type }.ifBlank { "无" }}")
+            lore.add("${Ui.GRAY}Triggers: $triggerCount")
+            if (template.parameters.isNotEmpty()) lore.add("${Ui.YELLOW}参数: ${template.parameters.keys.joinToString(", ")}")
+            lore.add("${Ui.GREEN}点击验证并创建场地。")
+            val item = named(templateMaterial(template.mode?.type), "${Ui.AQUA}${template.name}", lore)
+            item.itemMeta?.let { meta ->
+                meta.persistentDataContainer.set(templateKey(), PersistentDataType.STRING, template.id)
+                item.itemMeta = meta
+            }
+            inventory.setItem(slot, item)
+        }
+        if (templates.isEmpty()) {
+            inventory.setItem(22, named(Material.BARRIER, "${Ui.RED}没有可用模板", listOf(
+                "${Ui.GRAY}请检查 templates.yml。",
+            )))
+        }
+        if (page > 0) inventory.setItem(45, named(Material.ARROW, "${Ui.YELLOW}上一页"))
+        inventory.setItem(49, named(Material.BOOK, "${Ui.AQUA}${templates.size} 个模板", listOf(
+            "${Ui.GRAY}页面 ${page + 1}/$pageCount",
+            "${Ui.GRAY}模板会先经过能力 schema 和完整 Region 校验。",
+        )))
+        inventory.setItem(50, named(Material.BARRIER, "${Ui.RED}返回选择 Area"))
+        if (page + 1 < pageCount) inventory.setItem(53, named(Material.ARROW, "${Ui.YELLOW}下一页"))
+        player.openInventory(inventory)
+    }
+
+    private fun clickTemplate(player: Player, holder: RegionsHolder, item: ItemStack?, slot: Int) {
+        val context = holder.template ?: return openMain(player)
+        when (slot) {
+            45 -> return openTemplates(player, context.copy(page = context.page - 1))
+            50 -> return openOwnedAreas(player, OwnedAreaContext(OwnedAreaPurpose.CREATE, context.targetId, context.targetName))
+            53 -> return openTemplates(player, context.copy(page = context.page + 1))
+        }
+        if (slot !in 0 until TEMPLATE_PAGE_SIZE) return
+        val templateId = item?.itemMeta?.persistentDataContainer?.get(templateKey(), PersistentDataType.STRING) ?: return
+        if (!allow(player, plugin.authority().canCreate(player, context.source))) {
+            plugin.lang().sendRaw(player, "§e该 Lands area 的主人身份已变化，请重新选择。")
+            return openOwnedAreas(player, OwnedAreaContext(OwnedAreaPurpose.CREATE, context.targetId, context.targetName))
+        }
+        if (plugin.publishing().editable(context.targetId) != null) {
+            plugin.lang().sendRaw(player, "§c区域 ${context.targetId} 已存在，请重新创建。")
+            return openMain(player)
+        }
+        val base = RegionDefinition(
+            id = context.targetId,
+            name = context.targetName,
+            source = context.source,
+            ownerPolicy = OwnerPolicy.LANDS_OWNER,
+            mode = ModeConfig("free_event"),
+        )
+        val applied = plugin.templates().apply(templateId, base)
+        val region = applied.region
+        if (!applied.success || region == null) {
+            plugin.lang().sendRaw(player, "§c模板无法应用: ${applied.errors.joinToString("; ")}")
+            return openTemplates(player, context)
+        }
+        saveAndReopen(player, region) { openDetail(player, region.id) }
     }
 
     private fun promptBindCuboid(player: Player, region: RegionDefinition) {
@@ -585,11 +885,13 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
                 openDetail(player, region.id)
                 return@promptLine
             }
-            plugin.sessions().cleanupAll("gui-delete-${region.id}")
+            if (!canManageRegion(player, region)) return@promptLine
+            plugin.sessions().cleanupRegionAll(region.id, "gui-delete-${region.id}")
             val result = plugin.regions().remove(region.id)
             if (!result.success) {
                 plugin.lang().sendRaw(player, "§c删除失败: ${result.reason}")
             } else {
+                plugin.audit().record(player, region.id, "region.remove", "gui")
                 plugin.lang().sendRaw(player, "§a已删除区域 ${region.id}。")
             }
             openMain(player)
@@ -617,7 +919,7 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     private fun promptFlag(player: Player, region: RegionDefinition) {
-        promptLine(player, "§a请输入 <flag> <值> [key=value...]，例如 commands deny blocklist=/spawn,/home。") { raw ->
+        promptLine(player, "§a请输入 <flag> <值> [key=value...]，例如 commands blocklist values=/spawn,/home。") { raw ->
             val args = splitArgs(raw)
             if (args.size < 2) {
                 plugin.lang().sendRaw(player, "§c请输入 <flag> <值>。")
@@ -637,7 +939,7 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     private fun promptEffect(player: Player, region: RegionDefinition) {
-        promptLine(player, "§a请输入 <effect> [key=value...]，例如 scale value=0.5 或 potion effect=SPEED amplifier=1。") { raw ->
+        promptLine(player, "§a请输入 <effect> [key=value...]；可用 combination=highest_priority|exclusive|stack|merge_by_type。") { raw ->
             val args = splitArgs(raw)
             if (args.isEmpty()) {
                 plugin.lang().sendRaw(player, "§cEffect 类型不能为空。")
@@ -646,14 +948,15 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             }
             val values = parsePairs(args.drop(1))
             val scope = parseEffectScope(values.remove("scope"))
+            val combination = parseEffectCombination(values.remove("combination"))
             val effects = ArrayList(region.effects)
-            effects.add(EffectConfig(args[0].lowercase(Locale.ROOT), scope, values))
+            effects.add(EffectConfig(args[0].lowercase(Locale.ROOT), scope, values, combination))
             saveAndReopen(player, region.copy(effects = effects)) { openEffects(player, region.id) }
         }
     }
 
     private fun promptTriggerAction(player: Player, region: RegionDefinition) {
-        promptLine(player, "§a请输入 <trigger> <action> [key=value...]，例如 on_enter message text=\"欢迎 {player}\"。") { raw ->
+        promptLine(player, "§a请输入 <trigger> <action> [key=value...]；execution=primary 可限制为主 Region 执行。") { raw ->
             val args = splitArgs(raw)
             if (args.size < 2) {
                 plugin.lang().sendRaw(player, "§c请输入 <trigger> <action>。")
@@ -666,8 +969,17 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
                 openTriggers(player, region.id)
                 return@promptLine
             }
-            val action = ActionConfig(args[1].lowercase(Locale.ROOT), parsePairs(args.drop(2)))
-            val block = ActionBlockConfig("gui-${trigger.key}-${action.type}", thenActions = listOf(action))
+            val values = parsePairs(args.drop(2))
+            val execution = when (values.remove("execution")?.lowercase(Locale.ROOT)) {
+                "primary", "primary_region", "primary-region" -> TriggerExecution.PRIMARY_REGION
+                else -> TriggerExecution.ALL_ACTIVE
+            }
+            val action = ActionConfig(args[1].lowercase(Locale.ROOT), values)
+            val block = ActionBlockConfig(
+                "gui-${trigger.key}-${action.type}",
+                thenActions = listOf(action),
+                execution = execution,
+            )
             saveAndReopen(player, region.copy(triggers = appendTrigger(region.triggers, trigger, block))) { openTriggers(player, region.id) }
         }
     }
@@ -680,10 +992,10 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    fun onChat(event: AsyncPlayerChatEvent) {
+    fun onChat(event: AsyncChatEvent) {
         val pending = pendingInputs.remove(event.player.uniqueId) ?: return
         event.isCancelled = true
-        val message = event.message
+        val message = PlainTextComponentSerializer.plainText().serialize(event.message())
         plugin.regionScheduler().runAtEntity(event.player, Runnable {
             if (message.trim().equals("cancel", ignoreCase = true) || message.trim() == "取消") {
                 plugin.lang().sendRaw(event.player, "§7已取消。")
@@ -700,13 +1012,42 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
     }
 
     private fun saveAndReopen(player: Player, region: RegionDefinition, reopen: () -> Unit) {
-        val result = plugin.regions().put(region)
+        val existing = plugin.publishing().editable(region.id)
+        if (existing != null && !canManageRegion(player, existing)) return
+        val candidate = withOwnerSnapshot(region)
+        if (!canManageRegion(player, candidate)) return
+        val result = if (existing == null) {
+            plugin.publishing().createDraft(player, candidate)
+        } else {
+            plugin.publishing().saveDraft(player, candidate)
+        }
         if (!result.success) {
             plugin.lang().sendRaw(player, "§c操作失败: ${result.reason}")
             return
         }
-        plugin.lang().sendRaw(player, "§a已保存区域 ${region.id}。")
+        plugin.lang().sendRaw(player, "§a已保存区域 ${region.id} 的草稿。")
         reopen()
+    }
+
+    private fun sendRevisionHistory(player: Player, region: RegionDefinition) {
+        val revisions = plugin.publishing().history(region.id)
+        plugin.lang().sendRaw(player, "§6${region.id} 的已发布版本 (${revisions.size})")
+        if (revisions.isEmpty()) plugin.lang().sendRaw(player, "§7暂无已发布历史。")
+        revisions.take(20).forEach { snapshot ->
+            plugin.lang().sendRaw(
+                player,
+                "§7- §e#${snapshot.revision} §f${snapshot.name} §8mode=${snapshot.mode?.type ?: "none"}",
+            )
+        }
+        plugin.lang().sendRaw(player, "§7回滚命令: /regions rollback ${region.id} <revision>")
+    }
+
+    private fun withOwnerSnapshot(region: RegionDefinition): RegionDefinition {
+        val metadata = LinkedHashMap(region.metadata)
+        val ownerId = plugin.sources().find(region.source.type)?.ownerId(region.source)
+        if (ownerId == null) metadata.remove(org.cubexmc.regions.service.RegionAuthorityService.SOURCE_OWNER_METADATA)
+        else metadata[org.cubexmc.regions.service.RegionAuthorityService.SOURCE_OWNER_METADATA] = ownerId.toString()
+        return region.copy(metadata = metadata)
     }
 
     private fun saveModeValue(player: Player, region: RegionDefinition, values: Map<String, String>) {
@@ -812,6 +1153,14 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             else -> EffectScope.WHILE_INSIDE
         }
 
+    private fun parseEffectCombination(value: String?): EffectCombination =
+        when (value?.lowercase(Locale.ROOT)) {
+            "exclusive" -> EffectCombination.EXCLUSIVE
+            "stack" -> EffectCombination.STACK
+            "merge_by_type", "merge-by-type", "merge" -> EffectCombination.MERGE_BY_TYPE
+            else -> EffectCombination.HIGHEST_PRIORITY
+        }
+
     private fun parsePairs(args: List<String>): MutableMap<String, String> {
         val values = LinkedHashMap<String, String>()
         for (arg in args) {
@@ -860,13 +1209,14 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
         val material = if (region.enabled) Material.EMERALD_BLOCK else Material.COAL_BLOCK
         val item = named(
             material,
-            "${ChatColor.YELLOW}${region.name}",
+            "${Ui.YELLOW}${region.name}",
             listOf(
-                "${ChatColor.GRAY}ID: ${region.id}",
-                "${ChatColor.GRAY}Source: ${region.source.describe()}",
-                "${ChatColor.GRAY}Mode: ${region.mode?.type ?: "none"}",
-                "${ChatColor.GRAY}Flags: ${region.flags.size}",
-                "${ChatColor.GRAY}Effects: ${region.effects.size}",
+                "${Ui.GRAY}ID: ${region.id}",
+                "${Ui.GRAY}Source: ${region.source.describe()}",
+                "${Ui.GRAY}Lifecycle: ${region.lifecycle.name.lowercase(Locale.ROOT)} · r${region.revision}",
+                "${Ui.GRAY}Mode: ${region.mode?.type ?: "none"}",
+                "${Ui.GRAY}Flags: ${region.flags.size}",
+                "${Ui.GRAY}Effects: ${region.effects.size}",
             ),
         )
         val meta = item.itemMeta
@@ -889,9 +1239,18 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             else -> Material.CAMPFIRE
         }
         val lore = ArrayList<String>()
-        lore.add(if (active) "${ChatColor.GREEN}当前模式" else "${ChatColor.GRAY}点击切换到此模式")
+        lore.add(if (active) "${Ui.GREEN}当前模式" else "${Ui.GRAY}点击切换到此模式")
         lore.addAll(extraLore)
-        return named(material, "${if (active) ChatColor.GREEN else ChatColor.YELLOW}${type}", lore)
+        return named(material, "${if (active) Ui.GREEN else Ui.YELLOW}${type}", lore)
+    }
+
+    private fun templateMaterial(type: String?): Material = when (type?.lowercase(Locale.ROOT)) {
+        "dual_pvp", "union_war" -> Material.DIAMOND_SWORD
+        "run_race" -> Material.LEATHER_BOOTS
+        "boat_race" -> Material.OAK_BOAT
+        "horse_race" -> Material.SADDLE
+        "hide_and_seek" -> Material.ENDER_EYE
+        else -> Material.CAMPFIRE
     }
 
     private fun flagItem(flag: String, value: String): ItemStack {
@@ -901,29 +1260,32 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             "allow" -> Material.LIME_CONCRETE
             else -> Material.GRAY_CONCRETE
         }
-        return named(material, "${ChatColor.YELLOW}${flag}: ${statusColor(normalized)}${normalized}", listOf(
-            "${ChatColor.GRAY}点击循环: pass -> deny -> allow",
-            "${ChatColor.DARK_GRAY}pass 表示不覆盖 Lands 或服务器规则。",
+        return named(material, "${Ui.YELLOW}${flag}: ${statusColor(normalized)}${normalized}", listOf(
+            "${Ui.GRAY}点击循环: pass -> deny -> allow",
+            "${Ui.DARK_GRAY}pass 表示不覆盖 Lands 或服务器规则。",
         ))
     }
 
     private fun effectItem(index: Int, effect: EffectConfig): ItemStack =
-        named(Material.BLAZE_POWDER, "${ChatColor.YELLOW}${index + 1}. ${effect.type}", listOf(
-            "${ChatColor.GRAY}scope: ${effect.scope.name.lowercase(Locale.ROOT)}",
-            "${ChatColor.GRAY}${effect.values.entries.joinToString(", ") { "${it.key}=${it.value}" }.ifBlank { "无参数" }}",
-            "${ChatColor.RED}点击移除此 effect。",
+        named(Material.BLAZE_POWDER, "${Ui.YELLOW}${index + 1}. ${effect.type}", listOf(
+            "${Ui.GRAY}scope: ${effect.scope.name.lowercase(Locale.ROOT)}",
+            "${Ui.GRAY}combination: ${effect.combination.name.lowercase(Locale.ROOT)}",
+            "${Ui.GRAY}${effect.values.entries.joinToString(", ") { "${it.key}=${it.value}" }.ifBlank { "无参数" }}",
+            "${Ui.RED}点击移除此 effect。",
         ))
 
     private fun named(material: Material, name: String, lore: List<String> = emptyList()): ItemStack {
         val item = ItemStack(material)
         val meta = item.itemMeta
         if (meta != null) {
-            meta.setDisplayName(name)
-            meta.lore = lore
+            meta.displayName(ui(name))
+            meta.lore(lore.map { ui(it) })
             item.itemMeta = meta
         }
         return item
     }
+
+    private fun ui(value: String): Component = PaperText.parse(value)
 
     private fun formatLocation(location: org.bukkit.Location): String =
         "${location.world?.name ?: "world"},${"%.2f".format(Locale.ROOT, location.x)},${"%.2f".format(Locale.ROOT, location.y)},${"%.2f".format(Locale.ROOT, location.z)},${"%.2f".format(Locale.ROOT, location.yaw)},${"%.2f".format(Locale.ROOT, location.pitch)}"
@@ -954,9 +1316,19 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
         when (type) {
             "dual_pvp" -> linkedMapOf("min-players" to "2", "require-ready" to "true", "replace-gear" to "true")
             "union_war" -> linkedMapOf("min-players" to "2", "min-unions" to "2", "require-ready" to "true", "replace-gear" to "true")
-            "run_race", "boat_race", "horse_race" -> linkedMapOf("min-players" to "1", "start-mode" to "vote", "require-start" to "true", "radius" to "2.5", "vehicle" to defaultVehicle(type))
+            "run_race", "boat_race", "horse_race" -> linkedMapOf("min-players" to "1", "start-mode" to "vote", "require-start" to "true", "radius" to "2.5", "timeout-seconds" to "300", "vehicle" to defaultVehicle(type))
             "hide_and_seek" -> linkedMapOf("min-players" to "2", "start-mode" to "vote", "hide-seconds" to "30", "round-seconds" to "300", "found-becomes-seeker" to "true")
             else -> emptyMap()
+        }
+
+    private fun modeConfigurationSlots(type: String): Set<Int> =
+        when (type.lowercase(Locale.ROOT)) {
+            "dual_pvp" -> setOf(19, 20, 21, 22, 25, 28, 29, 30, 31, 33, 34)
+            "union_war" -> setOf(19, 20, 21, 22, 23, 25, 28, 29, 30, 31, 33, 34)
+            "run_race", "boat_race", "horse_race" ->
+                setOf(19, 20, 24, 26, 32, 36, 37, 38, 39, 40, 41, 42, 43, 44, 51)
+            "hide_and_seek" -> setOf(19, 20, 21, 22, 25, 33, 34, 42, 44, 45, 46, 47, 50)
+            else -> emptySet()
         }
 
     private fun nextFlagValue(value: String): String =
@@ -966,22 +1338,31 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             else -> "pass"
         }
 
-    private fun statusColor(value: String): ChatColor =
+    private fun statusColor(value: String): String =
         when (value) {
-            "deny" -> ChatColor.RED
-            "allow" -> ChatColor.GREEN
-            else -> ChatColor.GRAY
+            "deny" -> Ui.RED
+            "allow" -> Ui.GREEN
+            else -> Ui.GRAY
         }
 
-    private fun canManage(player: Player): Boolean {
-        if (player.hasPermission("regions.admin")) {
-            return true
-        }
-        plugin.lang().send(player, "no-permission")
+    private fun canEnterManagement(player: Player): Boolean =
+        allow(player, plugin.authority().canEnterManagement(player))
+
+    private fun canManageRegion(player: Player, region: RegionDefinition): Boolean =
+        allow(player, plugin.authority().canManage(player, region))
+
+    private fun allow(player: Player, decision: AuthorityDecision): Boolean {
+        if (decision.allowed) return true
+        plugin.lang().send(player, decision.denial?.messageKey ?: "no-permission")
         return false
     }
 
-    private class RegionsHolder(val view: View, val regionId: String? = null) : InventoryHolder {
+    private class RegionsHolder(
+        val view: View,
+        val regionId: String? = null,
+        val ownedArea: OwnedAreaContext? = null,
+        val template: TemplateContext? = null,
+    ) : InventoryHolder {
         override fun getInventory(): Inventory = Bukkit.createInventory(null, 9)
     }
 
@@ -995,11 +1376,40 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
         FLAGS,
         EFFECTS,
         TRIGGERS,
+        PUBLISH_PREVIEW,
+        OWNED_AREAS,
+        TEMPLATES,
     }
+
+    private enum class OwnedAreaPurpose { CREATE, BIND }
+
+    private data class OwnedAreaContext(
+        val purpose: OwnedAreaPurpose,
+        val targetId: String,
+        val targetName: String,
+        val page: Int = 0,
+    )
+
+    private data class TemplateContext(
+        val targetId: String,
+        val targetName: String,
+        val source: RegionSourceRef,
+        val page: Int = 0,
+    )
 
     private fun regionKey(): NamespacedKey = NamespacedKey(plugin, "region_id")
 
+    private fun landKey(): NamespacedKey = NamespacedKey(plugin, "owned_land")
+
+    private fun areaKey(): NamespacedKey = NamespacedKey(plugin, "owned_area")
+
+    private fun templateKey(): NamespacedKey = NamespacedKey(plugin, "region_template")
+
     companion object {
+        private const val OWNED_AREA_PAGE_SIZE = 45
+        private const val TEMPLATE_PAGE_SIZE = 45
+        private val MODE_CONFIGURATION_SLOTS =
+            setOf(19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 50, 51)
         private val FLAG_SLOTS = linkedMapOf(
             10 to "pvp",
             11 to "fly",
@@ -1012,5 +1422,15 @@ class RegionsGui(private val plugin: RegionsPlugin) : Listener {
             20 to "commands",
             21 to "teleport_out",
         )
+    }
+
+    private object Ui {
+        const val DARK_GREEN = "&2"
+        const val AQUA = "&b"
+        const val GRAY = "&7"
+        const val GREEN = "&a"
+        const val YELLOW = "&e"
+        const val RED = "&c"
+        const val DARK_GRAY = "&8"
     }
 }

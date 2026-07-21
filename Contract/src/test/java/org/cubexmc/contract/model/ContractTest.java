@@ -248,4 +248,28 @@ class ContractTest {
         assertEquals("ANY", objective.target());
         assertTrue(objective.matches("hello"));
     }
+
+    @Test
+    void objectiveChatTargetPreservesCaseAndMatchesExactText() {
+        ContractObjective objective = ContractObjective.of(ObjectiveType.CHAT, "  Hello World  ", 1);
+
+        assertEquals("Hello World", objective.target());
+        assertTrue(objective.matches("Hello World"));
+        assertTrue(objective.matches("  Hello World  "));
+        assertFalse(objective.matches("hello world"));
+        assertFalse(objective.matches("HELLO WORLD"));
+        assertFalse(objective.matches("Hello  World"));
+        assertFalse(objective.matches("Hello World!"));
+    }
+
+    @Test
+    void objectiveStoredChatTargetKeepsCaseSensitiveSemantics() {
+        ContractObjective restored = ContractObjective.fromMap(
+            java.util.Map.of("type", "CHAT", "target", "Use APIKey", "required", 1, "progress", 0)
+        );
+
+        assertEquals("Use APIKey", restored.target());
+        assertTrue(restored.matches("Use APIKey"));
+        assertFalse(restored.matches("use apikey"));
+    }
 }

@@ -1,22 +1,27 @@
-config-version: 1
+config-version: 4
 language: zh_CN
+
+audit:
+  max-events: 2000
+
+publishing:
+  keep-revisions: 20
 
 integrations:
   union-provider: lands
   lands:
     enabled: true
     required-for-startup: false
-  rulegems:
-    enabled: true
-  placeholderapi:
-    enabled: true
+
+governance:
+  ruler-permission: regions.admin
+  superadmin-permission: regions.superadmin
 
 safety:
   watchdog-interval-seconds: 3
   cleanup-on-death: true
   cleanup-on-quit: true
   cleanup-on-reload: true
-  deny-unsafe-player-op-actions: true
   max-actions-per-trigger: 16
   max-regions-per-player: 5
 

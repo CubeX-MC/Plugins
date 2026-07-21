@@ -1,19 +1,21 @@
 package org.cubexmc.regions.mode
 
-import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.cubexmc.regions.RegionsPlugin
+import org.cubexmc.regions.config.sendLegacyMessage
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionTrigger
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.ceil
 
 class RaceModeService(private val plugin: RegionsPlugin) {
     private val states: ConcurrentHashMap<String, RaceState> = ConcurrentHashMap()
+    private val endingRegions: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     fun isRaceMode(region: RegionDefinition): Boolean =
         isRaceMode(region.mode?.type)
@@ -27,19 +29,23 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         if (!isRaceMode(region)) {
             return
         }
+        if (endingRegions.contains(region.id)) {
+            player.sendLegacyMessage("§e${region.name} 正在结束上一局，请稍后重新进入。")
+            return
+        }
         val state = state(region)
         if (state.active) {
-            player.sendMessage("§e${region.name} 的比赛已经开始，你会在下一局加入。")
+            player.sendLegacyMessage("§e${region.name} 的比赛已经开始，你会在下一局加入。")
             return
         }
         val maxPlayers = region.mode?.values?.get("max-players")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
-            player.sendMessage("§c${region.name} 当前参赛人数已满。")
+            player.sendLegacyMessage("§c${region.name} 当前参赛人数已满。")
             return
         }
         state.players.add(player.uniqueId)
         state.ready.remove(player.uniqueId)
-        player.sendMessage("§a你已进入 ${region.name}。输入 §e/regions game ${region.id} ready §a准备比赛。")
+        player.sendLegacyMessage("§a你已进入 ${region.name}。输入 §e/regions game ${region.id} ready §a准备比赛。")
     }
 
     fun onLeave(player: Player, regionId: String, reason: String) {
@@ -75,20 +81,20 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         }
         val state = state(region)
         if (!state.players.contains(player.uniqueId)) {
-            player.sendMessage("§c你不在这个比赛场地内。")
+            player.sendLegacyMessage("§c你不在这个比赛场地内。")
             return true
         }
         if (state.active) {
-            player.sendMessage("§e比赛已经开始。")
+            player.sendLegacyMessage("§e比赛已经开始。")
             return true
         }
         val startConstraint = vehicleConstraint(region, "start", 0)
         if (!validRaceState(player, startConstraint)) {
-            player.sendMessage(raceStateMessage(startConstraint))
+            player.sendLegacyMessage(raceStateMessage(startConstraint))
             return true
         }
         if (!nearStart(player, region)) {
-            player.sendMessage("§e请先到起点附近再准备。")
+            player.sendLegacyMessage("§e请先到起点附近再准备。")
             return true
         }
         state.ready.add(player.uniqueId)
@@ -125,6 +131,19 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    fun forceEnd(regionId: String, reason: String): Boolean {
+        if (!states.containsKey(regionId)) return false
+        end(regionId, reason)
+        return true
+    }
+
+    fun cleanupAll(reason: String, shuttingDown: Boolean = false) {
+        val immediate = !plugin.regionScheduler().isFolia
+        for (regionId in states.keys.toList()) {
+            end(regionId, reason, immediate = immediate, restorePlayers = !shuttingDown || immediate)
+        }
+    }
+
     fun status(regionId: String): String {
         val state = states[regionId] ?: return "race idle"
         return if (state.active) {
@@ -135,7 +154,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
     }
 
     private fun start(region: RegionDefinition, state: RaceState, reason: String) {
-        if (state.active) {
+        if (state.active || state.starting) {
             return
         }
         val minPlayers = region.mode?.values?.get("min-players")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
@@ -143,17 +162,57 @@ class RaceModeService(private val plugin: RegionsPlugin) {
             broadcast(state, "§e还需要更多玩家才能开始比赛 (${state.players.size}/$minPlayers)。")
             return
         }
+        state.starting = true
         val start = parseLocation(region.mode?.values?.get("start"))
-        if (start != null) {
-            val outside = state.players.mapNotNull { Bukkit.getPlayer(it) }.filterNot { near(it.location, start, radius(region, "start-radius")) }
-            if (outside.isNotEmpty() && region.mode?.values?.get("require-start")?.toBooleanStrictOrNull() != false) {
-                broadcast(state, "§e还有玩家不在起点附近，比赛暂不能开始。")
-                return
+        val playerIds = state.players.toList()
+        val checks = ConcurrentHashMap<UUID, RaceStartCheck>()
+        val remaining = AtomicInteger(playerIds.size)
+        fun completeCheck() {
+            if (remaining.decrementAndGet() == 0) {
+                finalizeStart(region, state, reason, start, checks)
             }
         }
-        val invalidState = state.players.mapNotNull { Bukkit.getPlayer(it) }
-            .filterNot { validRaceState(it, vehicleConstraint(region, "start", 0)) }
-        if (invalidState.isNotEmpty()) {
+        for (playerId in playerIds) {
+            val player = plugin.server.getPlayer(playerId)
+            if (player == null) {
+                checks[playerId] = RaceStartCheck(atStart = false, validVehicle = false)
+                completeCheck()
+                continue
+            }
+            plugin.regionScheduler().runAtEntity(player, Runnable {
+                checks[playerId] = RaceStartCheck(
+                    atStart = start == null || near(player.location, start, radius(region, "start-radius")),
+                    validVehicle = validRaceState(player, vehicleConstraint(region, "start", 0)),
+                )
+                completeCheck()
+            })
+        }
+    }
+
+    private fun finalizeStart(
+        region: RegionDefinition,
+        state: RaceState,
+        reason: String,
+        start: Location?,
+        checks: Map<UUID, RaceStartCheck>,
+    ) {
+        if (states[region.id] !== state || !state.starting || state.active) return
+        state.starting = false
+        val currentPlayers = state.players.toSet()
+        val minPlayers = region.mode?.values?.get("min-players")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        if (currentPlayers.size < minPlayers) {
+            broadcast(state, "§e还有更多玩家才能开始比赛 (${currentPlayers.size}/$minPlayers)。")
+            return
+        }
+        if (!checks.keys.containsAll(currentPlayers)) return
+        if (
+            region.mode?.values?.get("require-start")?.toBooleanStrictOrNull() != false &&
+            currentPlayers.any { checks[it]?.atStart != true }
+        ) {
+            broadcast(state, "§e还有玩家不在起点附近，比赛暂不能开始。")
+            return
+        }
+        if (currentPlayers.any { checks[it]?.validVehicle != true }) {
             broadcast(state, "§e还有玩家不满足起点检查方式: ${describeVehicleConstraint(vehicleConstraint(region, "start", 0))}。")
             return
         }
@@ -163,28 +222,76 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         state.finishOrder.clear()
         for (playerId in state.players.toList()) {
             state.progress[playerId] = 0
-            val player = Bukkit.getPlayer(playerId) ?: continue
-            if (region.mode?.values?.get("teleport-start")?.toBooleanStrictOrNull() == true && start != null) {
-                plugin.regionScheduler().teleportAsync(player, start)
-            }
-            plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
+            val player = plugin.server.getPlayer(playerId) ?: continue
+            plugin.regionScheduler().runAtEntity(player, Runnable {
+                if (states[region.id] !== state || !state.active || !state.players.contains(playerId)) return@Runnable
+                if (region.mode?.values?.get("teleport-start")?.toBooleanStrictOrNull() == true && start != null) {
+                    plugin.regionScheduler().teleportAsync(player, start)
+                }
+                plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
+            })
         }
         broadcast(state, "§a${region.name} 比赛开始！")
+        val timeoutSeconds = raceTimeoutSeconds(region)
+        if (timeoutSeconds > 0) {
+            plugin.regionScheduler().runGlobalLater(Runnable {
+                if (states[region.id] === state && state.active) {
+                    broadcast(state, "§e比赛达到时间上限，已自动结束。")
+                    end(region.id, "time-limit")
+                }
+            }, timeoutSeconds * 20L)
+        }
         plugin.logger.fine("Started race ${region.id}: $reason")
     }
 
-    private fun end(regionId: String, reason: String) {
+    private fun end(
+        regionId: String,
+        reason: String,
+        immediate: Boolean = !plugin.regionScheduler().isFolia,
+        restorePlayers: Boolean = true,
+    ) {
         val state = states[regionId] ?: return
         val region = plugin.regions().find(regionId)
         state.active = false
-        if (region != null) {
-            for (playerId in state.players.toList()) {
-                val player = Bukkit.getPlayer(playerId) ?: continue
-                plugin.triggers().fire(RegionTrigger.ON_MODE_END, player, region)
+        state.starting = false
+        endingRegions.add(regionId)
+        states.remove(regionId, state)
+        plugin.audit().record(
+            null,
+            regionId,
+            "mode.race.end",
+            reason,
+            mapOf(
+                "revision" to (region?.publishedRevision?.toString() ?: "unknown"),
+                "participants" to state.players.size.toString(),
+                "finishers" to state.finishOrder.size.toString(),
+                "finish-order" to state.finishOrder.joinToString(","),
+            ),
+        )
+        if (region != null && restorePlayers) {
+            val players = state.players.mapNotNull { plugin.server.getPlayer(it) }
+            val remaining = AtomicInteger(players.size)
+            if (players.isEmpty()) endingRegions.remove(regionId)
+            for (player in players) {
+                runCatching {
+                    val restore = Runnable {
+                        try {
+                            plugin.triggers().fire(RegionTrigger.ON_MODE_END, player, region)
+                            plugin.effects().cleanupModeEffects(player, regionId, "mode-end:$reason")
+                        } finally {
+                            if (remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
+                        }
+                    }
+                    if (immediate) restore.run() else plugin.regionScheduler().runAtEntity(player, restore)
+                }.onFailure {
+                    plugin.logger.severe("Failed to schedule race cleanup for ${player.name} in $regionId: ${it.message}")
+                    if (!immediate && remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
+                }
             }
+        } else {
+            endingRegions.remove(regionId)
         }
         broadcast(state, "§e比赛结束。")
-        states.remove(regionId)
         plugin.logger.fine("Ended race $regionId: $reason")
     }
 
@@ -201,7 +308,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
                 val next = index + 1
                 state.progress[player.uniqueId] = next
                 plugin.sessions().setMetadata(player, region.id, "race_checkpoint", next.toString())
-                player.sendMessage("§a通过检查点 $next/${checkpoints.size}。")
+                player.sendLegacyMessage("§a通过检查点 $next/${checkpoints.size}。")
                 plugin.triggers().fire(RegionTrigger.ON_CHECKPOINT, player, region)
             }
             return
@@ -219,7 +326,17 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         val elapsed = System.currentTimeMillis() - state.startedAtMillis
         plugin.sessions().setMetadata(player, region.id, "race_rank", rank.toString())
         plugin.sessions().setMetadata(player, region.id, "race_time_ms", elapsed.toString())
-        player.sendMessage("§6完成比赛！名次: §e#$rank §7用时: ${elapsed / 1000.0}s")
+        plugin.audit().record(
+            player,
+            region.id,
+            "mode.race.finish",
+            details = mapOf(
+                "revision" to (region.publishedRevision?.toString() ?: "unknown"),
+                "rank" to rank.toString(),
+                "elapsed-ms" to elapsed.toString(),
+            ),
+        )
+        player.sendLegacyMessage("§6完成比赛！名次: §e#$rank §7用时: ${elapsed / 1000.0}s")
         plugin.triggers().fire(RegionTrigger.ON_FINISH, player, region)
         broadcast(state, "§6${player.name} 完成比赛，当前名次 #$rank。")
         if (state.finished.containsAll(state.players)) {
@@ -320,17 +437,16 @@ class RaceModeService(private val plugin: RegionsPlugin) {
     private fun startMode(region: RegionDefinition): String =
         region.mode?.values?.get("start-mode")?.lowercase(Locale.ROOT) ?: "vote"
 
+    private fun raceTimeoutSeconds(region: RegionDefinition): Long =
+        (region.mode?.values?.get("timeout-seconds")
+            ?: region.mode?.values?.get("max-duration-seconds")
+            ?: region.mode?.values?.get("duration-seconds"))
+            ?.toLongOrNull()
+            ?.coerceAtLeast(0L)
+            ?: DEFAULT_TIMEOUT_SECONDS
+
     private fun canJudge(sender: CommandSender, region: RegionDefinition): Boolean {
-        if (sender.hasPermission("regions.admin") || sender.hasPermission("regions.region.edit")) {
-            return true
-        }
-        val player = sender as? Player ?: return false
-        val judges = region.mode?.values?.get("judges")
-            ?.split(',', ';')
-            ?.map { it.trim() }
-            ?.filter { it.isNotBlank() }
-            ?: return false
-        return judges.any { it.equals(player.name, ignoreCase = true) || it.equals(player.uniqueId.toString(), ignoreCase = true) }
+        return plugin.authority().canManage(sender, region).allowed
     }
 
     private fun state(region: RegionDefinition): RaceState =
@@ -338,9 +454,9 @@ class RaceModeService(private val plugin: RegionsPlugin) {
 
     private fun broadcast(state: RaceState, message: String) {
         for (playerId in state.players.toList()) {
-            val player = Bukkit.getPlayer(playerId) ?: continue
+            val player = plugin.server.getPlayer(playerId) ?: continue
             plugin.regionScheduler().runAtEntity(player, Runnable {
-                player.sendMessage(message)
+                player.sendLegacyMessage(message)
             })
         }
     }
@@ -370,7 +486,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         if (parts.size < 4) {
             return null
         }
-        val world = Bukkit.getWorld(parts[0].trim()) ?: return null
+        val world = plugin.server.getWorld(parts[0].trim()) ?: return null
         val x = parts[1].trim().toDoubleOrNull() ?: return null
         val y = parts[2].trim().toDoubleOrNull() ?: return null
         val z = parts[3].trim().toDoubleOrNull() ?: return null
@@ -388,6 +504,17 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         @Volatile
         var active: Boolean = false
         @Volatile
+        var starting: Boolean = false
+        @Volatile
         var startedAtMillis: Long = 0L
+    }
+
+    private data class RaceStartCheck(
+        val atStart: Boolean,
+        val validVehicle: Boolean,
+    )
+
+    private companion object {
+        const val DEFAULT_TIMEOUT_SECONDS = 300L
     }
 }

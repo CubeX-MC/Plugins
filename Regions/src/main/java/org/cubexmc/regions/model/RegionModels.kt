@@ -9,6 +9,9 @@ data class RegionDefinition(
     val source: RegionSourceRef,
     val ownerPolicy: OwnerPolicy = OwnerPolicy.ADMIN,
     val enabled: Boolean = true,
+    val lifecycle: RegionLifecycle = RegionLifecycle.PUBLISHED,
+    val revision: Long = 1,
+    val publishedRevision: Long? = 1,
     val priority: Int = 0,
     val mode: ModeConfig? = ModeConfig("free_event"),
     val flags: Map<String, FlagConfig> = emptyMap(),
@@ -16,6 +19,13 @@ data class RegionDefinition(
     val triggers: Map<RegionTrigger, List<ActionBlockConfig>> = emptyMap(),
     val metadata: Map<String, String> = emptyMap(),
 )
+
+enum class RegionLifecycle {
+    DRAFT,
+    PUBLISHED,
+    FROZEN,
+    ARCHIVED,
+}
 
 data class RegionSourceRef(
     val type: String,
@@ -45,6 +55,7 @@ data class EffectConfig(
     val type: String,
     val scope: EffectScope = EffectScope.WHILE_INSIDE,
     val values: Map<String, String> = emptyMap(),
+    val combination: EffectCombination = EffectCombination.HIGHEST_PRIORITY,
 )
 
 enum class EffectScope {
@@ -53,12 +64,25 @@ enum class EffectScope {
     TIMED,
 }
 
+enum class EffectCombination {
+    EXCLUSIVE,
+    HIGHEST_PRIORITY,
+    STACK,
+    MERGE_BY_TYPE,
+}
+
 data class ActionBlockConfig(
     val name: String? = null,
     val conditions: List<ConditionConfig> = emptyList(),
     val thenActions: List<ActionConfig> = emptyList(),
     val elseActions: List<ActionConfig> = emptyList(),
+    val execution: TriggerExecution = TriggerExecution.ALL_ACTIVE,
 )
+
+enum class TriggerExecution {
+    ALL_ACTIVE,
+    PRIMARY_REGION,
+}
 
 data class ActionConfig(
     val type: String,
@@ -104,7 +128,27 @@ data class ExternalRegion(
     val id: String,
     val name: String,
     val sourceType: String,
+    val values: Map<String, String> = emptyMap(),
 )
+
+data class RegionGeometry(
+    val world: String,
+    val minX: Double,
+    val minY: Double,
+    val minZ: Double,
+    val maxX: Double,
+    val maxY: Double,
+    val maxZ: Double,
+) {
+    fun overlaps(other: RegionGeometry): Boolean =
+        world.equals(other.world, ignoreCase = true) &&
+            minOf(minX, maxX) <= maxOf(other.minX, other.maxX) &&
+            maxOf(minX, maxX) >= minOf(other.minX, other.maxX) &&
+            minOf(minY, maxY) <= maxOf(other.minY, other.maxY) &&
+            maxOf(minY, maxY) >= minOf(other.minY, other.maxY) &&
+            minOf(minZ, maxZ) <= maxOf(other.minZ, other.maxZ) &&
+            maxOf(minZ, maxZ) >= minOf(other.minZ, other.maxZ)
+}
 
 data class RegionSession(
     val id: UUID,
@@ -122,6 +166,7 @@ data class EffectLease(
     val effectType: String,
     val scope: EffectScope,
     val appliedAtMillis: Long,
+    val applicationOrder: Long,
     val expiresAtMillis: Long?,
     val snapshot: PlayerStateSnapshot = PlayerStateSnapshot(),
     val metadata: Map<String, String> = emptyMap(),

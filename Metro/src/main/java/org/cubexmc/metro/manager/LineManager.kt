@@ -713,11 +713,11 @@ class LineManager(private val plugin: Metro) {
                 if (newStop == null) {
                     newStop = stopManager.createStop(newStopId, oldStop.name, oldStop.corner1, oldStop.corner2, ownerId)
                     if (newStop != null) {
-                        var newYaw = (oldStop.launchYaw + 180.0f) % 360.0f
-                        if (newYaw > 180.0f) newYaw -= 360.0f
-                        if (newYaw < -180.0f) newYaw += 360.0f
-
-                        stopManager.setStopPoint(newStopId, oldStop.stopPointLocation, newYaw)
+                        stopManager.setStopPoint(
+                            newStopId,
+                            oldStop.stopPointLocation,
+                            reverseLaunchYaw(oldStop.launchYaw),
+                        )
 
                         for (adminId in oldStop.admins) {
                             stopManager.addStopAdmin(newStopId, adminId)
@@ -735,6 +735,13 @@ class LineManager(private val plugin: Metro) {
 
         saveConfig()
         return true
+    }
+
+    private fun reverseLaunchYaw(yaw: Float): Float {
+        var reversedYaw = (yaw + 180.0f) % 360.0f
+        if (reversedYaw > 180.0f) reversedYaw -= 360.0f
+        if (reversedYaw < -180.0f) reversedYaw += 360.0f
+        return reversedYaw
     }
 
     private fun rebuildRailProtection(lineId: String) {

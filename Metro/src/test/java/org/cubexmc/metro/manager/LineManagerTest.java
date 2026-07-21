@@ -16,9 +16,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
 
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.cubexmc.metro.Metro;
 import org.cubexmc.metro.model.Line;
 import org.cubexmc.metro.model.RoutePoint;
+import org.cubexmc.metro.model.Stop;
 import org.cubexmc.metro.persistence.SaveCoordinator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -225,6 +228,52 @@ class LineManagerTest {
         assertTrue(manager.deleteLine("red"));
 
         verify(railProtectionManager, org.mockito.Mockito.times(4)).rebuildLine("red");
+    }
+
+    @Test
+    void shouldReverseCopiedStopOrderAndLaunchYaw() throws IOException {
+        Files.writeString(tempDir.resolve("lines.yml"), "");
+        Files.writeString(tempDir.resolve("stops.yml"), "");
+        Metro plugin = createPluginMock(tempDir);
+        StopManager stopManager = new StopManager(plugin);
+        when(plugin.getStopManager()).thenReturn(stopManager);
+        LineManager manager = new LineManager(plugin);
+
+        World world = mock(World.class);
+        when(world.getName()).thenReturn("world");
+        Location corner1 = new Location(world, 0, 64, 0);
+        Location corner2 = new Location(world, 2, 66, 2);
+        Location firstPoint = new Location(world, 1, 64, 1);
+        Location secondPoint = new Location(world, 11, 64, 1);
+        UUID ownerId = UUID.randomUUID();
+
+        assertNotNull(stopManager.createStop("first", "First", corner1, corner2, ownerId));
+        assertNotNull(stopManager.createStop("second", "Second", corner1, corner2, ownerId));
+        assertTrue(stopManager.setStopPoint("first", firstPoint, 45.0F));
+        assertTrue(stopManager.setStopPoint("second", secondPoint, -90.0F));
+        assertTrue(manager.createLine("outbound", "Outbound", ownerId));
+        assertTrue(manager.addStopToLine("outbound", "first", -1));
+        assertTrue(manager.addStopToLine("outbound", "second", -1));
+
+        assertTrue(manager.cloneReverseLine("outbound", "inbound", "_rev", ownerId));
+
+        Line inbound = manager.getLine("inbound");
+        assertNotNull(inbound);
+        assertEquals(List.of("second_rev", "first_rev"), inbound.getOrderedStopIds());
+        Stop firstCopy = stopManager.getStop("first_rev");
+        Stop secondCopy = stopManager.getStop("second_rev");
+        Stop originalFirst = stopManager.getStop("first");
+        Stop originalSecond = stopManager.getStop("second");
+        assertNotNull(firstCopy);
+        assertNotNull(secondCopy);
+        assertNotNull(originalFirst);
+        assertNotNull(originalSecond);
+        assertEquals(-135.0F, firstCopy.getLaunchYaw());
+        assertEquals(90.0F, secondCopy.getLaunchYaw());
+        assertEquals(firstPoint, firstCopy.getStopPointLocation());
+        assertEquals(secondPoint, secondCopy.getStopPointLocation());
+        assertEquals(45.0F, originalFirst.getLaunchYaw());
+        assertEquals(-90.0F, originalSecond.getLaunchYaw());
     }
 
     private Metro createPluginMock(Path dataDir) {

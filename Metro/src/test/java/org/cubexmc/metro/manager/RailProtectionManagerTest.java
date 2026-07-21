@@ -3,14 +3,22 @@ package org.cubexmc.metro.manager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -21,10 +29,121 @@ import org.cubexmc.metro.config.ConfigFacade;
 import org.cubexmc.metro.manager.LanguageManager;
 import org.cubexmc.metro.model.Line;
 import org.cubexmc.metro.model.RoutePoint;
+import org.cubexmc.metro.util.SchedulerUtil;
+import org.cubexmc.metro.util.VersionUtil;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 class RailProtectionManagerTest {
+
+    @Test
+    void shouldReadFoliaBlocksOnlyInsideRegionTasksAndPublishAtomically() {
+        Metro plugin = mock(Metro.class);
+        LineManager lineManager = mock(LineManager.class);
+        when(plugin.getLineManager()).thenReturn(lineManager);
+        when(plugin.getLogger()).thenReturn(Logger.getLogger("RailProtectionManagerTest"));
+
+        Line line = protectedLine("nether", List.of(
+                new RoutePoint("world", 128.5, 99.5, 439.5)
+        ));
+        when(lineManager.getAllLines()).thenReturn(List.of(line));
+
+        World world = mock(World.class);
+        when(world.getName()).thenReturn("world");
+        when(world.getBlockAt(anyInt(), anyInt(), anyInt())).thenAnswer(invocation -> {
+            int x = invocation.getArgument(0);
+            int y = invocation.getArgument(1);
+            int z = invocation.getArgument(2);
+            return block(world, x, y, z, x == 128 && y == 99 && z == 439
+                    ? Material.RAIL
+                    : Material.AIR);
+        });
+
+        List<Runnable> regionTasks = new ArrayList<>();
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class);
+             MockedStatic<VersionUtil> versionUtil = mockStatic(VersionUtil.class);
+             MockedStatic<SchedulerUtil> schedulerUtil = mockStatic(SchedulerUtil.class)) {
+            bukkit.when(() -> Bukkit.getWorld("world")).thenReturn(world);
+            versionUtil.when(VersionUtil::isFolia).thenReturn(true);
+            schedulerUtil.when(() -> SchedulerUtil.regionRun(
+                    eq(plugin), any(Location.class), any(Runnable.class), eq(0L), eq(-1L)
+            )).thenAnswer(invocation -> {
+                regionTasks.add(invocation.getArgument(2));
+                return null;
+            });
+
+            RailProtectionManager manager = new RailProtectionManager(plugin);
+            manager.rebuildAll();
+
+            assertEquals(2, regionTasks.size());
+            verify(world, never()).getBlockAt(anyInt(), anyInt(), anyInt());
+            assertEquals(0, manager.getProtectedBlockCount("nether"));
+
+            regionTasks.get(0).run();
+            assertEquals(0, manager.getProtectedBlockCount("nether"));
+
+            regionTasks.get(1).run();
+            assertEquals(1, manager.getProtectedBlockCount("nether"));
+            assertEquals(new RailProtectionManager.ProtectionIndexStats(1, 1, 0, 0, 0),
+                    manager.getProtectionIndexStats("nether"));
+        }
+    }
+
+    @Test
+    void shouldKeepCurrentFoliaIndexUntilCompletionAndIgnoreStaleResults() {
+        Metro plugin = mock(Metro.class);
+        LineManager lineManager = mock(LineManager.class);
+        when(plugin.getLineManager()).thenReturn(lineManager);
+        when(plugin.getLogger()).thenReturn(Logger.getLogger("RailProtectionManagerTest"));
+
+        Line line = protectedLine("red", List.of(new RoutePoint("world", 128.5, 64.0, 439.5)));
+        when(lineManager.getAllLines()).thenReturn(List.of(line));
+        when(lineManager.getLine("red")).thenReturn(line);
+
+        World world = mock(World.class);
+        when(world.getName()).thenReturn("world");
+        when(world.getBlockAt(anyInt(), anyInt(), anyInt())).thenAnswer(invocation -> {
+            int x = invocation.getArgument(0);
+            int y = invocation.getArgument(1);
+            int z = invocation.getArgument(2);
+            return block(world, x, y, z, x == 128 && y == 64 && z == 439
+                    ? Material.RAIL
+                    : Material.AIR);
+        });
+
+        List<Runnable> regionTasks = new ArrayList<>();
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class);
+             MockedStatic<VersionUtil> versionUtil = mockStatic(VersionUtil.class);
+             MockedStatic<SchedulerUtil> schedulerUtil = mockStatic(SchedulerUtil.class)) {
+            bukkit.when(() -> Bukkit.getWorld("world")).thenReturn(world);
+            versionUtil.when(VersionUtil::isFolia).thenReturn(true);
+            schedulerUtil.when(() -> SchedulerUtil.regionRun(
+                    eq(plugin), any(Location.class), any(Runnable.class), eq(0L), eq(-1L)
+            )).thenAnswer(invocation -> {
+                regionTasks.add(invocation.getArgument(2));
+                return null;
+            });
+
+            RailProtectionManager manager = new RailProtectionManager(plugin);
+            manager.rebuildAll();
+            regionTasks.forEach(Runnable::run);
+            regionTasks.clear();
+            assertEquals(1, manager.getProtectedBlockCount("red"));
+
+            manager.rebuildLine("red");
+            List<Runnable> staleTasks = new ArrayList<>(regionTasks);
+            assertEquals(1, manager.getProtectedBlockCount("red"));
+
+            line.setRailProtected(false);
+            manager.rebuildLine("red");
+            assertEquals(0, manager.getProtectedBlockCount("red"));
+
+            staleTasks.forEach(Runnable::run);
+            assertEquals(0, manager.getProtectedBlockCount("red"));
+            assertEquals(RailProtectionManager.ProtectionIndexStats.empty(),
+                    manager.getProtectionIndexStats("red"));
+        }
+    }
 
     @Test
     void shouldIndexInterpolatedRailBlocksAndRemoveLineFromIndex() {

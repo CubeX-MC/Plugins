@@ -10,6 +10,7 @@ import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.gui.framework.Menu
 import org.cubexmc.contract.gui.framework.MenuRegistry
 import org.cubexmc.contract.model.Contract
+import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
 import org.cubexmc.contract.model.ContractType
@@ -425,6 +426,23 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         }
         if (draft.type() == ContractType.SERVICE) {
             menu.button(29, verificationButton(draft)) { toggleVerification(player, draft) }
+            if (player.hasPermission(BATCH_CREATE_PERMISSION)) {
+                menu.button(30, fieldButton(Material.PAPER, "发布份数", draft.contractCount().toString())) {
+                    promptNumberField(player, "&#FFE066请输入发布份数(输 cancel 取消)") { draft.contractCount(Math.round(it).toInt()) }
+                }
+                if (draft.contractCount() > 1) {
+                    menu.button(32, batchRepeatPolicyButton(draft)) { cycleBatchRepeatPolicy(player, draft) }
+                    if (draft.repeatPolicy() == BatchRepeatPolicy.COOLDOWN) {
+                        menu.button(39, fieldButton(Material.CLOCK, "重复冷却(小时)", draft.repeatCooldownHours().toString())) {
+                            promptNumberField(player, "&#FFE066请输入重复接取冷却小时数(输 cancel 取消)") {
+                                draft.repeatCooldownHours(Math.round(it).toInt())
+                            }
+                        }
+                    }
+                }
+            } else {
+                draft.contractCount(1)
+            }
             if (draft.systemVerified()) {
                 menu.button(38, objectiveTypeButton(draft)) { cycleObjectiveType(player, draft) }
                 val objectiveType = draft.objectiveType()
@@ -450,10 +468,10 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         menu.button(46, button(Material.BARRIER, "&#E63946放弃创建", "&#CFD8DC删除当前草稿并返回合同大厅")) { cancelDraft(player) }
         menu.button(48, button(Material.ARROW, "&#FFE066上一步", "&#CFD8DC重新选择合同类型")) { openWizardType(player) }
 
-        val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays())
+        val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
         if (validation == null) {
             menu.button(50, button(Material.EMERALD_BLOCK, "&#69DB7C预览并签署创建", "&#CFD8DC进入签署确认页", "&#FFE066需要签署确认")) {
-                val recheck = draft.validate(minAmount(), maxAmount(), minDays(), maxDays())
+                val recheck = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
                 if (recheck != null) {
                     player.sendMessage(Text.color("&#E63946$recheck"))
                 } else {
@@ -475,7 +493,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             openWizardType(player)
             return
         }
-        val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays())
+        val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
         if (validation != null) {
             player.sendMessage(Text.color("&#E63946$validation"))
             openWizardForm(player)
@@ -508,9 +526,10 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun executeAction(player: Player, action: PendingAction, onReturn: () -> Unit) {
         if (action.kind() == PendingAction.Kind.CREATE) {
+            val contractCount = drafts[player.uniqueId]?.contractCount() ?: 1
             val result = executeCreate(player)
             if (result.success()) {
-                player.sendMessage(Text.color("&#69DB7C签署成功,操作已完成。"))
+                player.sendMessage(Text.color("&#69DB7C签署成功,已发布 $contractCount 份委托。"))
                 drafts.remove(player.uniqueId)
                 val done = result.contract()
                 val mineBack = { openHall(player, HallView.OPEN, 1) }
@@ -548,7 +567,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun executeCreate(player: Player): ServiceResult {
         val draft = drafts[player.uniqueId] ?: return ServiceResult.fail("创建草稿已失效,请重新开始")
-        val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays())
+        val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
         if (validation != null) {
             return ServiceResult.fail(validation)
         }
@@ -558,10 +577,31 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         return when (draft.type()) {
             ContractType.SERVICE -> {
                 if (draft.itemReward()) {
-                    plugin.contracts().createWithItemReward(player, days, title, description, emptyToNull(draft.mediator()), objectiveFromDraft(draft))
+                    plugin.contracts().createWithItemReward(
+                        player,
+                        days,
+                        title,
+                        description,
+                        emptyToNull(draft.mediator()),
+                        objectiveFromDraft(draft),
+                        draft.contractCount(),
+                        draft.repeatPolicy(),
+                        draft.repeatCooldownHours(),
+                    )
                 } else {
                     val amount = draft.amount() ?: return ServiceResult.fail("请先填写金额")
-                    plugin.contracts().create(player, amount, days, title, description, emptyToNull(draft.mediator()), objectiveFromDraft(draft))
+                    plugin.contracts().create(
+                        player,
+                        amount,
+                        days,
+                        title,
+                        description,
+                        emptyToNull(draft.mediator()),
+                        objectiveFromDraft(draft),
+                        draft.contractCount(),
+                        draft.repeatPolicy(),
+                        draft.repeatCooldownHours(),
+                    )
                 }
             }
             ContractType.WAGER -> {
@@ -655,6 +695,13 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         if (draft.objectiveRequired() == null || (draft.objectiveRequired() ?: 0) <= 0) {
             draft.objectiveRequired(1)
         }
+        openWizardForm(player)
+    }
+
+    private fun cycleBatchRepeatPolicy(player: Player, draft: CreateDraft) {
+        val policies = BatchRepeatPolicy.entries
+        val current = draft.repeatPolicy()
+        draft.repeatPolicy(policies[(policies.indexOf(current) + 1) % policies.size])
         openWizardForm(player)
     }
 
@@ -917,6 +964,28 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             )
         }
 
+    private fun batchRepeatPolicyButton(draft: CreateDraft): ItemStack =
+        when (draft.repeatPolicy()) {
+            BatchRepeatPolicy.UNLIMITED -> button(
+                Material.REPEATER,
+                "&#FFE066重复接取: &#FFFFFF不限制",
+                "&#CFD8DC同一玩家可以连续领取该批次任务",
+                "&#FFE066点击切换规则",
+            )
+            BatchRepeatPolicy.ONCE -> button(
+                Material.IRON_DOOR,
+                "&#69DB7C重复接取: &#FFFFFF每人仅一次",
+                "&#CFD8DC每名玩家最多领取该批次一份任务",
+                "&#FFE066点击切换规则",
+            )
+            BatchRepeatPolicy.COOLDOWN -> button(
+                Material.CLOCK,
+                "&#69DB7C重复接取: &#FFFFFF冷却后可重复",
+                "&#CFD8DC同批次同时只能进行一份任务",
+                "&#FFE066点击切换规则",
+            )
+        }
+
     private fun objectiveTypeButton(draft: CreateDraft): ItemStack {
         val type = draft.objectiveType() ?: ObjectiveType.KILL_ENTITY
         return button(objectiveTargetMaterial(type), "&#69DB7C目标类型: &#FFFFFF${objectiveTypeLabel(type)}", "&#FFE066点击切换目标类型")
@@ -1001,7 +1070,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             ObjectiveType.SHEAR -> "&#FFE066请输入实体类型,如 SHEEP,或 ANY 表示任意"
             ObjectiveType.BREED -> "&#FFE066请输入动物类型,如 COW,或 ANY 表示任意"
             ObjectiveType.TAME -> "&#FFE066请输入动物类型,如 WOLF,或 ANY 表示任意"
-            ObjectiveType.CHAT -> "&#FFE066请输入聊天内容,或 ANY 表示发送任意消息"
+            ObjectiveType.CHAT -> "&#FFE066请输入聊天内容(区分大小写),或 ANY 表示发送任意消息"
             ObjectiveType.BLOCK_INTERACT -> "&#FFE066请输入方块类型,如 STONE_BUTTON,或 ANY 表示任意方块"
             ObjectiveType.RUN_COMMAND -> "&#FFE066请输入指令,不要带斜杠,如 spawn"
             ObjectiveType.USE_ITEM -> "&#FFE066请输入物品类型,如 ENDER_PEARL"
@@ -1087,6 +1156,11 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun maxDays(): Int = plugin.config.getInt("limits.max-deadline-days", 7)
 
+    private fun maxBatchContracts(): Int = plugin.config.getInt("limits.max-batch-contracts", 64).coerceAtLeast(1)
+
+    private fun maxRepeatCooldownHours(): Int =
+        plugin.config.getInt("limits.max-repeat-cooldown-hours", 8760).coerceAtLeast(1)
+
     enum class HallView { OPEN, ACTIVE, SUBMITTED, DISPUTED, DONE, CLOSED }
 
     enum class AdminFilter { DISPUTED, ACTIVE, ALL }
@@ -1107,6 +1181,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         private const val DISPUTE_PROMPT_TIMEOUT_MS = 60_000L
         private const val DESCRIPTION_PROMPT_TIMEOUT_MS = 120_000L
         private const val FIELD_PROMPT_TIMEOUT_MS = 60_000L
+        private const val BATCH_CREATE_PERMISSION = "contract.create.batch"
 
         private fun parseNonNegative(text: String): Double? =
             try {

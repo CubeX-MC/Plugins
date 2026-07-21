@@ -51,7 +51,7 @@ line:
   help_trust: "<gold>/m line trust \\<line_id> \\<spieler> <white>- Linienadministrator hinzufügen"
   help_untrust: "<gold>/m line untrust \\<line_id> \\<spieler> <white>- Linienadministrator entfernen"
   help_owner: "<gold>/m line owner \\<line_id> \\<spieler> <white>- Linienbesitz übertragen"
-  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Linie rückwärts klonen"
+  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Linie und Haltestellen mit umgekehrter Abfahrtsrichtung klonen"
   help_setprice: "<gold>/m line setprice \\<line_id> \\<preis> <white>- Traditionellen Pauschalpreis festlegen\n<gold>/m line setprice \\<line_id> flat|distance|interval \\<basis> [proEinheit] [max] <white>- Erweiterte Preisgestaltung\n<gold>/m line setprice reset \\<line_id> <white>- Zur traditionellen Preisgestaltung zurücksetzen"
   help_recordroute: "<gold>/m line recordroute \\<line_id> <white>- Routenpunkte für Online-Karten und Gleisschutz aufzeichnen oder speichern"
   help_clearroute: "<gold>/m line clearroute \\<line_id> confirm <white>- Aufgezeichnete Routenpunkte löschen"

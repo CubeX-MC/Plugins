@@ -1,6 +1,7 @@
 package org.cubexmc.contract.gui
 
 import org.cubexmc.contract.model.ContractType
+import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.model.ObjectiveType
 
 /**
@@ -20,6 +21,9 @@ class CreateDraft(private val type: ContractType) {
     private var objectiveType: ObjectiveType? = null
     private var objectiveTarget: String? = null
     private var objectiveRequired: Int? = null
+    private var contractCount: Int = 1
+    private var repeatPolicy: BatchRepeatPolicy = BatchRepeatPolicy.ONCE
+    private var repeatCooldownHours: Int = DEFAULT_REPEAT_COOLDOWN_HOURS
 
     fun type(): ContractType = type
 
@@ -100,6 +104,24 @@ class CreateDraft(private val type: ContractType) {
         this.objectiveRequired = objectiveRequired
     }
 
+    fun contractCount(): Int = contractCount
+
+    fun contractCount(contractCount: Int) {
+        this.contractCount = contractCount
+    }
+
+    fun repeatPolicy(): BatchRepeatPolicy = repeatPolicy
+
+    fun repeatPolicy(repeatPolicy: BatchRepeatPolicy) {
+        this.repeatPolicy = repeatPolicy
+    }
+
+    fun repeatCooldownHours(): Int = repeatCooldownHours
+
+    fun repeatCooldownHours(repeatCooldownHours: Int) {
+        this.repeatCooldownHours = repeatCooldownHours
+    }
+
     fun systemVerified(): Boolean = type == ContractType.SERVICE && objectiveType != null
 
     fun needsCounterparty(): Boolean = type == ContractType.WAGER || type == ContractType.PARTNERSHIP
@@ -108,13 +130,35 @@ class CreateDraft(private val type: ContractType) {
 
     fun mediatorRequired(): Boolean = type == ContractType.WAGER
 
-    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int): String? {
+    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int): String? =
+        validate(minAmount, maxAmount, minDays, maxDays, DEFAULT_MAX_BATCH_CONTRACTS, DEFAULT_MAX_REPEAT_COOLDOWN_HOURS)
+
+    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int, maxBatchContracts: Int): String? =
+        validate(minAmount, maxAmount, minDays, maxDays, maxBatchContracts, DEFAULT_MAX_REPEAT_COOLDOWN_HOURS)
+
+    fun validate(
+        minAmount: Double,
+        maxAmount: Double,
+        minDays: Int,
+        maxDays: Int,
+        maxBatchContracts: Int,
+        maxRepeatCooldownHours: Int,
+    ): String? {
         if (title.isNullOrBlank()) {
             return "请先填写标题"
         }
         val currentDays = days ?: return "请先填写期限"
         if (currentDays < minDays || currentDays > maxDays) {
             return "有效期必须在 $minDays 到 $maxDays 天之间"
+        }
+        if (type == ContractType.SERVICE && (contractCount < 1 || contractCount > maxBatchContracts.coerceAtLeast(1))) {
+            return "发布份数必须在 1 到 ${maxBatchContracts.coerceAtLeast(1)} 之间"
+        }
+        if (
+            type == ContractType.SERVICE && contractCount > 1 && repeatPolicy == BatchRepeatPolicy.COOLDOWN &&
+            repeatCooldownHours !in 1..maxRepeatCooldownHours.coerceAtLeast(1)
+        ) {
+            return "重复接取冷却必须在 1 到 ${maxRepeatCooldownHours.coerceAtLeast(1)} 小时之间"
         }
         val currentAmount = amount
         if (!(type == ContractType.SERVICE && itemReward)) {
@@ -165,4 +209,10 @@ class CreateDraft(private val type: ContractType) {
             -> true
             else -> false
         }
+
+    private companion object {
+        const val DEFAULT_MAX_BATCH_CONTRACTS = 64
+        const val DEFAULT_REPEAT_COOLDOWN_HOURS = 24
+        const val DEFAULT_MAX_REPEAT_COOLDOWN_HOURS = 8760
+    }
 }

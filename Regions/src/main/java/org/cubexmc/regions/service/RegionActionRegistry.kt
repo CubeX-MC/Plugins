@@ -29,8 +29,6 @@ class RegionActionRegistry {
             "clear_metadata",
             "cleanup_region",
             "mode_command",
-            "economy",
-            "permission_group",
         ).forEach { register(it) }
     }
 

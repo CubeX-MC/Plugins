@@ -51,7 +51,7 @@ line:
   help_trust: "<gold>/m line trust \\<line_id> \\<玩家> <white>- 授予线路管理权限"
   help_untrust: "<gold>/m line untrust \\<line_id> \\<玩家> <white>- 移除线路管理权限"
   help_owner: "<gold>/m line owner \\<line_id> \\<玩家> <white>- 转移线路所有权"
-  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- 反向克隆线路"
+  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- 反向克隆线路，并反转新停靠点的发车朝向"
   help_setprice: "<gold>/m line setprice \\<line_id> \\<价格> <white>- 设置传统固定票价\n<gold>/m line setprice \\<line_id> flat|distance|interval \\<基础> [每单位] [最大值] <white>- 设置高级计价\n<gold>/m line setprice reset \\<line_id> <white>- 重置为传统计价"
   help_recordroute: "<gold>/m line recordroute \\<line_id> <white>- 记录或保存线路轨迹点，用于在线地图和轨道保护"
   help_clearroute: "<gold>/m line clearroute \\<line_id> confirm <white>- 清除线路已记录的轨迹点"

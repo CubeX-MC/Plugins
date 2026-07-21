@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.9 (2026-07-15)
+
+- **Folia**: rebuild protected-route rail indexes through region-owned chunk
+  tasks and atomically publish the completed index, preventing startup and
+  reload failures caused by global-thread block reads.
+
 ## 1.1.8 (2026-07-10)
 
 - **Train display**: improve circular-line station planning, folded terminal

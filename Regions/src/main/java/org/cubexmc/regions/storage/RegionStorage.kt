@@ -7,24 +7,34 @@ import org.cubexmc.regions.model.ActionBlockConfig
 import org.cubexmc.regions.model.ActionConfig
 import org.cubexmc.regions.model.ConditionConfig
 import org.cubexmc.regions.model.EffectConfig
+import org.cubexmc.regions.model.EffectCombination
 import org.cubexmc.regions.model.EffectScope
 import org.cubexmc.regions.model.FlagConfig
 import org.cubexmc.regions.model.ModeConfig
 import org.cubexmc.regions.model.OwnerPolicy
 import org.cubexmc.regions.model.RegionDefinition
+import org.cubexmc.regions.model.RegionLifecycle
 import org.cubexmc.regions.model.RegionSourceRef
 import org.cubexmc.regions.model.RegionTrigger
+import org.cubexmc.regions.model.TriggerExecution
 import java.io.File
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Locale
 
 class RegionStorage(private val plugin: RegionsPlugin) {
     private val file = File(plugin.dataFolder, "regions.yml")
     private val regions: MutableMap<String, RegionDefinition> = LinkedHashMap()
+    private val drafts: MutableMap<String, RegionDefinition> = LinkedHashMap()
+    private val history: MutableMap<String, java.util.SortedMap<Long, RegionDefinition>> = LinkedHashMap()
     private var dirty = false
 
     fun load() {
         regions.clear()
+        drafts.clear()
+        history.clear()
         if (!file.exists()) {
             dirty = false
             return
@@ -42,6 +52,30 @@ class RegionStorage(private val plugin: RegionsPlugin) {
                 }
             }
         }
+        val draftRoot = yaml.getConfigurationSection("drafts")
+        if (draftRoot != null) {
+            for (id in draftRoot.getKeys(false)) {
+                val section = draftRoot.getConfigurationSection(id) ?: continue
+                runCatching { parseRegion(id, section) }
+                    .onSuccess { drafts[id] = it.copy(lifecycle = RegionLifecycle.DRAFT) }
+                    .onFailure { plugin.logger.warning("Failed to load draft $id: ${it.message}") }
+            }
+        }
+        val historyRoot = yaml.getConfigurationSection("history")
+        if (historyRoot != null) {
+            for (id in historyRoot.getKeys(false)) {
+                val regionHistory = historyRoot.getConfigurationSection(id) ?: continue
+                val revisions = java.util.TreeMap<Long, RegionDefinition>()
+                for (revisionKey in regionHistory.getKeys(false)) {
+                    val revision = revisionKey.toLongOrNull() ?: continue
+                    val section = regionHistory.getConfigurationSection(revisionKey) ?: continue
+                    runCatching { parseRegion(id, section) }
+                        .onSuccess { revisions[revision] = it.copy(revision = revision) }
+                        .onFailure { plugin.logger.warning("Failed to load region $id revision $revision: ${it.message}") }
+                }
+                if (revisions.isNotEmpty()) history[id] = revisions
+            }
+        }
         dirty = false
     }
 
@@ -49,14 +83,43 @@ class RegionStorage(private val plugin: RegionsPlugin) {
 
     fun find(id: String): RegionDefinition? = regions[id]
 
+    fun findDraft(id: String): RegionDefinition? = drafts[id]
+
+    fun revisionHistory(id: String): List<RegionDefinition> =
+        history[id]?.values?.toList() ?: emptyList()
+
+    fun findRevision(id: String, revision: Long): RegionDefinition? = history[id]?.get(revision)
+
     fun put(region: RegionDefinition) {
         regions[region.id] = region
+        dirty = true
+    }
+
+    fun putDraft(region: RegionDefinition) {
+        drafts[region.id] = region.copy(lifecycle = RegionLifecycle.DRAFT)
+        dirty = true
+    }
+
+    fun removeDraft(id: String): Boolean {
+        val removed = drafts.remove(id) != null
+        if (removed) dirty = true
+        return removed
+    }
+
+    fun recordRevision(region: RegionDefinition, maxRevisions: Int = 20) {
+        val revisions = history.getOrPut(region.id) { java.util.TreeMap() }
+        revisions[region.revision] = region
+        while (revisions.size > maxRevisions.coerceAtLeast(1)) {
+            revisions.remove(revisions.firstKey())
+        }
         dirty = true
     }
 
     fun remove(id: String): Boolean {
         val removed = regions.remove(id) != null
         if (removed) {
+            drafts.remove(id)
+            history.remove(id)
             dirty = true
         }
         return removed
@@ -66,95 +129,93 @@ class RegionStorage(private val plugin: RegionsPlugin) {
         dirty = true
     }
 
-    fun flushIfDirty() {
-        if (dirty) {
-            save()
-        }
-    }
+    fun flushIfDirty(): Boolean = if (dirty) save() else true
 
-    fun save() {
+    fun save(): Boolean {
         val yaml = YamlConfiguration()
-        yaml.set("regions-version", 1)
+        yaml.set("regions-version", 4)
         for (region in regions.values) {
-            val path = "regions.${region.id}"
-            yaml.set("$path.name", region.name)
-            yaml.set("$path.enabled", region.enabled)
-            yaml.set("$path.priority", region.priority)
-            yaml.set("$path.owner-policy", region.ownerPolicy.name.lowercase(Locale.ROOT))
-            yaml.set("$path.source.type", region.source.type)
-            for ((key, value) in region.source.values) {
-                yaml.set("$path.source.$key", value)
-            }
-            val mode = region.mode
-            if (mode != null) {
-                yaml.set("$path.mode.type", mode.type)
-                for ((key, value) in mode.values) {
-                    yaml.set("$path.mode.$key", value)
-                }
-            }
-            for ((key, flag) in region.flags) {
-                yaml.set("$path.flags.$key.value", flag.value)
-                for ((valueKey, value) in flag.values) {
-                    yaml.set("$path.flags.$key.$valueKey", value)
-                }
-            }
-            if (region.effects.isNotEmpty()) {
-                yaml.set("$path.effects", region.effects.map { effect ->
-                    val values = LinkedHashMap<String, Any>()
-                    values["type"] = effect.type
-                    values["scope"] = effect.scope.name.lowercase(Locale.ROOT)
-                    values.putAll(effect.values)
-                    values
-                })
-            }
-            if (region.metadata.isNotEmpty()) {
-                for ((key, value) in region.metadata) {
-                    yaml.set("$path.metadata.$key", value)
-                }
-            }
-            if (region.triggers.isNotEmpty()) {
-                for ((trigger, blocks) in region.triggers) {
-                    yaml.set("$path.triggers.${trigger.key}", blocks.map { block ->
-                        val values = LinkedHashMap<String, Any>()
-                        block.name?.let { values["name"] = it }
-                        if (block.conditions.isNotEmpty()) {
-                            values["if"] = block.conditions.map { condition ->
-                                val conditionValues = LinkedHashMap<String, Any>()
-                                conditionValues["type"] = condition.type
-                                conditionValues.putAll(condition.values)
-                                if (condition.negated) {
-                                    conditionValues["negated"] = true
-                                }
-                                conditionValues
-                            }
-                        }
-                        if (block.thenActions.isNotEmpty()) {
-                            values["then"] = block.thenActions.map { action ->
-                                val actionValues = LinkedHashMap<String, Any>()
-                                actionValues["type"] = action.type
-                                actionValues.putAll(action.values)
-                                actionValues
-                            }
-                        }
-                        if (block.elseActions.isNotEmpty()) {
-                            values["else"] = block.elseActions.map { action ->
-                                val actionValues = LinkedHashMap<String, Any>()
-                                actionValues["type"] = action.type
-                                actionValues.putAll(action.values)
-                                actionValues
-                            }
-                        }
-                        values
-                    })
-                }
+            writeRegion(yaml, "regions.${region.id}", region)
+        }
+        for (draft in drafts.values) {
+            writeRegion(yaml, "drafts.${draft.id}", draft)
+        }
+        for ((id, revisions) in history) {
+            for ((revision, snapshot) in revisions) {
+                writeRegion(yaml, "history.$id.$revision", snapshot)
             }
         }
         try {
             file.parentFile?.mkdirs()
-            yaml.save(file)
+            val temporary = File(file.parentFile, "${file.name}.tmp")
+            yaml.save(temporary)
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    file.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
             dirty = false
+            return true
         } catch (ex: IOException) {
             plugin.logger.warning("Failed to save regions.yml: ${ex.message}")
+            return false
+        }
+    }
+
+    private fun writeRegion(yaml: YamlConfiguration, path: String, region: RegionDefinition) {
+        yaml.set("$path.name", region.name)
+        yaml.set("$path.enabled", region.enabled)
+        yaml.set("$path.lifecycle", region.lifecycle.name.lowercase(Locale.ROOT))
+        yaml.set("$path.revision", region.revision)
+        yaml.set("$path.published-revision", region.publishedRevision)
+        yaml.set("$path.priority", region.priority)
+        yaml.set("$path.owner-policy", region.ownerPolicy.name.lowercase(Locale.ROOT))
+        yaml.set("$path.source.type", region.source.type)
+        for ((key, value) in region.source.values) yaml.set("$path.source.$key", value)
+        region.mode?.let { mode ->
+            yaml.set("$path.mode.type", mode.type)
+            for ((key, value) in mode.values) yaml.set("$path.mode.$key", value)
+        }
+        for ((key, flag) in region.flags) {
+            yaml.set("$path.flags.$key.value", flag.value)
+            for ((valueKey, value) in flag.values) yaml.set("$path.flags.$key.$valueKey", value)
+        }
+        if (region.effects.isNotEmpty()) {
+            yaml.set("$path.effects", region.effects.map { effect ->
+                linkedMapOf<String, Any>(
+                    "type" to effect.type,
+                    "scope" to effect.scope.name.lowercase(Locale.ROOT),
+                    "combination" to effect.combination.name.lowercase(Locale.ROOT),
+                ).apply { putAll(effect.values) }
+            })
+        }
+        for ((key, value) in region.metadata) yaml.set("$path.metadata.$key", value)
+        for ((trigger, blocks) in region.triggers) {
+            yaml.set("$path.triggers.${trigger.key}", blocks.map { block ->
+                linkedMapOf<String, Any>().apply {
+                    block.name?.let { put("name", it) }
+                    if (block.execution != TriggerExecution.ALL_ACTIVE) {
+                        put("execution", block.execution.name.lowercase(Locale.ROOT))
+                    }
+                    if (block.conditions.isNotEmpty()) put("if", block.conditions.map { condition ->
+                        linkedMapOf<String, Any>("type" to condition.type).apply {
+                            putAll(condition.values)
+                            if (condition.negated) put("negated", true)
+                        }
+                    })
+                    if (block.thenActions.isNotEmpty()) put("then", block.thenActions.map { action ->
+                        linkedMapOf<String, Any>("type" to action.type).apply { putAll(action.values) }
+                    })
+                    if (block.elseActions.isNotEmpty()) put("else", block.elseActions.map { action ->
+                        linkedMapOf<String, Any>("type" to action.type).apply { putAll(action.values) }
+                    })
+                }
+            })
         }
     }
 
@@ -173,6 +234,9 @@ class RegionStorage(private val plugin: RegionsPlugin) {
             source = RegionSourceRef(sourceType, sourceValues),
             ownerPolicy = parseOwnerPolicy(section.getString("owner-policy")),
             enabled = section.getBoolean("enabled", true),
+            lifecycle = parseLifecycle(section.getString("lifecycle")),
+            revision = section.getLong("revision", 1L).coerceAtLeast(1L),
+            publishedRevision = if (section.contains("published-revision")) section.getLong("published-revision") else 1L,
             priority = section.getInt("priority", 0),
             mode = mode,
             flags = flags,
@@ -216,10 +280,12 @@ class RegionStorage(private val plugin: RegionsPlugin) {
             val values = stringify(entry)
             val type = values["type"] ?: continue
             val scope = parseScope(values["scope"])
+            val combination = parseCombination(values["combination"])
             val arguments = LinkedHashMap(values)
             arguments.remove("type")
             arguments.remove("scope")
-            result.add(EffectConfig(type, scope, arguments))
+            arguments.remove("combination")
+            result.add(EffectConfig(type, scope, arguments, combination))
         }
         return result
     }
@@ -242,10 +308,11 @@ class RegionStorage(private val plugin: RegionsPlugin) {
 
     private fun parseActionBlock(values: Map<String, Any?>): ActionBlockConfig {
         val name = values["name"]?.toString()
+        val execution = parseTriggerExecution(values["execution"]?.toString())
         val conditions = parseConditions(values["if"])
         val thenActions = parseActions(values["then"])
         val elseActions = parseActions(values["else"])
-        return ActionBlockConfig(name, conditions, thenActions, elseActions)
+        return ActionBlockConfig(name, conditions, thenActions, elseActions, execution)
     }
 
     private fun parseConditions(raw: Any?): List<ConditionConfig> {
@@ -261,7 +328,8 @@ class RegionStorage(private val plugin: RegionsPlugin) {
                 val type = values["type"] ?: continue
                 val args = LinkedHashMap(values)
                 args.remove("type")
-                result.add(ConditionConfig(type, args))
+                val negated = args.remove("negated")?.toBooleanStrictOrNull() ?: false
+                result.add(ConditionConfig(type, args, negated))
             }
         }
         return result
@@ -288,11 +356,33 @@ class RegionStorage(private val plugin: RegionsPlugin) {
             else -> OwnerPolicy.ADMIN
         }
 
+    private fun parseLifecycle(value: String?): RegionLifecycle =
+        when (value?.lowercase(Locale.ROOT)) {
+            "draft" -> RegionLifecycle.DRAFT
+            "frozen" -> RegionLifecycle.FROZEN
+            "archived" -> RegionLifecycle.ARCHIVED
+            else -> RegionLifecycle.PUBLISHED
+        }
+
     private fun parseScope(value: String?): EffectScope =
         when (value?.lowercase(Locale.ROOT)) {
             "until_mode_end", "until-mode-end" -> EffectScope.UNTIL_MODE_END
             "timed" -> EffectScope.TIMED
             else -> EffectScope.WHILE_INSIDE
+        }
+
+    private fun parseCombination(value: String?): EffectCombination =
+        when (value?.lowercase(Locale.ROOT)) {
+            "exclusive" -> EffectCombination.EXCLUSIVE
+            "stack" -> EffectCombination.STACK
+            "merge_by_type", "merge-by-type" -> EffectCombination.MERGE_BY_TYPE
+            else -> EffectCombination.HIGHEST_PRIORITY
+        }
+
+    private fun parseTriggerExecution(value: String?): TriggerExecution =
+        when (value?.lowercase(Locale.ROOT)) {
+            "primary", "primary_region", "primary-region" -> TriggerExecution.PRIMARY_REGION
+            else -> TriggerExecution.ALL_ACTIVE
         }
 
     private fun valuesOf(section: ConfigurationSection, excluded: Set<String> = emptySet()): Map<String, String> {

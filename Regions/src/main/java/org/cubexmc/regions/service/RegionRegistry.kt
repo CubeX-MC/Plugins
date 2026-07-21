@@ -11,21 +11,30 @@ class RegionRegistry(
 
     fun find(id: String): RegionDefinition? = storage.find(id)
 
-    fun put(region: RegionDefinition): ServiceResult {
+    internal fun put(region: RegionDefinition): ServiceResult {
         val issues = validator.validate(region).filter { it.severity.name == "ERROR" }
         if (issues.isNotEmpty()) {
             return ServiceResult.fail(issues.joinToString("; ") { it.message })
         }
         storage.put(region)
-        storage.flushIfDirty()
-        return ServiceResult.ok()
+        return persistOrReload()
     }
 
-    fun remove(id: String): ServiceResult {
+    internal fun putSystem(region: RegionDefinition): ServiceResult {
+        storage.put(region)
+        return persistOrReload()
+    }
+
+    internal fun remove(id: String): ServiceResult {
         if (!storage.remove(id)) {
             return ServiceResult.fail("Region not found: $id")
         }
-        storage.flushIfDirty()
-        return ServiceResult.ok()
+        return persistOrReload()
+    }
+
+    private fun persistOrReload(): ServiceResult {
+        if (storage.flushIfDirty()) return ServiceResult.ok()
+        storage.load()
+        return ServiceResult.fail("Failed to persist regions.yml; the previous on-disk state was restored.")
     }
 }

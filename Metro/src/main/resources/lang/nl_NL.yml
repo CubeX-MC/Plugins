@@ -51,7 +51,7 @@ line:
   help_trust: "<gold>/m line trust \\<line_id> \\<speler> <white>- Voeg een lijnbeheerder toe"
   help_untrust: "<gold>/m line untrust \\<line_id> \\<speler> <white>- Verwijder een lijnbeheerder"
   help_owner: "<gold>/m line owner \\<line_id> \\<speler> <white>- Draag lijnbezit over"
-  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Lijn omgekeerd klonen"
+  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Lijn en haltes klonen met omgekeerde volgorde en vertrekrichting"
   help_setprice: "<gold>/m line setprice \\<line_id> \\<prijs> <white>- Traditionele vaste ticketprijs instellen\n<gold>/m line setprice \\<line_id> flat|distance|interval \\<basis> [perEenheid] [max] <white>- Geavanceerde prijsstelling\n<gold>/m line setprice reset \\<line_id> <white>- Terugzetten naar traditionele prijsstelling"
   help_recordroute: "<gold>/m line recordroute \\<line_id> <white>- Neem routepunten op of sla ze op voor online kaarten en spoorbescherming"
   help_clearroute: "<gold>/m line clearroute \\<line_id> confirm <white>- Wis opgenomen routepunten"

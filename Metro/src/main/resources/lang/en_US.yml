@@ -51,7 +51,7 @@ line:
   help_trust: "<gold>/m line trust \\<line_id> \\<player> <white>- Add a line administrator"
   help_untrust: "<gold>/m line untrust \\<line_id> \\<player> <white>- Remove a line administrator"
   help_owner: "<gold>/m line owner \\<line_id> \\<player> <white>- Transfer line ownership"
-  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Clone line in reverse"
+  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Clone line and stops with reversed order and launch direction"
   help_setprice: "<gold>/m line setprice \\<line_id> \\<price> <white>- Set legacy flat ticket price\n<gold>/m line setprice \\<line_id> flat|distance|interval \\<base> [perUnit] [max] <white>- Set advanced pricing\n<gold>/m line setprice reset \\<line_id> <white>- Reset to legacy pricing"
   help_recordroute: "<gold>/m line recordroute \\<line_id> <white>- Record or save route points for online maps and rail protection"
   help_clearroute: "<gold>/m line clearroute \\<line_id> confirm <white>- Clear recorded route points"

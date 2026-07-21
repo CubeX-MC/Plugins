@@ -1,29 +1,45 @@
-lang-version: 1
+lang-version: 4
 
 prefix: "&#69DB7C[Regions] "
 help: |
   &#69DB7C/regions gui &#CFD8DC- 打开 Regions 管理界面
   &#69DB7C/regions list &#CFD8DC- 查看区域
-  &#69DB7C/regions create <id> <名称> &#CFD8DC- 创建区域
+  &#69DB7C/regions create <id> <名称> --land <领地> [area] &#CFD8DC- 在自己的 Lands 区域创建场地
   &#69DB7C/regions bind <id> cuboid|lands ... &#CFD8DC- 绑定区域来源
   &#69DB7C/regions mode set <id> dual_pvp|union_war|run_race|boat_race|horse_race|hide_and_seek ... &#CFD8DC- 设置玩法
   &#69DB7C/regions game <id> ready/start/status/end &#CFD8DC- 确认、裁判开始、查看或结束游戏
   &#69DB7C/regions flag set <id> <flag> <值> &#CFD8DC- 设置规则
   &#69DB7C/regions effect add <id> <effect> [参数] &#CFD8DC- 添加区域效果
+  &#69DB7C/regions trial <id> [start|stop] &#CFD8DC- 仅对自己隔离试运行草稿 Effect 与 Flag
+  &#69DB7C/regions preview <id> &#CFD8DC- 查看依赖、冲突和最终有效规则
   &#69DB7C/regions validate [id] &#CFD8DC- 校验配置
   &#69DB7C/regions inspect <玩家> &#CFD8DC- 查看玩家区域状态
   &#69DB7C/regions cleanup <玩家> &#CFD8DC- 清理玩家区域状态
+  &#69DB7C/regions freeze|unfreeze <id> [原因] &#CFD8DC- 超级管理员冻结或复核解冻场地
+  &#69DB7C/regions audit [id] [条数] &#CFD8DC- 超级管理员查看审计记录
   &#69DB7C/regions reload &#CFD8DC- 重载配置
+help-publishing: |
+  &#69DB7C/regions publish|withdraw <id> &#CFD8DC- 发布草稿或撤回当前版本
+  &#69DB7C/regions history <id> &#CFD8DC- 查看不可变版本历史
+  &#69DB7C/regions rollback <id> <revision> &#CFD8DC- 将历史版本发布为新 revision
+  &#69DB7C/regions archive <id> &#CFD8DC- 归档场地
 help-player: "&#CFD8DC进入被设置过的领地或场地即可体验 Regions；对战、比赛、小游戏场地会在需要确认时提示你使用 &#69DB7C/regions game <场地> ready&#CFD8DC。"
 reloaded: "&#69DB7CRegions 已重载。"
 no-permission: "&#E63946你没有权限。"
+authority-not-ruler: "&#E63946只有 RuleGems 统治者可以管理场地。"
+authority-not-source-owner: "&#E63946你不是该场地所绑定区域的当前主人。"
+authority-source-unknown: "&#E63946该场地的区域来源不存在。"
+authority-source-unavailable: "&#E63946该场地的区域来源当前不可用。"
+authority-superadmin-required: "&#E63946此操作仅限 Regions 超级管理员。"
+authority-region-frozen: "&#E63946该场地已冻结，仅 Regions 超级管理员可以处理。"
+authority-ownership-changed: "&#E63946区域主人已发生变化；场地必须冻结并由超级管理员复核。"
 player-only: "&#E63946该命令只能由玩家执行。"
 invalid-usage: "&#FFE066用法: {usage}"
 not-found: "&#E63946找不到区域: {id}"
 player-not-found: "&#E63946找不到在线玩家: {player}"
 list-empty: "&#CFD8DC还没有配置任何区域。"
 list-header: "&#69DB7C已配置区域 ({count}):"
-list-line: "&#CFD8DC- &#FFE066{id} &#CFD8DC{enabled} &#FFFFFF{name} &#90A4AE[source={source}, mode={mode}]"
+list-line: "&#CFD8DC- &#FFE066{id} &#CFD8DC{enabled} &#FFFFFF{name} &#90A4AE[state={lifecycle}, source={source}, mode={mode}]"
 enabled: "&#69DB7C启用"
 disabled: "&#90A4AE禁用"
 validate-ok: "&#69DB7C区域配置校验通过。"

@@ -51,7 +51,7 @@ line:
   help_trust: "<gold>/m line trust \\<line_id> \\<jugador> <white>- Añadir administrador de la línea"
   help_untrust: "<gold>/m line untrust \\<line_id> \\<jugador> <white>- Quitar administrador de la línea"
   help_owner: "<gold>/m line owner \\<line_id> \\<jugador> <white>- Transferir propiedad de la línea"
-  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Clonar línea en reverso"
+  help_clonereverse: "<gold>/m line clonereverse \\<source_id> \\<new_id> [suffix] <white>- Clonar línea y paradas con orden y dirección de salida inversos"
   help_setprice: "<gold>/m line setprice \\<line_id> \\<precio> <white>- Establecer precio fijo tradicional\n<gold>/m line setprice \\<line_id> flat|distance|interval \\<base> [porUnidad] [max] <white>- Establecer precios avanzados\n<gold>/m line setprice reset \\<line_id> <white>- Restablecer a precios tradicionales"
   help_recordroute: "<gold>/m line recordroute \\<line_id> <white>- Grabar o guardar puntos de ruta para mapas en línea y protección de vías"
   help_clearroute: "<gold>/m line clearroute \\<line_id> confirm <white>- Borrar los puntos de ruta grabados"
