@@ -46,10 +46,10 @@ public class GuiListener implements Listener {
     
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        Inventory inv = event.getInventory();
+        Inventory topInv = event.getView().getTopInventory();
         
         // 检查是否是我们的 GUI
-        if (!(inv.getHolder() instanceof GuiHolder holder)) {
+        if (!(topInv.getHolder() instanceof GuiHolder holder)) {
             return;
         }
         
@@ -64,7 +64,7 @@ public class GuiListener implements Listener {
         int slot = event.getRawSlot();
         
         // 忽略点击 GUI 外部
-        if (slot < 0 || slot >= inv.getSize()) {
+        if (slot < 0 || slot >= topInv.getSize()) {
             return;
         }
         
@@ -94,9 +94,14 @@ public class GuiListener implements Listener {
     
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
-        // 防止在 GUI 中拖拽物品
-        if (event.getInventory().getHolder() instanceof GuiHolder) {
-            event.setCancelled(true);
+        if (event.getView().getTopInventory().getHolder() instanceof GuiHolder) {
+            int topSize = event.getView().getTopInventory().getSize();
+            for (int slot : event.getRawSlots()) {
+                if (slot < topSize) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
         }
     }
 }
