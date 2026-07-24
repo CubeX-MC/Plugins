@@ -53,11 +53,36 @@ jobs:
             echo "::group::$p -> $repo (main)"
             sha="$(git subtree split --prefix="$p")"
             url="https://x-access-token:${MIRROR_TOKEN}@github.com/${repo}.git"
-            # 仅 fast-forward 推送到 main;失败(如非 FF 或分支保护)记录但继续其余,绝不 force
-            if git push "$url" "${sha}:refs/heads/main"; then
-              echo "ok: $p -> $repo @ ${sha}"
+
+            # 独立 repo 偶尔会收到直接提交。分叉时保留双方历史,但让最终文件树
+            # 严格等于 monorepo 的 subtree split;整个过程仍是 fast-forward,绝不 force。
+            remote_sha="$(git ls-remote "$url" refs/heads/main | awk '{print $1}')"
+            push_sha="$sha"
+            if [ -n "$remote_sha" ]; then
+              remote_ref="refs/remotes/mirror-${i}/main"
+              git fetch --no-tags "$url" "refs/heads/main:${remote_ref}"
+
+              if git merge-base --is-ancestor "$remote_sha" "$sha"; then
+                push_sha="$sha"
+              elif [ "$(git rev-parse "${remote_sha}^{tree}")" = "$(git rev-parse "${sha}^{tree}")" ]; then
+                echo "ok: $p 内容已同步(历史分叉,无需推送)@ ${remote_sha}"
+                echo "::endgroup::"
+                continue
+              else
+                tree_sha="$(git rev-parse "${sha}^{tree}")"
+                push_sha="$(
+                  printf 'chore: sync %s from CubeX-Plugins\n' "$p" |
+                    git commit-tree "$tree_sha" -p "$remote_sha" -p "$sha"
+                )"
+                echo "::notice::$p 历史分叉;创建保留双方历史的同步提交 ${push_sha}"
+              fi
+            fi
+
+            # 仅 fast-forward 推送到 main;失败(如分支保护或并发写入)记录但继续其余。
+            if git push "$url" "${push_sha}:refs/heads/main"; then
+              echo "ok: $p -> $repo @ ${push_sha} (tree from ${sha})"
             else
-              echo "::error::push 失败(可能非 fast-forward 或权限不足):$p -> $repo"
+              echo "::error::push 失败(可能有并发写入、分支保护或权限不足):$p -> $repo"
               failed=1
             fi
             echo "::endgroup::"
