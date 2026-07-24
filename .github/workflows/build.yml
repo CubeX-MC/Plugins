@@ -40,8 +40,8 @@ jobs:
             !FAWEReplacer/build/libs/*-plain.jar
             MountLicense/build/libs/*.jar
             !MountLicense/build/libs/*-plain.jar
-            Contracts/build/libs/*.jar
-            !Contracts/build/libs/*-plain.jar
+            Contract/build/libs/*.jar
+            !Contract/build/libs/*-plain.jar
             EcoBalancer/build/libs/*.jar
             !EcoBalancer/build/libs/*-plain.jar
             RuleGems/build/libs/*.jar
@@ -50,6 +50,10 @@ jobs:
             !Metro/build/libs/*-plain.jar
             Railway/build/libs/*.jar
             !Railway/build/libs/*-plain.jar
+            Clarity/build/libs/*.jar
+            !Clarity/build/libs/*-plain.jar
+            Reputations/build/libs/*.jar
+            !Reputations/build/libs/*-plain.jar
             Regions/build/libs/*.jar
             !Regions/build/libs/*-plain.jar
 
@@ -63,12 +67,13 @@ jobs:
           - BookLite
           - FAWEReplacer
           - MountLicense
-          - Contracts
+          - Contract
           - EcoBalancer
           - RuleGems
           - Metro
           - Railway
           - Clarity
+          - Reputations
           - Regions
 
     steps:
