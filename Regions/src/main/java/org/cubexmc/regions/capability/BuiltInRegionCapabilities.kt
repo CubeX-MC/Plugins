@@ -8,6 +8,33 @@ object BuiltInRegionCapabilities {
         registerEffects(catalog)
         registerActions(catalog)
         registerConditions(catalog)
+        registerTriggers(catalog)
+    }
+
+    /**
+     * Only triggers with a runtime firing site belong here. `RegionsPlugin.verifyCapabilityCatalog`
+     * compares this set against [org.cubexmc.regions.model.RegionTrigger], so a trigger that is
+     * declared but never fired cannot reach a published revision.
+     */
+    private fun registerTriggers(catalog: CapabilityCatalog) {
+        listOf(
+            "on_enter",
+            "on_leave",
+            "on_death",
+            "on_kill",
+            "on_respawn",
+            "on_interact",
+            "on_command",
+            "on_timer",
+            "on_mode_start",
+            "on_mode_end",
+            "on_role_assigned",
+            "on_found",
+            "on_checkpoint",
+            "on_finish",
+        ).forEach { id ->
+            catalog.register(descriptor(CapabilityKind.TRIGGER, id))
+        }
     }
 
     private fun registerSources(catalog: CapabilityCatalog) {

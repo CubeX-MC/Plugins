@@ -24,6 +24,9 @@ safety:
   cleanup-on-reload: true
   max-actions-per-trigger: 16
   max-regions-per-player: 5
+  # How often on_timer triggers fire for players inside a region. Values below 5 are raised to 5 so a
+  # misconfigured venue cannot run action blocks every tick.
+  timer-trigger-interval-seconds: 5
 
 effects:
   refresh-interval-ticks: 60

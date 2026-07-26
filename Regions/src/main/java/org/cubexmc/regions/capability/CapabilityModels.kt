@@ -9,6 +9,7 @@ enum class CapabilityKind {
     EFFECT,
     ACTION,
     CONDITION,
+    TRIGGER,
 }
 
 enum class CapabilityStatus {

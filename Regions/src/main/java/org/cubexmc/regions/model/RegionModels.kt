@@ -95,6 +95,12 @@ data class ConditionConfig(
     val negated: Boolean = false,
 )
 
+/**
+ * Every constant must have a runtime firing site; a trigger that can be saved and validated but
+ * never fires is a silent no-op for the venue owner. `RegionsPlugin.verifyCapabilityCatalog` asserts
+ * this list matches the registered TRIGGER descriptors, so adding a constant here without wiring it
+ * up fails startup.
+ */
 enum class RegionTrigger(val key: String) {
     ON_ENTER("on_enter"),
     ON_LEAVE("on_leave"),
@@ -108,7 +114,6 @@ enum class RegionTrigger(val key: String) {
     ON_MODE_END("on_mode_end"),
     ON_ROLE_ASSIGNED("on_role_assigned"),
     ON_FOUND("on_found"),
-    ON_SCORE("on_score"),
     ON_CHECKPOINT("on_checkpoint"),
     ON_FINISH("on_finish"),
     ;

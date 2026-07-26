@@ -46,6 +46,18 @@ class LandsRegionSource(private val plugin: RegionsPlugin) : RegionSource {
         return matchesConfiguredArea(area, ref)
     }
 
+    /**
+     * Every Lands-backed region at one location resolves to the same Lands area, and that resolution
+     * is a chain of reflective calls. Doing it once per lookup instead of once per region keeps a
+     * server with many Lands venues from paying for them on every step a player takes.
+     */
+    override fun containing(refs: Collection<RegionSourceRef>, location: Location): Set<RegionSourceRef> {
+        if (refs.isEmpty()) return emptySet()
+        val integration = integration() ?: return emptySet()
+        val area = areaAt(integration, location) ?: return emptySet()
+        return refs.filterTo(LinkedHashSet()) { matchesConfiguredArea(area, it) }
+    }
+
     override fun getOwnedRegions(playerId: UUID): List<ExternalRegion> {
         val integration = integration() ?: return emptyList()
         val landsPlayer = invoke(integration, "getLandPlayer", playerId)

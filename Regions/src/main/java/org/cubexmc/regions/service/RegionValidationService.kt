@@ -91,6 +91,9 @@ class RegionValidationService(
         }
 
         for ((trigger, blocks) in region.triggers) {
+            if (capabilities.find(CapabilityKind.TRIGGER, trigger.key) == null) {
+                issues.add(error(region.id, "Trigger '${trigger.key}' has no runtime and would never fire."))
+            }
             for (block in blocks) {
                 for (condition in block.conditions) {
                     if (!conditions.isRegistered(condition.type)) {

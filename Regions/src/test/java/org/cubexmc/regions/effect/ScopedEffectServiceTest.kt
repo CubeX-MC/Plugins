@@ -105,6 +105,49 @@ class ScopedEffectServiceTest {
     }
 
     @Test
+    fun `batched applies write the escrow once at the end of the batch`() {
+        `when`(player.walkSpeed).thenReturn(0.2f)
+        `when`(player.flySpeed).thenReturn(0.1f)
+        `when`(player.isGlowing).thenReturn(false)
+
+        val persisted = service.batched {
+            service.applyDeclared(player, region, EffectConfig("walk_speed", values = mapOf("value" to "0.6")))
+            service.applyDeclared(player, region, EffectConfig("fly_speed", values = mapOf("value" to "0.4")))
+            service.applyDeclared(player, region, EffectConfig("glowing", values = mapOf("value" to "true")))
+            // Nothing is on disk yet: the three applies coalesce into the single write below.
+            assertEquals(0, persistedLeaseCount())
+        }
+
+        assertTrue(persisted)
+        assertEquals(3, persistedLeaseCount())
+        assertEquals(3, ScopedEffectService(plugin).apply { registerDefaults() }.pendingLeaseCount(playerId))
+    }
+
+    @Test
+    fun `batched cleanup restores every lease and leaves the escrow empty`() {
+        `when`(player.walkSpeed).thenReturn(0.2f)
+        `when`(player.flySpeed).thenReturn(0.1f)
+        service.applyDeclared(player, region, EffectConfig("walk_speed", values = mapOf("value" to "0.6")))
+        service.applyDeclared(player, region, EffectConfig("fly_speed", values = mapOf("value" to "0.4")))
+
+        assertEquals(2, service.cleanupPlayer(player, "leave"))
+
+        assertEquals(0, persistedLeaseCount())
+        verify(player).walkSpeed = 0.2f
+        verify(player).flySpeed = 0.1f
+    }
+
+    private fun persistedLeaseCount(): Int {
+        val file = tempDir.resolve("effect-escrow.yml").toFile()
+        if (!file.exists()) return 0
+        return YamlConfiguration.loadConfiguration(file)
+            .getConfigurationSection("leases")
+            ?.getKeys(false)
+            ?.size
+            ?: 0
+    }
+
+    @Test
     fun `persisted leases restore after service recreation`() {
         `when`(player.walkSpeed).thenReturn(0.2f)
         assertTrue(service.apply(

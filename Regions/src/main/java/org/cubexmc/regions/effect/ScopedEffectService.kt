@@ -20,10 +20,15 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 import kotlin.math.min
 
+/** One region-declared effect awaiting application, paired with the region that declared it. */
+data class DeclaredEffect(val region: RegionDefinition, val config: EffectConfig)
+
 class ScopedEffectService(private val plugin: RegionsPlugin) {
     private val effectTypes: MutableSet<String> = LinkedHashSet()
     private val leases: MutableMap<UUID, EffectLease> = ConcurrentHashMap()
     private val applicationSequence = AtomicLong()
+    private var batchDepth = 0
+    private var batchDirty = false
     private val leaseStore: EffectLeaseStore? = runCatching { plugin.dataFolder }
         .getOrNull()
         ?.let { EffectLeaseStore(it, plugin.logger) }
@@ -62,6 +67,34 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
 
     fun applyDeclared(player: Player, region: RegionDefinition, config: EffectConfig): ServiceResult {
         return applyInternal(player, region, config, mapOf(ORIGIN_KEY to DECLARED_ORIGIN))
+    }
+
+    /**
+     * Applies a resolved effect set as one unit: a single escrow write for the whole set, and on any
+     * failure every effect already applied in the set is rolled back. Callers get all of the region's
+     * declared state or none of it, never a half-applied player.
+     */
+    fun applyDeclaredSet(player: Player, requests: List<DeclaredEffect>): ServiceResult {
+        if (requests.isEmpty()) return ServiceResult.ok()
+        var failure: ServiceResult? = null
+        val persisted = batched {
+            for (request in requests) {
+                val result = applyInternal(
+                    player,
+                    request.region,
+                    request.config,
+                    mapOf(ORIGIN_KEY to DECLARED_ORIGIN),
+                )
+                if (!result.success) {
+                    failure = result
+                    break
+                }
+            }
+        }
+        val failed = failure
+        if (failed == null && persisted) return ServiceResult.ok()
+        cleanupDeclaredEffects(player, "declared-set-rollback")
+        return failed ?: ServiceResult.fail("Unable to persist the effect escrow for the resolved set.")
     }
 
     private fun applyInternal(
@@ -106,50 +139,49 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
     internal fun pendingLeaseCount(playerId: UUID? = null): Int =
         if (playerId == null) leases.size else leases.values.count { it.playerId == playerId }
 
-    fun cleanupPlayer(player: Player, reason: String): Int {
-        val playerLeases = leases.values
-            .filter { it.playerId == player.uniqueId }
-            .sortedByDescending { it.applicationOrder }
-        val restored = playerLeases.count { restoreKnownPlayer(player, it.id).success }
-        if (restored > 0) {
-            plugin.logger.fine("Cleaned $restored effect lease(s) for ${player.name}: $reason")
-        }
-        return restored
-    }
+    fun cleanupPlayer(player: Player, reason: String): Int =
+        restoreMatching(player, reason, "effect lease(s)") { true }
 
-    fun cleanupRegion(player: Player, regionId: String, reason: String): Int {
-        val playerLeases = leases.values
-            .filter { it.playerId == player.uniqueId && it.regionId == regionId }
-            .sortedByDescending { it.applicationOrder }
-        val restored = playerLeases.count { restoreKnownPlayer(player, it.id).success }
-        if (restored > 0) {
-            plugin.logger.fine("Cleaned $restored effect lease(s) for ${player.name} in $regionId: $reason")
-        }
-        return restored
-    }
+    fun cleanupRegion(player: Player, regionId: String, reason: String): Int =
+        restoreMatching(player, reason, "effect lease(s) in $regionId") { it.regionId == regionId }
 
-    fun cleanupModeEffects(player: Player, regionId: String, reason: String): Int {
-        val modeLeases = leases.values
-            .filter {
-                it.playerId == player.uniqueId &&
-                    it.regionId == regionId &&
-                    it.scope == EffectScope.UNTIL_MODE_END
-            }
-            .sortedByDescending { it.applicationOrder }
-        val restored = modeLeases.count { restoreKnownPlayer(player, it.id).success }
-        if (restored > 0) {
-            plugin.logger.fine("Cleaned $restored mode effect lease(s) for ${player.name} in $regionId: $reason")
+    fun cleanupModeEffects(player: Player, regionId: String, reason: String): Int =
+        restoreMatching(player, reason, "mode effect lease(s) in $regionId") {
+            it.regionId == regionId && it.scope == EffectScope.UNTIL_MODE_END
         }
-        return restored
-    }
 
-    fun cleanupDeclaredEffects(player: Player, reason: String): Int {
-        val declared = leases.values
-            .filter { it.playerId == player.uniqueId && it.metadata[ORIGIN_KEY] == DECLARED_ORIGIN }
+    fun cleanupDeclaredEffects(player: Player, reason: String): Int =
+        restoreMatching(player, reason, "declared effect lease(s)") {
+            it.metadata[ORIGIN_KEY] == DECLARED_ORIGIN
+        }
+
+    /**
+     * Restores every matching lease newest-first so stacked effects unwind in reverse application
+     * order, and writes the escrow once for the whole set.
+     */
+    private fun restoreMatching(
+        player: Player,
+        reason: String,
+        describe: String,
+        predicate: (EffectLease) -> Boolean,
+    ): Int {
+        val matching = leases.values
+            .filter { it.playerId == player.uniqueId && predicate(it) }
             .sortedByDescending { it.applicationOrder }
-        val restored = declared.count { restoreKnownPlayer(player, it.id).success }
-        if (restored > 0) {
-            plugin.logger.fine("Reconciled $restored declared effect lease(s) for ${player.name}: $reason")
+        if (matching.isEmpty()) return 0
+        var restored = 0
+        val persisted = batched {
+            restored = matching.count { restoreKnownPlayer(player, it.id).success }
+        }
+        if (!persisted) {
+            // The player state is already back to its snapshot; the escrow just still lists the
+            // leases. That errs towards restoring twice on the next start, which is idempotent.
+            plugin.logger.severe(
+                "Restored $restored $describe for ${player.name} ($reason) but could not update " +
+                    "effect-escrow.yml; those records will be replayed on the next start.",
+            )
+        } else if (restored > 0) {
+            plugin.logger.fine("Cleaned $restored $describe for ${player.name}: $reason")
         }
         return restored
     }
@@ -165,10 +197,19 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
     }
 
     fun refreshPlayer(player: Player, nowMillis: Long = System.currentTimeMillis()) {
-        for (lease in leases.values.toList()) {
-            if (lease.playerId == player.uniqueId) {
+        val owned = leases.values.filter { it.playerId == player.uniqueId }
+        if (owned.isEmpty()) return
+        // Several leases can expire in the same pass; batch so they cost one escrow write, not one each.
+        val persisted = batched {
+            for (lease in owned) {
                 refreshLease(player, lease, nowMillis)
             }
+        }
+        if (!persisted) {
+            plugin.logger.severe(
+                "Refreshed effect leases for ${player.name} but could not update effect-escrow.yml; " +
+                    "expired records will be replayed on the next start.",
+            )
         }
     }
 
@@ -374,7 +415,38 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         }
     }
 
-    private fun persistLeases(): Boolean = leaseStore?.replace(leases.values) ?: true
+    /**
+     * Coalesces the escrow writes of everything [block] does into one write at the end.
+     *
+     * Entering a region applies every resolved effect in one go; without this each one rewrote the
+     * whole escrow file on the calling thread. The batch is synchronous and completes before the
+     * caller returns, so the crash window is the same as writing per effect — what changes is the
+     * number of writes, not when durability is reached.
+     *
+     * Returns false when the deferred write failed. The caller must then roll back the player state
+     * it applied inside the block, exactly as it would for a failed individual apply.
+     */
+    fun batched(block: () -> Unit): Boolean {
+        batchDepth++
+        try {
+            block()
+        } finally {
+            batchDepth--
+        }
+        if (batchDepth > 0 || !batchDirty) return true
+        batchDirty = false
+        return writeLeases()
+    }
+
+    private fun persistLeases(): Boolean {
+        if (batchDepth > 0) {
+            batchDirty = true
+            return true
+        }
+        return writeLeases()
+    }
+
+    private fun writeLeases(): Boolean = leaseStore?.replace(leases.values) ?: true
 
     private fun createLease(
         player: Player,

@@ -57,6 +57,36 @@ class CapabilityTruthTest {
     }
 
     @Test
+    fun `every declared trigger has a descriptor and no descriptor outlives its runtime`() {
+        val catalog = CapabilityCatalog().apply { BuiltInRegionCapabilities.registerAll(this) }
+
+        // This is the same assertion RegionsPlugin.verifyCapabilityCatalog makes at startup: a
+        // trigger that parses and validates but never fires is a silent no-op for the venue owner.
+        assertEquals(
+            RegionTrigger.entries.mapTo(LinkedHashSet()) { it.key },
+            catalog.stableIds(CapabilityKind.TRIGGER),
+        )
+        assertFalse(catalog.stableIds(CapabilityKind.TRIGGER).contains("on_score"))
+    }
+
+    @Test
+    fun `validation rejects triggers that have no runtime`() {
+        val validation = validationForModes("free_event")
+        val catalog = CapabilityCatalog().apply {
+            BuiltInRegionCapabilities.registerAll(this)
+            register(CapabilityDescriptor(CapabilityKind.SOURCE, "test"))
+        }
+
+        assertFalse(catalog.validate(CapabilityKind.TRIGGER, "on_score", emptyMap()).isEmpty())
+        assertTrue(validation.validate(RegionDefinition(
+            id = "venue",
+            name = "Venue",
+            source = RegionSourceRef("test"),
+            triggers = mapOf(RegionTrigger.ON_TIMER to listOf(ActionBlockConfig())),
+        )).none { it.message.contains("never fire") })
+    }
+
+    @Test
     fun `validation rejects unknown conditions and unavailable flags`() {
         val sources = RegionSourceRegistry().apply { register(AlwaysAvailableSource()) }
         val modes = RegionModeRegistry().apply { register("free_event") }

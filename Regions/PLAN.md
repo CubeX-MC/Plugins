@@ -1367,7 +1367,7 @@ data class RegionAuditEvent(
 
 ## 12. 测试计划
 
-当前自动化基线（2026-07-16）：12 个测试套件、44 个测试全部通过，0 failure、0 error、0 skipped。
+当前自动化基线（2026-07-25）：17 个测试套件、71 个测试全部通过，0 failure、0 error、0 skipped。
 
 单元测试优先覆盖纯逻辑：
 
@@ -1687,7 +1687,10 @@ Regions 尚未公开发布，因此当前格式直接作为首个公开版本基
 - [x] Trigger block 可声明全部 active Region 或主 Region 执行；相同 Source、Cuboid 及其他提供 geometry 的 Source 支持发布期重叠预判，未知几何会在预览中明确警告。
 - [x] 完成 mode-specific GUI，普通统治者只看到当前 Mode 相关设置；原始 `key=value` Mode 编辑仅向 superadmin 保留。
 - [x] 发布阻断错误会指出具体能力、字段、依赖或冲突来源，并给出可操作的修改方向。
-- [ ] 将所有动态校验和第三方依赖错误完整迁入语言文件；首轮真人验证先收集实际难懂文案，再统一调整翻译键和措辞。
+- [x] GUI、命令与 Mode 运行时文案全部迁入语言文件；`LanguageFileTest` 保证 zh_CN/en_US 键集一致且 en_US 不残留源语言。
+- [x] `fly: deny` 通过合成 `allow_flight` Effect 强制执行，飞行中进入区域的玩家同样被落地并在离开时恢复。
+- [x] `on_interact` / `on_timer` 补齐运行时触发点；无运行时概念的 `on_score` 已移除，TRIGGER 纳入启动期能力真值校验。
+- [ ] 校验器与第三方依赖错误正文仍是英文常量，未拆成翻译键；首轮真人验证先收集实际难懂文案，再统一调整。
 
 验收：
 

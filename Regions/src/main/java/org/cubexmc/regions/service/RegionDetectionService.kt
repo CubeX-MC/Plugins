@@ -8,14 +8,46 @@ import org.cubexmc.regions.model.RegionLifecycle
 import org.cubexmc.regions.model.RegionTrigger
 
 class RegionDetectionService(private val plugin: RegionsPlugin) {
-    fun regionsAt(location: Location): List<RegionDefinition> =
-        plugin.regions().all()
-            .filter { it.enabled && it.lifecycle == RegionLifecycle.PUBLISHED }
-            .filter { region ->
-                val source = plugin.sources().find(region.source.type) ?: return@filter false
-                source.isAvailable() && source.contains(region.source, location)
-            }
-            .sortedWith(compareByDescending<RegionDefinition> { it.priority }.thenBy { it.id })
+    @Volatile
+    private var candidates: PublishedCandidates = PublishedCandidates(-1L, emptyMap())
+
+    private data class PublishedCandidates(
+        val revision: Long,
+        val bySourceType: Map<String, List<RegionDefinition>>,
+    )
+
+    /**
+     * Called on every block-boundary move, so the work is grouped rather than per region: the
+     * published set is rebuilt only when it actually changes, source availability is evaluated once
+     * per source, and each source resolves the whole location lookup in a single call.
+     */
+    fun regionsAt(location: Location): List<RegionDefinition> {
+        val grouped = publishedCandidates().bySourceType
+        if (grouped.isEmpty()) return emptyList()
+        val matched = ArrayList<RegionDefinition>()
+        for ((sourceType, regions) in grouped) {
+            val source = plugin.sources().find(sourceType) ?: continue
+            if (!source.isAvailable()) continue
+            val hits = source.containing(regions.map { it.source }.distinct(), location)
+            if (hits.isEmpty()) continue
+            regions.filterTo(matched) { hits.contains(it.source) }
+        }
+        return matched.sortedWith(RegionOverlapResolver.REGION_ORDER)
+    }
+
+    private fun publishedCandidates(): PublishedCandidates {
+        val revision = plugin.storage().publishedRevision()
+        val cached = candidates
+        if (cached.revision == revision) return cached
+        val rebuilt = PublishedCandidates(
+            revision,
+            plugin.regions().all()
+                .filter { it.enabled && it.lifecycle == RegionLifecycle.PUBLISHED }
+                .groupBy { it.source.type },
+        )
+        candidates = rebuilt
+        return rebuilt
+    }
 
     fun updatePlayer(player: Player) {
         val currentRegions = regionsAt(player.location)

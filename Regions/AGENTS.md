@@ -19,6 +19,9 @@
 - Paper 与 Folia 的实体访问必须走 `CubexScheduler`；停服时不能依赖新调度任务执行。
 - 发布验证必须递归检查 Action 中嵌套的 Effect/Action 参数。
 - 不得绕过 draft → validate/preview → publish 的 revision 流程直接改变运行态定义。
+- 每个 `RegionTrigger` 枚举项都必须有运行时触发点，并在 `BuiltInRegionCapabilities` 注册 TRIGGER descriptor；启动期校验会拒绝不一致。
+- 没有可取消事件的 `deny` Flag 必须在 `RegionOverlapResolver` 合成对应 Effect，不能只靠监听器；合成 Effect 要沿用 Flag 的豁免规则。
+- 玩家可见文案一律走语言文件，不写字面量；新增键必须同时补 `zh_CN` 与 `en_US`。
 
 新增能力时同步更新 `BuiltInRegionCapabilities`、验证器、GUI/模板、语言资源、回归测试和相关文档。
 

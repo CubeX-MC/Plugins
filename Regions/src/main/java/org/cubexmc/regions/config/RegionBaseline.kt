@@ -14,8 +14,8 @@ object RegionBaseline {
         BaselineFile("config.yml", "config-version", 4),
         BaselineFile("regions.yml", "regions-version", 4),
         BaselineFile("templates.yml", "templates-version", 1),
-        BaselineFile("lang/zh_CN.yml", "lang-version", 4),
-        BaselineFile("lang/en_US.yml", "lang-version", 4),
+        BaselineFile("lang/zh_CN.yml", "lang-version", 5),
+        BaselineFile("lang/en_US.yml", "lang-version", 5),
     )
 
     fun validate(dataFolder: File): List<String> =

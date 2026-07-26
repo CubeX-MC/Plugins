@@ -41,22 +41,22 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             return
         }
         if (endingRegions.contains(region.id)) {
-            player.sendLegacyMessage("§e${region.name} 正在恢复上一局，请稍后重新进入。")
+            player.sendLegacyMessage(plugin.gameText("game.round.restoring", mapOf("name" to region.name)))
             return
         }
         val state = state(region)
         if (state.active) {
-            player.sendLegacyMessage("§e${region.name} 正在进行中，你会在下一局加入。")
+            player.sendLegacyMessage(plugin.gameText("game.round.in-progress", mapOf("name" to region.name)))
             return
         }
         val maxPlayers = region.mode?.values?.get("max-players")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
-            player.sendLegacyMessage("§c${region.name} 当前人数已满。")
+            player.sendLegacyMessage(plugin.gameText("game.round.full", mapOf("name" to region.name)))
             return
         }
         state.players.add(player.uniqueId)
         state.ready.remove(player.uniqueId)
-        player.sendLegacyMessage("§a你已进入 ${region.name}。输入 §e/regions game ${region.id} ready §a准备小游戏。")
+        player.sendLegacyMessage(plugin.gameText("game.round.joined", mapOf("name" to region.name, "id" to region.id)))
     }
 
     fun onLeave(player: Player, regionId: String, reason: String) {
@@ -87,7 +87,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             return false
         }
         event.isCancelled = true
-        player.sendLegacyMessage("§e请等待隐藏时间结束。")
+        player.sendLegacyMessage(plugin.gameText("game.round.wait-hiding"))
         return true
     }
 
@@ -118,7 +118,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         state.ready.remove(player.uniqueId)
         state.roles.remove(player.uniqueId)
         state.found.remove(player.uniqueId)
-        player.sendLegacyMessage("§e你已离开当前小游戏，复活后会恢复入场前状态。")
+        player.sendLegacyMessage(plugin.gameText("game.round.removed"))
         maybeEndHideAndSeek(state, "death")
         return true
     }
@@ -136,15 +136,15 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
         val state = state(region)
         if (!state.players.contains(player.uniqueId)) {
-            player.sendLegacyMessage("§c你不在这个小游戏场地内。")
+            player.sendLegacyMessage(plugin.gameText("game.round.not-inside"))
             return true
         }
         if (state.active) {
-            player.sendLegacyMessage("§e小游戏已经开始。")
+            player.sendLegacyMessage(plugin.gameText("game.round.already-started"))
             return true
         }
         state.ready.add(player.uniqueId)
-        broadcast(state, "§a${player.name} 已准备 (${state.ready.size}/${state.players.size})")
+        broadcast(state, plugin.gameText("game.round.ready", mapOf("player" to player.name, "current" to state.ready.size.toString(), "total" to state.players.size.toString())))
         if (startMode(region) == "vote" && state.ready.size >= requiredVotes(region, state)) {
             start(region, state, "vote")
         }
@@ -230,7 +230,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
         val minPlayers = region.mode?.values?.get("min-players")?.toIntOrNull()?.coerceAtLeast(2) ?: 2
         if (state.players.size < minPlayers) {
-            broadcast(state, "§e还需要更多玩家才能开始小游戏 (${state.players.size}/$minPlayers)。")
+            broadcast(state, plugin.gameText("game.round.waiting-players", mapOf("current" to state.players.size.toString(), "required" to minPlayers.toString())))
             return
         }
         state.active = true
@@ -257,7 +257,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             })
         }
         val hideSeconds = hideSeconds(region)
-        broadcast(state, "§a${region.name} 开始！寻找者将在 ${hideSeconds} 秒后释放。")
+        broadcast(state, plugin.gameText("game.round.started", mapOf("name" to region.name, "seconds" to hideSeconds.toString())))
         plugin.regionScheduler().runGlobalLater(Runnable {
             if (states[region.id] === state && state.active) {
                 releaseSeekers(region.id)
@@ -268,7 +268,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             plugin.regionScheduler().runGlobalLater(Runnable {
                 val current = states[region.id]
                 if (current === state && current.active) {
-                    broadcast(current, "§6时间到，隐藏者获胜！")
+                    broadcast(current, plugin.gameText("game.round.hiders-win-timeout"))
                     end(region.id, "time-limit")
                 }
             }, roundSeconds * 20L)
@@ -300,14 +300,14 @@ class RoundModeService(private val plugin: RegionsPlugin) {
                 if (shouldReplaceGear(region)) {
                     applyKit(player, region.mode?.values?.get("seeker-kit") ?: region.mode?.values?.get("kit"))
                 }
-                player.sendLegacyMessage("§c你的身份: 寻找者。等待倒计时结束后，攻击隐藏者即可找到对方。")
+                player.sendLegacyMessage(plugin.gameText("game.round.role-seeker"))
             }
             RoundRole.HIDER -> {
                 applyHiderVisual(player, region)
                 if (shouldReplaceGear(region)) {
                     applyKit(player, region.mode?.values?.get("hider-kit") ?: region.mode?.values?.get("kit"))
                 }
-                player.sendLegacyMessage("§a你的身份: 隐藏者。倒计时结束前赶快藏好，被寻找者攻击会出局。")
+                player.sendLegacyMessage(plugin.gameText("game.round.role-hider"))
             }
         }
     }
@@ -318,7 +318,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             return
         }
         state.seekersReleased = true
-        broadcast(state, "§c寻找者已释放！")
+        broadcast(state, plugin.gameText("game.round.seek-start"))
     }
 
     private fun found(hider: Player, seeker: Player, state: RoundState, reason: String) {
@@ -332,14 +332,14 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         if (region.mode?.values?.get("found-becomes-seeker")?.toBooleanStrictOrNull() != false) {
             state.roles[hider.uniqueId] = RoundRole.SEEKER
             applySeekerVisual(hider, region)
-            hider.sendLegacyMessage("§e你被 ${seeker.name} 找到了，现在加入寻找者。")
+            hider.sendLegacyMessage(plugin.gameText("game.round.found-become-seeker", mapOf("seeker" to seeker.name)))
         } else {
             state.roles.remove(hider.uniqueId)
             outsideLocation(region)?.let { plugin.regionScheduler().teleportAsync(hider, it) }
-            hider.sendLegacyMessage("§e你被 ${seeker.name} 找到了，已离开本局。")
+            hider.sendLegacyMessage(plugin.gameText("game.round.found-eliminated", mapOf("seeker" to seeker.name)))
         }
         plugin.triggers().fire(RegionTrigger.ON_FOUND, hider, region)
-        broadcast(state, "§6${hider.name} 被 ${seeker.name} 找到了。")
+        broadcast(state, plugin.gameText("game.round.found", mapOf("player" to hider.name, "seeker" to seeker.name)))
         plugin.logger.fine("Hide-and-seek found ${hider.name} by ${seeker.name} in ${state.regionId}: $reason")
         maybeEndHideAndSeek(state, "all-found-check")
     }
@@ -351,10 +351,10 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         val remainingHiders = state.players.count { state.roles[it] == RoundRole.HIDER && !state.found.contains(it) }
         val seekers = state.players.count { state.roles[it] == RoundRole.SEEKER }
         if (remainingHiders <= 0) {
-            broadcast(state, "§c所有隐藏者都被找到了，寻找者获胜！")
+            broadcast(state, plugin.gameText("game.round.seekers-win"))
             end(state.regionId, reason)
         } else if (seekers <= 0) {
-            broadcast(state, "§6寻找者离开了游戏，隐藏者获胜！")
+            broadcast(state, plugin.gameText("game.round.hiders-win-abandoned"))
             end(state.regionId, reason)
         }
     }
@@ -395,7 +395,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
                             plugin.triggers().fire(RegionTrigger.ON_MODE_END, player, region)
                         }
                         restoreRoundState(player, state, teleportOut = false, reason = reason)
-                        player.sendLegacyMessage("§e小游戏结束，你的临时状态已恢复。")
+                        player.sendLegacyMessage(plugin.gameText("game.round.ended"))
                     } finally {
                         if (remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
                     }

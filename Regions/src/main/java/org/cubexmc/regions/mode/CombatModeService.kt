@@ -30,17 +30,17 @@ class CombatModeService(private val plugin: RegionsPlugin) {
             return
         }
         if (endingRegions.contains(region.id)) {
-            player.sendLegacyMessage("§e${region.name} 正在恢复上一局，请稍后重新进入。")
+            player.sendLegacyMessage(plugin.gameText("game.combat.restoring", mapOf("name" to region.name)))
             return
         }
         val state = state(region)
         if (state.active) {
-            player.sendLegacyMessage("§e${region.name} 的战斗已经开始，你不会加入当前局。")
+            player.sendLegacyMessage(plugin.gameText("game.combat.in-progress", mapOf("name" to region.name)))
             return
         }
         val maxPlayers = maxPlayers(region)
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
-            player.sendLegacyMessage("§c${region.name} 当前人数已满。")
+            player.sendLegacyMessage(plugin.gameText("game.combat.full", mapOf("name" to region.name)))
             return
         }
         state.players.add(player.uniqueId)
@@ -72,20 +72,20 @@ class CombatModeService(private val plugin: RegionsPlugin) {
     fun ready(player: Player, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isCombatMode(region)) {
-            player.sendLegacyMessage("§c这个区域不是对战模式。")
+            player.sendLegacyMessage(plugin.gameText("game.combat.not-combat"))
             return true
         }
         val state = state(region)
         if (!state.players.contains(player.uniqueId)) {
-            player.sendLegacyMessage("§c你不在这个场地内。")
+            player.sendLegacyMessage(plugin.gameText("game.combat.not-inside"))
             return true
         }
         if (state.active) {
-            player.sendLegacyMessage("§e战斗已经开始。")
+            player.sendLegacyMessage(plugin.gameText("game.combat.already-started"))
             return true
         }
         state.ready.add(player.uniqueId)
-        broadcast(state, "§a${player.name} 已确认开始 (${state.ready.size}/${state.players.size})")
+        broadcast(state, plugin.gameText("game.combat.ready", mapOf("player" to player.name, "current" to state.ready.size.toString(), "total" to state.players.size.toString())))
         if (!canPromptReady(region, state)) {
             player.sendLegacyMessage(startRequirementMessage(region, state))
             return true
@@ -115,7 +115,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         }
         state.players.remove(player.uniqueId)
         state.ready.remove(player.uniqueId)
-        player.sendLegacyMessage("§e你已被移出本局战斗，复活后会恢复入场前状态。")
+        player.sendLegacyMessage(plugin.gameText("game.combat.removed"))
         maybeEndAfterRosterChange(state, "death")
         return true
     }
@@ -184,7 +184,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                             applyKit(player, region)
                         }
                     }
-                    player.sendLegacyMessage("§c战斗开始！")
+                    player.sendLegacyMessage(plugin.gameText("game.combat.started"))
                     plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
                 }.onFailure { error ->
                     plugin.logger.severe("Failed to start combat ${region.id} for ${player.name}: ${error.message}")
@@ -229,7 +229,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                         }
                         plugin.effects().cleanupModeEffects(player, regionId, "mode-end:$reason")
                         restoreGear(player, state, teleportOut = true, reason = reason)
-                        player.sendLegacyMessage("§e战斗结束。")
+                        player.sendLegacyMessage(plugin.gameText("game.combat.ended"))
                     } finally {
                         if (remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
                     }
@@ -324,7 +324,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
             return
         }
         state.prompted = true
-        broadcast(state, "§e${region.name} 已满足开战人数。输入 §a/regions game ${region.id} ready §e确认开始。")
+        broadcast(state, plugin.gameText("game.combat.ready-prompt", mapOf("name" to region.name, "id" to region.id)))
     }
 
     private fun canPromptReady(region: RegionDefinition, state: CombatState): Boolean {
@@ -339,12 +339,12 @@ class CombatModeService(private val plugin: RegionsPlugin) {
 
     private fun startRequirementMessage(region: RegionDefinition, state: CombatState): String {
         if (state.players.size < minPlayers(region)) {
-            return "§e还需要更多玩家进入场地 (${state.players.size}/${minPlayers(region)})。"
+            return plugin.gameText("game.combat.waiting-players", mapOf("current" to state.players.size.toString(), "required" to minPlayers(region).toString()))
         }
         if (region.mode?.type.equals("union_war", ignoreCase = true)) {
-            return "§e工会战需要至少 ${minUnions(region)} 个不同工会在场，目前识别到 ${unionIds(state).size} 个。"
+            return plugin.gameText("game.combat.waiting-unions", mapOf("required" to minUnions(region).toString(), "current" to unionIds(state).size.toString()))
         }
-        return "§e尚未满足开战条件。"
+        return plugin.gameText("game.combat.not-ready")
     }
 
     private fun maybeEndAfterRosterChange(state: CombatState, reason: String) {
@@ -361,7 +361,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
             if (unions.size <= 1) {
                 val winner = unions.firstOrNull()
                 if (winner != null) {
-                    broadcast(state, "§6工会战结束，胜利工会: §e$winner")
+                    broadcast(state, plugin.gameText("game.combat.union-winner", mapOf("union" to winner)))
                 }
                 end(state.regionId, reason)
             }

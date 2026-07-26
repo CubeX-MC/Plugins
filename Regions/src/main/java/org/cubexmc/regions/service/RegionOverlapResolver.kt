@@ -22,9 +22,12 @@ data class ResolvedEffect(
     val sourceRegionId: String,
     val sourcePriority: Int,
     val sourceIndex: Int,
+    /** Set when the effect was synthesized from a `deny` flag rather than declared in `effects`. */
+    val bridgedFromFlag: String? = null,
 ) {
     val identity: String =
-        "$sourceRegionId:$sourceIndex:${config.type}:${config.scope}:${config.combination}:${config.values.toSortedMap()}"
+        "$sourceRegionId:$sourceIndex:${config.type}:${config.scope}:${config.combination}:" +
+            "${config.values.toSortedMap()}:${bridgedFromFlag.orEmpty()}"
 }
 
 data class OverlapResolution(
@@ -144,9 +147,19 @@ class RegionOverlapResolver {
 
     private fun resolveEffects(ordered: List<RegionDefinition>): List<ResolvedEffect> {
         val indexed = ordered.flatMap { region ->
-            effectiveRegionEffects(region).mapIndexed { index, effect ->
+            val declared = region.effects.mapIndexed { index, effect ->
                 ResolvedEffect(effect, region.id, region.priority, index)
             }
+            val bridged = flagBridgedEffects(region).mapIndexed { offset, bridge ->
+                ResolvedEffect(
+                    bridge.config,
+                    region.id,
+                    region.priority,
+                    region.effects.size + offset,
+                    bridge.flag,
+                )
+            }
+            declared + bridged
         }
         val result = ArrayList<ResolvedEffect>()
         for ((_, group) in indexed.groupBy { effectFamily(it.config) }) {
@@ -168,16 +181,25 @@ class RegionOverlapResolver {
         return result
     }
 
-    private fun effectiveRegionEffects(region: RegionDefinition): List<EffectConfig> {
-        if (!region.flags["vanish"]?.value.equals("deny", ignoreCase = true)) {
-            return region.effects
+    private data class FlagBridge(val flag: String, val config: EffectConfig)
+
+    /**
+     * A `deny` flag that has no event to cancel needs a scoped effect to hold the player state and
+     * restore it on leave. `fly` cannot rely on [org.bukkit.event.player.PlayerToggleFlightEvent]
+     * alone because a player who is already flying never toggles on the way in.
+     */
+    private fun flagBridgedEffects(region: RegionDefinition): List<FlagBridge> =
+        FLAG_EFFECT_BRIDGES.mapNotNull { (flag, bridged) ->
+            if (!denies(region, flag)) return@mapNotNull null
+            FlagBridge(flag, bridged)
         }
-        return region.effects + EffectConfig(
-            "invisibility_suppression",
-            EffectScope.WHILE_INSIDE,
-            combination = EffectCombination.HIGHEST_PRIORITY,
-        )
-    }
+
+    private fun denies(region: RegionDefinition, flag: String): Boolean =
+        region.flags.entries
+            .firstOrNull { it.key.equals(flag, ignoreCase = true) }
+            ?.value
+            ?.value
+            .equals("deny", ignoreCase = true)
 
     private fun effectFamily(config: EffectConfig): String =
         config.type.lowercase(Locale.ROOT)
@@ -196,5 +218,19 @@ class RegionOverlapResolver {
     companion object {
         val REGION_ORDER: Comparator<RegionDefinition> =
             compareByDescending<RegionDefinition> { it.priority }.thenBy { it.id }
+
+        private val FLAG_EFFECT_BRIDGES: List<Pair<String, EffectConfig>> = listOf(
+            "fly" to EffectConfig(
+                "allow_flight",
+                EffectScope.WHILE_INSIDE,
+                mapOf("value" to "false"),
+                EffectCombination.HIGHEST_PRIORITY,
+            ),
+            "vanish" to EffectConfig(
+                "invisibility_suppression",
+                EffectScope.WHILE_INSIDE,
+                combination = EffectCombination.HIGHEST_PRIORITY,
+            ),
+        )
     }
 }

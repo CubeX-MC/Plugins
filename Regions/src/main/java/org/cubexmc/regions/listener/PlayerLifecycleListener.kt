@@ -8,6 +8,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.player.PlayerKickEvent
 import org.bukkit.event.player.PlayerCommandPreprocessEvent
 import org.bukkit.event.player.PlayerDropItemEvent
+import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.event.player.PlayerQuitEvent
@@ -16,8 +17,10 @@ import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.event.player.PlayerToggleFlightEvent
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
+import org.bukkit.inventory.EquipmentSlot
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.RegionTrigger
+import java.util.Locale
 
 class PlayerLifecycleListener(private val plugin: RegionsPlugin) : Listener {
     @EventHandler
@@ -82,6 +85,19 @@ class PlayerLifecycleListener(private val plugin: RegionsPlugin) : Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    fun onInteract(event: PlayerInteractEvent) {
+        // Both hands raise the event for a single right click; only the main hand should fire once.
+        if (event.hand != null && event.hand != EquipmentSlot.HAND) {
+            return
+        }
+        for (session in plugin.sessions().activeSessions(event.player.uniqueId)) {
+            val region = plugin.regions().find(session.regionId) ?: continue
+            session.metadata["last_interact"] = event.action.name.lowercase(Locale.ROOT)
+            plugin.triggers().fire(RegionTrigger.ON_INTERACT, event.player, region)
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     fun onCommand(event: PlayerCommandPreprocessEvent) {
         val label = event.message.removePrefix("/").trim().substringBefore(' ')
         for (session in plugin.sessions().activeSessions(event.player.uniqueId)) {
@@ -91,7 +107,7 @@ class PlayerLifecycleListener(private val plugin: RegionsPlugin) : Listener {
         }
         if (plugin.flagRules().isCommandBlocked(event.player, label)) {
             event.isCancelled = true
-            plugin.lang().sendRaw(event.player, "§c这个区域不允许使用 /$label。")
+            plugin.lang().sendRaw(event.player, plugin.lang().message("command.flag-denied", mapOf("command" to label)))
         }
     }
 
