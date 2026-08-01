@@ -1,7 +1,9 @@
 package org.cubexmc.regions.service
 
+import org.bukkit.GameMode
 import org.bukkit.entity.Player
 import org.cubexmc.regions.RegionsPlugin
+import org.cubexmc.regions.effect.DeclaredEffect
 import org.cubexmc.regions.effect.ScopedEffectService
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionSession
@@ -38,24 +40,20 @@ class RegionSessionService(
 
     fun reconcileEffects(player: Player, activeRegions: Collection<RegionDefinition>) {
         val resolution = plugin.overlaps().resolve(activeRegions)
-        val signature = resolution.effects.joinToString("|") { it.identity }
+        val applicable = resolution.effects.filter { appliesTo(player, it) }
+        val signature = applicable.joinToString("|") { it.identity }
         if (effectSignatures[player.uniqueId] == signature) return
         effects.cleanupDeclaredEffects(player, "overlap-resolution-changed")
         val byId = activeRegions.associateBy { it.id }
-        var appliedAll = true
-        for (resolved in resolution.effects) {
-            val region = byId[resolved.sourceRegionId] ?: continue
-            if (!effects.applyDeclared(player, region, resolved.config).success) {
-                appliedAll = false
-                break
-            }
+        val requests = applicable.mapNotNull { resolved ->
+            byId[resolved.sourceRegionId]?.let { DeclaredEffect(it, resolved.config) }
         }
-        if (!appliedAll) {
-            effects.cleanupDeclaredEffects(player, "overlap-apply-failed")
+        val applied = effects.applyDeclaredSet(player, requests)
+        if (!applied.success) {
             effectSignatures.remove(player.uniqueId)
             plugin.logger.warning(
                 "Unable to apply the complete resolved effect set for ${player.name}; " +
-                    "declared region effects were rolled back",
+                    "declared region effects were rolled back: ${applied.reason}",
             )
             return
         }
@@ -194,6 +192,18 @@ class RegionSessionService(
         if (offline.isNotEmpty()) {
             plugin.logger.fine("Regions watchdog cleared ${offline.size} offline player session bucket(s).")
         }
+    }
+
+    /**
+     * Declared effects apply to everyone, but a flag-bridged effect is only the enforcement arm of a
+     * `deny` flag and must follow the same exemptions [RegionFlagService.isDenied] honours. Creative
+     * and spectator flight is owned by the game mode; clearing `allowFlight` there desynchronizes the
+     * client instead of enforcing anything.
+     */
+    private fun appliesTo(player: Player, resolved: ResolvedEffect): Boolean {
+        val flag = resolved.bridgedFromFlag ?: return true
+        if (player.hasPermission("regions.bypass.flags")) return false
+        return !(flag == "fly" && (player.gameMode == GameMode.CREATIVE || player.gameMode == GameMode.SPECTATOR))
     }
 
     private fun activateMode(player: Player, region: RegionDefinition) {

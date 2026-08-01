@@ -23,6 +23,7 @@ import org.cubexmc.regions.mode.CombatModeService
 import org.cubexmc.regions.mode.RaceModeService
 import org.cubexmc.regions.mode.RegionModeRegistry
 import org.cubexmc.regions.mode.RoundModeService
+import org.cubexmc.regions.model.RegionTrigger
 import org.cubexmc.regions.service.RegionActionRegistry
 import org.cubexmc.regions.service.RegionAuditService
 import org.cubexmc.regions.service.RegionAuthorityService
@@ -153,6 +154,7 @@ class RegionsPlugin : CubexPlugin() {
         registerCommand()
         scheduleWatchdog()
         scheduleEffectRefresh()
+        scheduleTimerTriggers()
         restoreOnlinePlayersAfterEnable()
 
         logger.info("Regions enabled with ${regions().all().size} configured regions.")
@@ -279,6 +281,7 @@ class RegionsPlugin : CubexPlugin() {
         verifyCapabilityKind(CapabilityKind.EFFECT, effects().allTypes())
         verifyCapabilityKind(CapabilityKind.ACTION, actions().all())
         verifyCapabilityKind(CapabilityKind.CONDITION, conditions().all())
+        verifyCapabilityKind(CapabilityKind.TRIGGER, RegionTrigger.entries.mapTo(LinkedHashSet()) { it.key })
     }
 
     private fun verifyCapabilityKind(kind: CapabilityKind, runtimeIds: Set<String>) {
@@ -286,6 +289,10 @@ class RegionsPlugin : CubexPlugin() {
         check(runtimeIds == descriptorIds) {
             "Capability catalog mismatch for $kind: runtime=$runtimeIds descriptors=$descriptorIds"
         }
+    }
+
+    private companion object {
+        const val MIN_TIMER_TRIGGER_SECONDS = 5L
     }
 
     private fun saveDefaultFiles() {
@@ -329,6 +336,19 @@ class RegionsPlugin : CubexPlugin() {
         val periodTicks = max(1L, config.getLong("effects.refresh-interval-ticks", 60L))
         regionScheduler().runGlobalTimer(
             Runnable { effects().refreshAll() },
+            periodTicks,
+            periodTicks,
+        )
+    }
+
+    private fun scheduleTimerTriggers() {
+        val intervalSeconds = max(
+            MIN_TIMER_TRIGGER_SECONDS,
+            config.getLong("safety.timer-trigger-interval-seconds", MIN_TIMER_TRIGGER_SECONDS),
+        )
+        val periodTicks = intervalSeconds * 20L
+        regionScheduler().runGlobalTimer(
+            Runnable { triggers().fireTimers() },
             periodTicks,
             periodTicks,
         )

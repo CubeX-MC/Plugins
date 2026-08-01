@@ -134,7 +134,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         }
         val id = args[1].lowercase(Locale.ROOT)
         if (plugin.regions().find(id) != null) {
-            plugin.lang().sendRaw(sender, "§c区域已存在: $id")
+            plugin.lang().sendPlain(sender, "gui.create.exists", mapOf("id" to id))
             return true
         }
         val landMarker = args.indexOfFirst { it.equals("--land", ignoreCase = true) }
@@ -162,10 +162,10 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         ))
         val result = plugin.publishing().createDraft(sender, region)
         if (!result.success) {
-            plugin.lang().sendRaw(sender, "§c创建失败: ${result.reason}")
+            plugin.lang().sendPlain(sender, "command.region-failed", mapOf("reason" to result.reason))
             return true
         }
-        plugin.lang().sendRaw(sender, "§a已创建区域草稿 $id，并绑定到 ${source.describe()}。校验后使用 /regions publish $id 发布。")
+        plugin.lang().sendPlain(sender, "command.region-created", mapOf("id" to id, "source" to source.describe()))
         return true
     }
 
@@ -181,7 +181,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
             return true
         }
         plugin.audit().record(sender, region.id, "region.remove")
-        plugin.lang().sendRaw(sender, "§a已删除区域 ${region.id}。")
+        plugin.lang().sendPlain(sender, "command.region-removed", mapOf("id" to region.id))
         return true
     }
 
@@ -193,11 +193,15 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         if (!canManage(sender, region)) return true
         val result = plugin.publishing().saveDraft(sender, region.copy(enabled = enabled))
         if (!result.success) {
-            plugin.lang().sendRaw(sender, "§c操作失败: ${result.reason}")
+            plugin.lang().sendPlain(sender, "command.region-failed", mapOf("reason" to result.reason))
             return true
         }
         plugin.audit().record(sender, region.id, if (enabled) "region.enable" else "region.disable")
-        plugin.lang().sendRaw(sender, "§a区域 ${region.id} 已${if (enabled) "启用" else "禁用"}。")
+        plugin.lang().sendPlain(
+            sender,
+            if (enabled) "command.region-enabled" else "command.region-disabled",
+            mapOf("id" to region.id),
+        )
         return true
     }
 
@@ -222,18 +226,18 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
                 RegionSourceRef("cuboid", keys.zip(args.drop(3).take(7)).toMap())
             }
             else -> {
-                plugin.lang().sendRaw(sender, "§c未知 source: ${args[2]}")
+                plugin.lang().sendPlain(sender, "command.unknown-source", mapOf("input" to args[2]))
                 return true
             }
         }
         if (!allow(sender, plugin.authority().canCreate(sender, source))) return true
         val result = plugin.publishing().saveDraft(sender, withOwnerSnapshot(region.copy(source = source)))
         if (!result.success) {
-            plugin.lang().sendRaw(sender, "§c绑定失败: ${result.reason}")
+            plugin.lang().sendPlain(sender, "command.region-failed", mapOf("reason" to result.reason))
             return true
         }
         plugin.audit().record(sender, region.id, "region.bind", details = mapOf("source" to source.describe()))
-        plugin.lang().sendRaw(sender, "§a区域 ${region.id} 已绑定到 ${source.describe()}。")
+        plugin.lang().sendPlain(sender, "command.bound", mapOf("id" to region.id, "source" to source.describe()))
         return true
     }
 
@@ -256,11 +260,15 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         flags[key] = FlagConfig(key, args[4].lowercase(Locale.ROOT), parsePairs(args, 5))
         val result = plugin.publishing().saveDraft(sender, region.copy(flags = flags))
         if (!result.success) {
-            plugin.lang().sendRaw(sender, "§c设置失败: ${result.reason}")
+            plugin.lang().sendPlain(sender, "command.region-failed", mapOf("reason" to result.reason))
             return true
         }
         plugin.audit().record(sender, region.id, "region.flag.set", details = mapOf("flag" to key, "value" to args[4]))
-        plugin.lang().sendRaw(sender, "§a区域 ${region.id} 的 flag $key 已设为 ${args[4]}。")
+        plugin.lang().sendPlain(
+            sender,
+            "command.flag-set",
+            mapOf("id" to region.id, "flag" to key, "value" to args[4]),
+        )
         return true
     }
 
@@ -281,11 +289,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         val type = args[3].lowercase(Locale.ROOT)
         val result = plugin.publishing().saveDraft(sender, region.copy(mode = ModeConfig(type, parsePairs(args, 4))))
         if (!result.success) {
-            plugin.lang().sendRaw(sender, "§c设置失败: ${result.reason}")
+            plugin.lang().sendPlain(sender, "command.region-failed", mapOf("reason" to result.reason))
             return true
         }
         plugin.audit().record(sender, region.id, "region.mode.set", details = mapOf("mode" to type))
-        plugin.lang().sendRaw(sender, "§a区域 ${region.id} 的 mode 已设为 $type。")
+        plugin.lang().sendPlain(sender, "command.mode-set", mapOf("id" to region.id, "mode" to type))
         return true
     }
 
@@ -319,11 +327,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         effects.add(EffectConfig(args[3].lowercase(Locale.ROOT), scope, values, combination))
         val result = plugin.publishing().saveDraft(sender, region.copy(effects = effects))
         if (!result.success) {
-            plugin.lang().sendRaw(sender, "§c添加失败: ${result.reason}")
+            plugin.lang().sendPlain(sender, "command.region-failed", mapOf("reason" to result.reason))
             return true
         }
         plugin.audit().record(sender, region.id, "region.effect.add", details = mapOf("effect" to args[3]))
-        plugin.lang().sendRaw(sender, "§a区域 ${region.id} 已添加 effect ${args[3]}。")
+        plugin.lang().sendPlain(sender, "command.effect-added", mapOf("id" to region.id, "effect" to args[3]))
         return true
     }
 
@@ -335,8 +343,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
             return true
         }
         val result = plugin.publishing().publish(sender, regionId)
-        if (result.success) plugin.lang().sendRaw(sender, "§a区域 $regionId 的草稿已发布。")
-        else plugin.lang().sendRaw(sender, "§c发布失败: ${result.reason}")
+        if (result.success) {
+            plugin.lang().sendPlain(sender, "command.published", mapOf("id" to regionId))
+        } else {
+            plugin.lang().sendPlain(sender, "command.publish-failed", mapOf("reason" to result.reason))
+        }
         return true
     }
 
@@ -358,9 +369,10 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
             plugin.trials().start(player, regionId)
         }
         if (result.success) {
-            plugin.lang().sendRaw(player, if (operation == "stop" || operation == "end") "§e隔离试运行已结束。" else "§a隔离试运行已开始。")
+            val stopping = operation == "stop" || operation == "end"
+            plugin.lang().sendPlain(player, if (stopping) "command.trial-stopped" else "command.trial-started")
         } else {
-            plugin.lang().sendRaw(player, "§c试运行失败: ${result.reason}")
+            plugin.lang().sendPlain(player, "command.trial-failed", mapOf("reason" to result.reason))
         }
         return true
     }
@@ -373,29 +385,59 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         }
         val region = plugin.publishing().draft(regionId)
         if (region == null) {
-            plugin.lang().sendRaw(sender, "§c区域 $regionId 没有可预览的草稿。")
+            plugin.lang().sendPlain(sender, "command.preview-no-draft", mapOf("id" to regionId))
             return true
         }
         if (!allow(sender, plugin.authority().canView(sender, region))) return true
         val report = plugin.publishing().previewReport(sender, regionId) ?: return true
-        plugin.lang().sendRaw(sender, "§6$regionId 发布预览 · revision ${region.revision}")
-        plugin.lang().sendRaw(sender, "§7变化: ${report.changes.size}，问题: ${report.issues.size}，确定重叠: ${report.resolution.orderedRegions.size}")
+        val none = plugin.lang().message("gui.common.none")
+        plugin.lang().sendPlain(
+            sender,
+            "command.preview-header",
+            mapOf("id" to regionId, "revision" to region.revision.toString()),
+        )
+        plugin.lang().sendPlain(
+            sender,
+            "command.preview-summary",
+            mapOf(
+                "changes" to report.changes.size.toString(),
+                "issues" to report.issues.size.toString(),
+                "overlaps" to report.resolution.orderedRegions.size.toString(),
+            ),
+        )
         report.dependencies.forEach {
-            plugin.lang().sendRaw(sender, "${if (it.available) "§a" else "§c"}依赖 ${it.id}: ${it.detail}")
+            plugin.lang().sendPlain(
+                sender,
+                if (it.available) "command.preview-dependency-ok" else "command.preview-dependency-missing",
+                mapOf("id" to it.id, "detail" to it.detail),
+            )
         }
         val displayedMode = report.resolution.primaryModeRegion
             ?: report.resolution.orderedRegions.firstOrNull { it.mode != null }
-        plugin.lang().sendRaw(
+        plugin.lang().sendPlain(
             sender,
-            "§b最终 Mode: ${displayedMode?.let { "${it.id}:${it.mode?.type}" } ?: "无"}；主 Trigger Region: ${report.resolution.primaryTriggerRegion?.id ?: "无"}",
+            "command.preview-resolution-summary",
+            mapOf(
+                "mode" to (displayedMode?.let { "${it.id}:${it.mode?.type}" } ?: none),
+                "trigger" to (report.resolution.primaryTriggerRegion?.id ?: none),
+            ),
         )
         report.resolution.flags.values.take(12).forEach {
-            plugin.lang().sendRaw(sender, "§7Flag ${it.key}=${it.config.value} §8← ${it.sourceRegionId}")
+            plugin.lang().sendPlain(
+                sender,
+                "command.preview-flag-line",
+                mapOf("flag" to it.key, "value" to it.config.value, "source" to it.sourceRegionId),
+            )
         }
         report.resolution.effects.take(12).forEach {
-            plugin.lang().sendRaw(
+            plugin.lang().sendPlain(
                 sender,
-                "§7Effect ${it.config.type} [${it.config.combination.name.lowercase(Locale.ROOT)}] §8← ${it.sourceRegionId}",
+                "command.preview-effect-line",
+                mapOf(
+                    "effect" to it.config.type,
+                    "combination" to it.config.combination.name.lowercase(Locale.ROOT),
+                    "source" to it.sourceRegionId,
+                ),
             )
         }
         sendIssues(sender, report.issues)
@@ -410,8 +452,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
             return true
         }
         val result = plugin.publishing().withdraw(sender, regionId)
-        if (result.success) plugin.lang().sendRaw(sender, "§e区域 $regionId 已撤回，并生成可继续编辑的草稿。")
-        else plugin.lang().sendRaw(sender, "§c撤回失败: ${result.reason}")
+        if (result.success) {
+            plugin.lang().sendPlain(sender, "command.withdrawn", mapOf("id" to regionId))
+        } else {
+            plugin.lang().sendPlain(sender, "command.withdraw-failed", mapOf("reason" to result.reason))
+        }
         return true
     }
 
@@ -420,12 +465,22 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         val region = requireEditableRegion(sender, args, "/regions history <id>") ?: return true
         if (!allow(sender, plugin.authority().canView(sender, region))) return true
         val revisions = plugin.publishing().history(region.id)
-        plugin.lang().sendRaw(sender, "§6${region.id} 的已发布版本 (${revisions.size})")
-        if (revisions.isEmpty()) plugin.lang().sendRaw(sender, "§7暂无已发布历史。")
+        plugin.lang().sendPlain(
+            sender,
+            "command.history-header",
+            mapOf("id" to region.id, "count" to revisions.size.toString()),
+        )
+        if (revisions.isEmpty()) plugin.lang().sendPlain(sender, "command.history-empty")
         revisions.take(20).forEach { snapshot ->
-            plugin.lang().sendRaw(
+            plugin.lang().sendPlain(
                 sender,
-                "§7- §e#${snapshot.revision} §f${snapshot.name} §8mode=${snapshot.mode?.type ?: "none"}, state=${snapshot.lifecycle.name.lowercase(Locale.ROOT)}",
+                "command.history-line",
+                mapOf(
+                    "revision" to snapshot.revision.toString(),
+                    "name" to snapshot.name,
+                    "mode" to (snapshot.mode?.type ?: "none"),
+                    "state" to snapshot.lifecycle.name.lowercase(Locale.ROOT),
+                ),
             )
         }
         return true
@@ -440,8 +495,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
             return true
         }
         val result = plugin.publishing().rollback(sender, regionId, revision)
-        if (result.success) plugin.lang().sendRaw(sender, "§a区域 $regionId 已从版本 #$revision 回滚并发布为新版本。")
-        else plugin.lang().sendRaw(sender, "§c回滚失败: ${result.reason}")
+        if (result.success) {
+            plugin.lang().sendPlain(sender, "command.rolled-back", mapOf("id" to regionId, "revision" to revision.toString()))
+        } else {
+            plugin.lang().sendPlain(sender, "command.rollback-failed", mapOf("reason" to result.reason))
+        }
         return true
     }
 
@@ -453,8 +511,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
             return true
         }
         val result = plugin.publishing().archive(sender, regionId)
-        if (result.success) plugin.lang().sendRaw(sender, "§e区域 $regionId 已归档。")
-        else plugin.lang().sendRaw(sender, "§c归档失败: ${result.reason}")
+        if (result.success) {
+            plugin.lang().sendPlain(sender, "command.archived", mapOf("id" to regionId))
+        } else {
+            plugin.lang().sendPlain(sender, "command.region-failed", mapOf("reason" to result.reason))
+        }
         return true
     }
 
@@ -463,8 +524,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         val region = requireRegion(sender, args, "/regions freeze <id> [reason]") ?: return true
         val reason = join(args, 2).ifBlank { "manual-command" }
         val result = plugin.lifecycle().freeze(sender, region.id, reason)
-        if (result.success) plugin.lang().sendRaw(sender, "§a区域 ${region.id} 已冻结，运行状态与玩家会话已安全清理。")
-        else plugin.lang().sendRaw(sender, "§c冻结失败: ${result.reason}")
+        if (result.success) {
+            plugin.lang().sendPlain(sender, "command.frozen", mapOf("id" to region.id))
+        } else {
+            plugin.lang().sendPlain(sender, "command.freeze-failed", mapOf("reason" to result.reason))
+        }
         return true
     }
 
@@ -473,8 +537,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         val region = requireRegion(sender, args, "/regions unfreeze <id> [reason]") ?: return true
         val reason = join(args, 2).ifBlank { "manual-command" }
         val result = plugin.lifecycle().unfreeze(sender, region.id, reason)
-        if (result.success) plugin.lang().sendRaw(sender, "§a区域 ${region.id} 已复核并重新发布。")
-        else plugin.lang().sendRaw(sender, "§c解冻失败: ${result.reason}")
+        if (result.success) {
+            plugin.lang().sendPlain(sender, "command.unfrozen", mapOf("id" to region.id))
+        } else {
+            plugin.lang().sendPlain(sender, "command.freeze-failed", mapOf("reason" to result.reason))
+        }
         return true
     }
 
@@ -487,11 +554,20 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         }
         val limit = args.getOrNull(2)?.toIntOrNull()?.coerceIn(1, 100) ?: 20
         val events = plugin.audit().recent(regionId, limit)
-        plugin.lang().sendRaw(sender, "§6Regions 审计记录 (${events.size})")
-        if (events.isEmpty()) plugin.lang().sendRaw(sender, "§7暂无记录。")
+        plugin.lang().sendPlain(sender, "command.audit-header", mapOf("count" to events.size.toString()))
+        if (events.isEmpty()) plugin.lang().sendPlain(sender, "command.audit-empty")
         for (event in events) {
-            val reason = event.reason?.let { " reason=$it" } ?: ""
-            plugin.lang().sendRaw(sender, "§7${DATE_FORMAT.format(Instant.ofEpochMilli(event.createdAtMillis))} §f${event.regionId} §e${event.action} §7by ${event.actorName}$reason")
+            plugin.lang().sendPlain(
+                sender,
+                "command.audit-line",
+                mapOf(
+                    "time" to DATE_FORMAT.format(Instant.ofEpochMilli(event.createdAtMillis)),
+                    "region" to event.regionId,
+                    "action" to event.action,
+                    "actor" to event.actorName,
+                    "reason" to (event.reason?.let { " reason=$it" } ?: ""),
+                ),
+            )
         }
         return true
     }
@@ -539,7 +615,14 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
                     plugin.audit().record(sender, region.id, "game.start.requested", "manual-command")
                 }
             }
-            "status" -> plugin.lang().sendRaw(sender, "§e${args[1]}: ${if (isRace) plugin.raceModes().status(args[1]) else if (isRound) plugin.roundModes().status(args[1]) else plugin.combatModes().status(args[1])}")
+            "status" -> {
+                val state = when {
+                    isRace -> plugin.raceModes().status(args[1])
+                    isRound -> plugin.roundModes().status(args[1])
+                    else -> plugin.combatModes().status(args[1])
+                }
+                plugin.lang().sendPlain(sender, "command.game-status", mapOf("id" to args[1], "state" to state))
+            }
             "end", "stop" -> {
                 if (!canManage(sender, region)) return true
                 val ended = if (isRace) {
@@ -554,9 +637,9 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
                 }
                 if (ended) {
                     plugin.audit().record(sender, region.id, "game.end", "manual-command")
-                    plugin.lang().sendRaw(sender, "§a已结束 ${args[1]} 的战斗。")
+                    plugin.lang().sendPlain(sender, "command.game-ended", mapOf("id" to args[1]))
                 } else {
-                    plugin.lang().sendRaw(sender, "§e${args[1]} 当前没有进行中的游戏。")
+                    plugin.lang().sendPlain(sender, "command.game-not-running", mapOf("id" to args[1]))
                 }
             }
             else -> plugin.lang().send(sender, "invalid-usage", mapOf("usage" to "/regions game <id> <ready|start|status|end>"))

@@ -45,6 +45,25 @@ class RegionTriggerService(private val plugin: RegionsPlugin) {
         }
     }
 
+    /**
+     * Fires [RegionTrigger.ON_TIMER] for every player currently inside a region that declares it.
+     * Scheduled globally but dispatched per entity, because the actions reach player state.
+     */
+    fun fireTimers() {
+        if (plugin.regions().all().none { it.triggers.containsKey(RegionTrigger.ON_TIMER) }) {
+            return
+        }
+        for (player in plugin.server.onlinePlayers.toList()) {
+            if (plugin.sessions().activeSessions(player.uniqueId).isEmpty()) continue
+            plugin.regionScheduler().runAtEntity(player, Runnable {
+                for (session in plugin.sessions().activeSessions(player.uniqueId)) {
+                    val region = plugin.regions().find(session.regionId) ?: continue
+                    fire(RegionTrigger.ON_TIMER, player, region)
+                }
+            })
+        }
+    }
+
     private fun matches(player: Player, region: RegionDefinition, block: ActionBlockConfig): Boolean =
         block.conditions.all { condition -> evaluate(condition, player, region) }
 

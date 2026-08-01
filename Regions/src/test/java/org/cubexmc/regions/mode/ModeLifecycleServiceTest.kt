@@ -5,6 +5,7 @@ import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.inventory.PlayerInventory
 import org.cubexmc.regions.RegionsPlugin
+import org.cubexmc.regions.config.LanguageManager
 import org.cubexmc.regions.effect.ScopedEffectService
 import org.cubexmc.regions.model.ModeConfig
 import org.cubexmc.regions.model.RegionDefinition
@@ -205,6 +206,11 @@ class ModeLifecycleServiceTest {
         `when`(plugin.triggers()).thenReturn(triggers)
         `when`(plugin.effects()).thenReturn(effects)
         `when`(plugin.audit()).thenReturn(audit)
+        // Mode services resolve every player-facing string through the language file; echoing the
+        // key back keeps these lifecycle tests about state transitions rather than wording.
+        val lang = mock(LanguageManager::class.java)
+        `when`(lang.message(anyK(), anyK())).thenAnswer { it.getArgument<String>(0) }
+        `when`(plugin.lang()).thenReturn(lang)
         `when`(scheduler.isFolia).thenReturn(false)
         `when`(effects.apply(anyK(), anyK(), anyK()))
             .thenReturn(ServiceResult.ok())

@@ -30,8 +30,16 @@ class RegionStorage(private val plugin: RegionsPlugin) {
     private val drafts: MutableMap<String, RegionDefinition> = LinkedHashMap()
     private val history: MutableMap<String, java.util.SortedMap<Long, RegionDefinition>> = LinkedHashMap()
     private var dirty = false
+    private var publishedRevision = 0L
+
+    /**
+     * Bumped whenever the published region set changes. [RegionDetectionService] uses it to know when
+     * a cached lookup is still valid; drafts and history are excluded because detection ignores them.
+     */
+    fun publishedRevision(): Long = publishedRevision
 
     fun load() {
+        publishedRevision++
         regions.clear()
         drafts.clear()
         history.clear()
@@ -92,6 +100,7 @@ class RegionStorage(private val plugin: RegionsPlugin) {
 
     fun put(region: RegionDefinition) {
         regions[region.id] = region
+        publishedRevision++
         dirty = true
     }
 
@@ -120,6 +129,7 @@ class RegionStorage(private val plugin: RegionsPlugin) {
         if (removed) {
             drafts.remove(id)
             history.remove(id)
+            publishedRevision++
             dirty = true
         }
         return removed
@@ -296,7 +306,14 @@ class RegionStorage(private val plugin: RegionsPlugin) {
         }
         val result = LinkedHashMap<RegionTrigger, List<ActionBlockConfig>>()
         for (triggerKey in section.getKeys(false)) {
-            val trigger = RegionTrigger.fromKey(triggerKey) ?: continue
+            val trigger = RegionTrigger.fromKey(triggerKey)
+            if (trigger == null) {
+                plugin.logger.warning(
+                    "Ignoring unknown trigger '$triggerKey'; it will never fire. " +
+                        "Known triggers: ${RegionTrigger.entries.joinToString { it.key }}.",
+                )
+                continue
+            }
             val blocks = ArrayList<ActionBlockConfig>()
             for (entry in section.getMapList(triggerKey)) {
                 blocks.add(parseActionBlock(stringifyNested(entry)))

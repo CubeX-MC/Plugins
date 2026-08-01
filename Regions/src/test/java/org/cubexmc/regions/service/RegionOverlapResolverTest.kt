@@ -92,6 +92,61 @@ class RegionOverlapResolverTest {
     }
 
     @Test
+    fun `deny flags without a cancellable event are bridged to scoped effects`() {
+        val venue = region("venue", 1, "free_event", "deny").copy(
+            flags = mapOf(
+                "pvp" to FlagConfig("pvp", "deny"),
+                "fly" to FlagConfig("fly", "deny"),
+                "vanish" to FlagConfig("vanish", "deny"),
+            ),
+        )
+
+        val effects = resolver.resolve(listOf(venue)).effects
+
+        val flight = effects.single { it.config.type == "allow_flight" }
+        assertEquals("false", flight.config.values["value"])
+        assertEquals("fly", flight.bridgedFromFlag)
+        assertEquals("vanish", effects.single { it.config.type == "invisibility_suppression" }.bridgedFromFlag)
+        // pvp is enforced by cancelling EntityDamageByEntityEvent, so it needs no lease.
+        assertTrue(effects.none { it.bridgedFromFlag == "pvp" })
+    }
+
+    @Test
+    fun `allow and pass fly flags are not bridged`() {
+        val allowed = region("allowed", 1, "free_event", "pass").copy(
+            flags = mapOf("fly" to FlagConfig("fly", "allow")),
+        )
+        val passed = region("passed", 1, "free_event", "pass").copy(
+            flags = mapOf("FLY" to FlagConfig("fly", "pass")),
+        )
+
+        assertTrue(resolver.resolve(listOf(allowed)).effects.none { it.config.type == "allow_flight" })
+        assertTrue(resolver.resolve(listOf(passed)).effects.none { it.config.type == "allow_flight" })
+    }
+
+    @Test
+    fun `explicit allow_flight effect outranks the bridged one`() {
+        val venue = region("venue", 1, "free_event", "pass").copy(
+            flags = mapOf("fly" to FlagConfig("fly", "deny")),
+            effects = listOf(EffectConfig("allow_flight", values = mapOf("value" to "true"))),
+        )
+
+        val flight = resolver.resolve(listOf(venue)).effects.single { it.config.type == "allow_flight" }
+
+        assertEquals("true", flight.config.values["value"])
+        assertEquals(null, flight.bridgedFromFlag)
+    }
+
+    @Test
+    fun `bridged flags are resolved case insensitively`() {
+        val venue = region("venue", 1, "free_event", "pass").copy(
+            flags = mapOf("Fly" to FlagConfig("fly", "DENY")),
+        )
+
+        assertEquals("fly", resolver.resolve(listOf(venue)).effects.single().bridgedFromFlag)
+    }
+
+    @Test
     fun `exclusive overlapping effects block publishing`() {
         val live = region("live", 10, "free_event", "pass").copy(
             effects = listOf(EffectConfig("scale", values = mapOf("value" to "0.5"), combination = EffectCombination.EXCLUSIVE)),
