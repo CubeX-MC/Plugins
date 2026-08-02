@@ -138,3 +138,30 @@ class LineCommandService(lineManager: LineManager?) {
 - **Railway 的源码包就是 `org.cubexmc.metro`（主类 `org.cubexmc.metro.Metro`），与 Metro 完全同名，这是有意保留的**——方便 Metro 的功能更新直接搬过来，两者本就不支持同时安装。`build.gradle.kts` 里 relocate 到 `org.cubexmc.metro.lib.*` 同理。**迁移时不要顺手改包名或 relocate 目标。**
 - 因为同包同名，改 Railway 时**务必确认自己打开的是 `Railway/src/...` 而不是 `Metro/src/...`**；提交前 `git status` 看一眼路径前缀。
 - `Railway/.claude/worktrees/` 下有两份历史 agent worktree 副本（已 gitignore，未跟踪）。它们会污染"数文件"和全目录 grep——统计一律以 `kotlinMigrationStatus` 或 `Railway/src` 为准。
+
+### 什么时候可以直接复用 Metro 的 `.kt`
+
+同源 fork 让"把 Metro 的 `.kt` 拷过来"很诱人，但**只有同时满足两个条件才安全**：
+
+1. **Railway 的 `.java` 与 Metro 迁移当时的 `.java` 一致**（`git diff -w`，忽略空白）；
+2. **Metro 的 `.kt` 在迁移提交之后没有再被改过**（`git log <migrationCommit>..HEAD -- <ktPath>` 为空）。
+
+条件 2 是真正的坑：Metro 的 Kotlin 文件后来被玩法提交改过（例如 `c68de20` 改了 `PriceRule`/`TextUtil`/`MetroConstants`，`383f683` 删掉了整套传送门配对）。直接拷当前版本 = 把 Metro 的玩法变更偷偷带进 Railway。
+
+两条都满足才拷当前 `.kt`；条件 1 满足、条件 2 不满足时，拷**迁移当时那一版**：
+
+```powershell
+git show <migrationCommit>:Metro/src/main/java/org/cubexmc/metro/<Path>.kt
+```
+
+条件 1 不满足（Railway 有自己的差异，如 `MetroTextRenderer` 多一个 trusted 占位符 `color_code`、`OwnershipUtil` 权限节点是 `railway.*`、`SchedulerUtil` 开了 tick 计数、`Portal` 多了 `linkedPortalId` 与 `linked` 配置键）→ **从 Railway 自己的 `.java` 转**，Metro 的 `.kt` 只当写法参考。
+
+判定脚本（一次看一批）：
+
+```powershell
+$del = (git log --diff-filter=D --format=%H -1 -- "Metro/src/main/java/org/cubexmc/metro/<Path>.java")
+git diff --no-index -w -- <metro-java-at-$del^> <railway-java>   # 条件 1
+git log --oneline "$del..HEAD" -- "Metro/src/main/java/org/cubexmc/metro/<Path>.kt"  # 条件 2:输出为空才安全
+```
+
+**别用"只差 1 行 = 只差换行"这类速判**——`MetroTextRenderer` 的 trusted 列表就写在一行里，只差 1 行恰恰是实质差异。最终以 `:Railway:build`（全部单测）为准。
