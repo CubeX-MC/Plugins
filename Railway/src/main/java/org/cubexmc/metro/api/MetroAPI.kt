@@ -443,7 +443,7 @@ class MetroAPI private constructor(private val plugin: Metro) {
     fun createPortal(portalId: String?, entrance: Location?, ownerId: UUID?): PortalWriteResult {
         val service = portalService() ?: return PortalWriteResult(PortalWriteStatus.FAILED, null, entrance)
         val result = service.createPortal(portalId, entrance, null, ownerId)
-        return PortalWriteResult(toPortalWriteStatus(result.status()), result.portal(), result.location())
+        return PortalWriteResult(toPortalWriteStatus(result.status), result.portal, result.location)
     }
 
     fun setPortalDestination(portalId: String?, destination: Location?): PortalWriteStatus {
@@ -451,7 +451,7 @@ class MetroAPI private constructor(private val plugin: Metro) {
         if (portalId == null) {
             return PortalWriteStatus.FAILED
         }
-        return toPortalWriteStatus(service.setDestination(portalId, destination).status())
+        return toPortalWriteStatus(service.setDestination(portalId, destination).status)
     }
 
     fun linkPortals(firstPortalId: String?, secondPortalId: String?): PortalWriteStatus {

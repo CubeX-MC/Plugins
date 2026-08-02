@@ -2,6 +2,7 @@ package org.cubexmc.metro.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -58,6 +59,17 @@ class StopCommandServiceTest {
         when(stopManager.getStop("alpha")).thenReturn(alpha);
 
         assertEquals(List.of(alpha, beta), service.listStops());
+        assertThrows(UnsupportedOperationException.class, () -> service.listStops().add(beta));
+    }
+
+    @Test
+    void resultTypesAndPublishedValueSetsShouldRemainCompatible() {
+        assertTrue(StopCommandService.CreateStopResult.class.isRecord());
+        assertTrue(SetPointResult.class.isRecord());
+        assertThrows(UnsupportedOperationException.class,
+                () -> StopCommandService.TITLE_TYPES.add("custom"));
+        assertThrows(UnsupportedOperationException.class,
+                () -> StopCommandService.TITLE_KEYS.add("custom"));
     }
 
     @Test

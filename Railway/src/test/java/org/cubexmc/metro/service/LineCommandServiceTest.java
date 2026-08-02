@@ -2,6 +2,7 @@ package org.cubexmc.metro.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -76,6 +77,13 @@ class LineCommandServiceTest {
         when(lineManager.getAllLines()).thenReturn(List.of(beta, alpha));
 
         assertEquals(List.of(alpha, beta), service.listLines());
+        assertThrows(UnsupportedOperationException.class, () -> service.listLines().add(beta));
+    }
+
+    @Test
+    void resultTypesShouldRemainJvmRecords() {
+        assertTrue(AddStopResult.class.isRecord());
+        assertTrue(LineCommandService.ClearRouteResult.class.isRecord());
     }
 
     @Test
