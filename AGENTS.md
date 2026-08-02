@@ -43,6 +43,10 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 - **Reputations 的 3 个 `.java` 是故意的 Java API 面**（`org.cubexmc.reputations.api`），不要迁 Kotlin。
 - **Clarity 编译到 Java 21**（用 1.21 属性 API），全仓其余插件是 17；`jarGate` 已按各插件的 java release 分别校验。
 
+## 进行中的工作
+
+- **Railway Kotlin 迁移**在分支 `kotlin/railway`（已推 origin），66/167。接力点、剩余包顺序、以及"能不能照抄 Metro 的 `.kt`"的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——已经有三个文件因为只比 Java 不看 Metro 的 `.kt` 历史而差点被抄错，其中两个没有测试会报警。
+
 ## 已知脆弱点
 
 - `Metro:TrainTravelDisplayControllerTest.shouldThrottleUpdatesToConfiguredInterval` 偶发 `World unloaded`（Bukkit `Location` 对 mock World 持弱引用，被 GC 即抛），重跑即过。

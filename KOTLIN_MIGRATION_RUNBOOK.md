@@ -14,16 +14,34 @@
 .\gradlew.bat kotlinMigrationStatus
 ```
 
-截至 Metro 收尾（2026-08-02）：
+截至 2026-08-02：
 
 | 插件 | 状态 |
 |------|------|
 | BookLite / FAWEReplacer / MountLicense / Contract / EcoBalancer / RuleGems / Metro | ✅ main 源码全 Kotlin（仅留 vendored bStats `Metrics.java`） |
 | Regions | ✅ 原生 Kotlin |
 | Reputations | ✅ 3 个 `.java` 是**故意**保留的 Java API 面（`org.cubexmc.reputations.api`），不要动 |
-| **Railway** | ⬜ 167 个 main `.java`，Metro 同源 fork，**下一个** |
+| **Railway** | 🚧 **进行中**，见下节 |
 | **Clarity** | ⬜ 8 个 main `.java`，且是唯一零 `cubex-*` 模块接入的插件 |
 | **modules** | ⬜ cubex-config(16) / cubex-i18n(9) / cubex-scheduler(5)；**cubex-core(9) 按既定最后迁** |
+
+### Railway 接力点
+
+**分支 `kotlin/railway`（已推 origin）**，66/167 已迁，`:Railway:build` 与 `:Railway:jarGate` 绿。
+已整包完成：`util`、`update`、`event`、`spatial`、`persistence`；`model` 只剩 2 个；leaf 枚举/接口已清空。
+
+剩余（按建议顺序，括号内为文件数）：
+
+| 顺序 | 包 | 剩余 |
+|---|---|---|
+| 1 | `model`(2) | EntityDisplayConfig、EntityModelController（Railway 独有） |
+| 2 | `estimation`(1) `placeholder`(1) `config`(1) `api`(1) | TravelTimeEstimator、RailwayPlaceholders、ConfigFacade、MetroAPI |
+| 3 | `service`(10) + `service/strategy`(2) + `service/virtual`(2) | LineService / TrainSpawner / VirtualTrain 等 |
+| 4 | `manager`(7) | LineManager(968 行)、StopManager、PortalManager 等 |
+| 5 | `train`(13) | TrainInstance(864 行)、TrainMovementTask、TrainDisplayController 等 |
+| 6 | `physics`(18) | Kinematic* / Reactive* / TrainCartsBridge |
+| 7 | `gui`(5) + `gui/view`(9) + `gui/controller`(10) | 与 Metro 同构，`GuiHolder` 需要 `NullableInventoryHolder` 那套（见 Metro） |
+| 8 | `integration`(3) `lifecycle`(3) `command/newcmd`(7) `listener`(4) | 最后是 `Metro.java` 主类；`Metrics.java` 永远保留 Java |
 
 ---
 
@@ -147,7 +165,15 @@ class LineCommandService(lineManager: LineManager?) {
   git log --oneline -- "Metro/src/main/java/org/cubexmc/metro/<pkg>/<Name>.kt"
   ```
 
-  只做 ① 会中招：`TrainScoreboardController` 两边 Java 一致，但 Metro 后来在 travel feedback 里让 `MOVING_BETWEEN_STATIONS` 也刷新记分板，Railway 仍然是空实现。照抄会把 Metro 的玩法改动偷渡进 Railway（Railway 的 `shouldDoNothingWhenMovingBetweenStations` 会当场报错，但别指望每个差异都有测试兜着）。
+  只做 ① 会中招，已实际踩到三次（14 个候选里只有 6 个真正合格）：
+
+  | 文件 | Java 一致？ | Metro 迁移后又改了什么 | 后果 |
+  |---|---|---|---|
+  | `TrainScoreboardController` | 是 | travel feedback 让 `MOVING_BETWEEN_STATIONS` 也刷新记分板 | 把 Metro 玩法偷渡进 Railway（Railway 的测试当场报错） |
+  | `update/DataFileUpdater` | 是 | 删掉了 `linkedPortalId → linked` 字段重命名 | **静默丢一步数据迁移**，无测试兜底 |
+  | `integration/VaultIntegration` | 是 | 重写成会动态重解析经济服务的 `Listener` | 引入 Railway 没有的行为，无测试兜底 |
+
+  后两个都没有测试会报警——所以 ② 是硬要求，不是可选检查。
 - Railway 比 Metro 多：physics / 发车调度 / entity.yml，`tickAccessEnabled=true` 的调度差异。
 - **Railway 的源码包就是 `org.cubexmc.metro`（主类 `org.cubexmc.metro.Metro`），与 Metro 完全同名，这是有意保留的**——方便 Metro 的功能更新直接搬过来，两者本就不支持同时安装。`build.gradle.kts` 里 relocate 到 `org.cubexmc.metro.lib.*` 同理。**迁移时不要顺手改包名或 relocate 目标。**
 - 因为同包同名，改 Railway 时**务必确认自己打开的是 `Railway/src/...` 而不是 `Metro/src/...`**；提交前 `git status` 看一眼路径前缀。
