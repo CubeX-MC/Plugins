@@ -45,7 +45,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 进行中的工作
 
-- **Railway Kotlin 迁移**在分支 `kotlin/railway`（origin 已有该分支），当前分支 68/167；`model` 已清空 Java，下一批是 `TravelTimeEstimator` + `RailwayPlaceholders`。接力点、细化后的批次顺序、以及"能不能照抄 Metro 的 `.kt`"的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——已经有三个文件因为只比 Java 不看 Metro 的 `.kt` 历史而差点被抄错，其中两个没有测试会报警。
+- **Railway Kotlin 迁移**在分支 `kotlin/railway`（origin 已有该分支），原始源码 70/167 已迁（当前 `98 Java / 70 Kotlin`，多出的 Java 是有意保留的 PlaceholderAPI 可空 shim）；下一批是 `ConfigFacade`。接力点、细化后的批次顺序、以及"能不能照抄 Metro 的 `.kt`"的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——已经有三个文件因为只比 Java 不看 Metro 的 `.kt` 历史而差点被抄错，其中两个没有测试会报警。
 
 ## 已知脆弱点
 

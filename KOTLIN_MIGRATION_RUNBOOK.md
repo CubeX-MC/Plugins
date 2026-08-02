@@ -18,7 +18,8 @@
 
 | 插件 | 状态 |
 |------|------|
-| BookLite / FAWEReplacer / MountLicense / Contract / EcoBalancer / RuleGems / Metro | ✅ main 源码全 Kotlin（仅留 vendored bStats `Metrics.java`） |
+| BookLite / FAWEReplacer / MountLicense / Contract / EcoBalancer / RuleGems | ✅ main 源码全 Kotlin（仅留 vendored bStats `Metrics.java`） |
+| Metro | ✅ 实现已全 Kotlin；保留 `Metrics.java` 与两个必要的 Java 互操作 shim |
 | Regions | ✅ 原生 Kotlin |
 | Reputations | ✅ 3 个 `.java` 是**故意**保留的 Java API 面（`org.cubexmc.reputations.api`），不要动 |
 | **Railway** | 🚧 **进行中**，见下节 |
@@ -27,32 +28,36 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，当前分支 68/167 已迁，`:Railway:build` 与 `:Railway:jarGate` 绿。
-已整包完成：`util`、`update`、`event`、`spatial`、`persistence`、`model`；leaf 枚举/接口已清空。
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 70/167 已迁；当前计数为 98 Java / 70 Kotlin，
+`:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
+`persistence`、`model`、`estimation`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
+`RailwayPlaceholders` 因 PlaceholderAPI 把 `params` 标成非空、而旧实现明确容忍 null，新增了一个
+`NullablePlaceholderExpansion.java` 兼容 shim。它是有意保留的 Java 文件，因此当前 main 文件总数
+为 168；进度分母 167 仍指迁移开始时的原始源码数，不要为了让计数好看而删除这个 shim。
 
 剩余（按建议顺序）：
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | 外围叶子 | `TravelTimeEstimator` + `RailwayPlaceholders`，2 文件 / 454 行 | 下一批；Railway 自有逻辑，不从 Metro 复制 |
-| 2 | 配置 facade | `ConfigFacade`，1 文件 / 702 行 | 单独迁，跑 `ConfigFacadeTest` |
-| 3 | API facade | `MetroAPI`，1 文件 / 783 行 | 单独迁，保住 Java-friendly API 与 `MetroAPITest` |
-| 4 | service 叶子 | `PriceService` + `TicketService` + `LineStatusService`，3 文件 / 546 行 | 无发车引擎内部循环 |
-| 5 | service 命令域 | `LineCommandService` + `LineSelectionService` + `PortalCommandService` + `StopCommandService`，4 文件 / 868 行 | 与对应 service 测试一起验证 |
-| 6 | virtual service | `VirtualTrain` + `VirtualTrainPool`，2 文件 / 1184 行 | 强耦合，不拆开；跑 `VirtualTrainPoolTest` |
-| 7 | dispatch runtime | `LineService` + `LineServiceManager` + `TrainSpawner` + 两个 strategy，5 文件 / 1295 行 | 强耦合边界；完成后 service 包清空 Java |
-| 8 | `manager` | 7 文件 / 3126 行 | 继续拆批；`LineManager` 等超大类可单独提交 |
-| 9 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
-| 10 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 11 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 12 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 13 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | 配置 facade | `ConfigFacade`，1 文件 / 702 行 | 下一批；单独迁，跑 `ConfigFacadeTest` |
+| 2 | API facade | `MetroAPI`，1 文件 / 783 行 | 单独迁，保住 Java-friendly API 与 `MetroAPITest` |
+| 3 | service 叶子 | `PriceService` + `TicketService` + `LineStatusService`，3 文件 / 546 行 | 无发车引擎内部循环 |
+| 4 | service 命令域 | `LineCommandService` + `LineSelectionService` + `PortalCommandService` + `StopCommandService`，4 文件 / 868 行 | 与对应 service 测试一起验证 |
+| 5 | virtual service | `VirtualTrain` + `VirtualTrainPool`，2 文件 / 1184 行 | 强耦合，不拆开；跑 `VirtualTrainPoolTest` |
+| 6 | dispatch runtime | `LineService` + `LineServiceManager` + `TrainSpawner` + 两个 strategy，5 文件 / 1295 行 | 强耦合边界；完成后 service 包清空 Java |
+| 7 | `manager` | 7 文件 / 3126 行 | 继续拆批；`LineManager` 等超大类可单独提交 |
+| 8 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
+| 9 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 10 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 11 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 12 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
-这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。下一批不要把外围 4 文件
-一次迁完：原表虽然只有 4 个文件，但合计 1939 行且横跨配置/API 两个兼容性面。
+这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
+`TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
+配置与 API 两个兼容性面混进同一提交。
 
 ---
 
@@ -151,6 +156,11 @@ class LineCommandService(lineManager: LineManager?) {
 **仍被 Java 调用的 static**：放进 companion 后给入口加 `@JvmStatic`，并用 Java 测试或
 `compileJava` 验证真正的 static bridge。Kotlin 没有 package-private；包内 Java 测试仍需直接调用时，
 可让承载类保持 `internal`、把所需 bridge 声明为普通 JVM 可见方法，但不要把它当成新公共 API 承诺。
+
+**第三方 `@NotNull` override 与旧 null 容错冲突**：如果 Java 实现明确检查过 null，而 Kotlin 因
+第三方注解不允许把 override 参数声明成可空，不要删守卫或接受 Intrinsics NPE。增加一个最小 Java
+抽象 shim，在 override 参数上显式 `@Nullable`，让 Kotlin 子类继续实现可空契约；
+`NullablePlaceholderExpansion` 是 Railway 的现成例子。
 
 **空值语义别改**：原来会 NPE 的路径，改成早返回/抛 `IllegalStateException` 都要在提交信息里说明；原来返回 null 的公开契约（如 GUI holder 的 `getInventory()`）必须保住。
 
