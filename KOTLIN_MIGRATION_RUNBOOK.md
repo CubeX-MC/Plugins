@@ -133,7 +133,8 @@ class LineCommandService(lineManager: LineManager?) {
 
 ## 下一轮（Railway）已知注意点
 
-- Railway 是 Metro 的同源 fork，Metro 这一轮的分批顺序、可空性模式、互操作坑**可整套复用**。
+- Railway 是 Metro 的同源 fork，Metro 这一轮的分批顺序、可空性模式、互操作坑**可整套复用**。对照 Metro 的同名文件改，通常八成能直接套。
 - Railway 比 Metro 多：physics / 发车调度 / entity.yml，`tickAccessEnabled=true` 的调度差异。
-- Railway 的 `build.gradle.kts` 把 cloud / scoreboardlibrary / geantyref relocate 到了 **`org.cubexmc.metro.lib.*`**（从 Metro 抄来时没改）。ClassLoader 隔离下不影响运行，但命名是错的；要改就单独一个提交、单独验收，**不要混进 Kotlin 迁移批次**。
+- **Railway 的源码包就是 `org.cubexmc.metro`（主类 `org.cubexmc.metro.Metro`），与 Metro 完全同名，这是有意保留的**——方便 Metro 的功能更新直接搬过来，两者本就不支持同时安装。`build.gradle.kts` 里 relocate 到 `org.cubexmc.metro.lib.*` 同理。**迁移时不要顺手改包名或 relocate 目标。**
+- 因为同包同名，改 Railway 时**务必确认自己打开的是 `Railway/src/...` 而不是 `Metro/src/...`**；提交前 `git status` 看一眼路径前缀。
 - `Railway/.claude/worktrees/` 下有两份历史 agent worktree 副本（已 gitignore，未跟踪）。它们会污染"数文件"和全目录 grep——统计一律以 `kotlinMigrationStatus` 或 `Railway/src` 为准。
