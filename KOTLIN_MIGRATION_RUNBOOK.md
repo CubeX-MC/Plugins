@@ -42,7 +42,7 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | 配置 facade | `ConfigFacade`，1 文件 / 702 行 | 下一批；单独迁，跑 `ConfigFacadeTest` |
+| 1 | 配置 facade | `ConfigFacade`，1 文件 / 702 行 | 下一批；从 Railway Java 转，单独迁并跑 `ConfigFacadeTest` |
 | 2 | API facade | `MetroAPI`，1 文件 / 783 行 | 单独迁，保住 Java-friendly API 与 `MetroAPITest` |
 | 3 | service 叶子 | `PriceService` + `TicketService` + `LineStatusService`，3 文件 / 546 行 | 无发车引擎内部循环 |
 | 4 | service 命令域 | `LineCommandService` + `LineSelectionService` + `PortalCommandService` + `StopCommandService`，4 文件 / 868 行 | 与对应 service 测试一起验证 |
@@ -58,6 +58,10 @@
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
 配置与 API 两个兼容性面混进同一提交。
+
+`ConfigFacade` 已完成 Metro 复用判定：Railway Java 与 Metro 迁移前 Java 不同，且 Metro Kotlin
+迁移后又被 `c68de20` 修改；两项条件都不满足。必须从 Railway 自己的 Java 机械迁移，Metro 版本
+只能参考写法，不能复制。
 
 ---
 
