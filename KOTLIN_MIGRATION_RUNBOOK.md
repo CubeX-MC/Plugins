@@ -27,21 +27,32 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（已推 origin）**，66/167 已迁，`:Railway:build` 与 `:Railway:jarGate` 绿。
-已整包完成：`util`、`update`、`event`、`spatial`、`persistence`；`model` 只剩 2 个；leaf 枚举/接口已清空。
+**分支 `kotlin/railway`（origin 已有该分支）**，当前分支 68/167 已迁，`:Railway:build` 与 `:Railway:jarGate` 绿。
+已整包完成：`util`、`update`、`event`、`spatial`、`persistence`、`model`；leaf 枚举/接口已清空。
+`model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
+自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
+`spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
 
-剩余（按建议顺序，括号内为文件数）：
+剩余（按建议顺序）：
 
-| 顺序 | 包 | 剩余 |
-|---|---|---|
-| 1 | `model`(2) | EntityDisplayConfig、EntityModelController（Railway 独有） |
-| 2 | `estimation`(1) `placeholder`(1) `config`(1) `api`(1) | TravelTimeEstimator、RailwayPlaceholders、ConfigFacade、MetroAPI |
-| 3 | `service`(10) + `service/strategy`(2) + `service/virtual`(2) | LineService / TrainSpawner / VirtualTrain 等 |
-| 4 | `manager`(7) | LineManager(968 行)、StopManager、PortalManager 等 |
-| 5 | `train`(13) | TrainInstance(864 行)、TrainMovementTask、TrainDisplayController 等 |
-| 6 | `physics`(18) | Kinematic* / Reactive* / TrainCartsBridge |
-| 7 | `gui`(5) + `gui/view`(9) + `gui/controller`(10) | 与 Metro 同构，`GuiHolder` 需要 `NullableInventoryHolder` 那套（见 Metro） |
-| 8 | `integration`(3) `lifecycle`(3) `command/newcmd`(7) `listener`(4) | 最后是 `Metro.java` 主类；`Metrics.java` 永远保留 Java |
+| 顺序 | 批次 | 文件 / 规模 | 边界说明 |
+|---|---|---:|---|
+| 1 | 外围叶子 | `TravelTimeEstimator` + `RailwayPlaceholders`，2 文件 / 454 行 | 下一批；Railway 自有逻辑，不从 Metro 复制 |
+| 2 | 配置 facade | `ConfigFacade`，1 文件 / 702 行 | 单独迁，跑 `ConfigFacadeTest` |
+| 3 | API facade | `MetroAPI`，1 文件 / 783 行 | 单独迁，保住 Java-friendly API 与 `MetroAPITest` |
+| 4 | service 叶子 | `PriceService` + `TicketService` + `LineStatusService`，3 文件 / 546 行 | 无发车引擎内部循环 |
+| 5 | service 命令域 | `LineCommandService` + `LineSelectionService` + `PortalCommandService` + `StopCommandService`，4 文件 / 868 行 | 与对应 service 测试一起验证 |
+| 6 | virtual service | `VirtualTrain` + `VirtualTrainPool`，2 文件 / 1184 行 | 强耦合，不拆开；跑 `VirtualTrainPoolTest` |
+| 7 | dispatch runtime | `LineService` + `LineServiceManager` + `TrainSpawner` + 两个 strategy，5 文件 / 1295 行 | 强耦合边界；完成后 service 包清空 Java |
+| 8 | `manager` | 7 文件 / 3126 行 | 继续拆批；`LineManager` 等超大类可单独提交 |
+| 9 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
+| 10 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 11 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 12 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 13 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+
+这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。下一批不要把外围 4 文件
+一次迁完：原表虽然只有 4 个文件，但合计 1939 行且横跨配置/API 两个兼容性面。
 
 ---
 
@@ -63,7 +74,10 @@ model / util / event  →  service / manager  →  integration / lifecycle
   →  command 层  →  GUI（core → view → controller）  →  listener  →  主类
 ```
 
-一批 5–20 个文件、控制在一次可验证的范围内。**跨批不要留半个包**：同包内互相引用的 `internal` 类要一起迁（Kotlin `internal` 成员对 Java 调用方会改名，混编期会断）。
+通常一批 5–20 个小文件；对 Railway 这类大类密集的插件，优先把一批控制在约 400–1200 行。
+单个 700+ 行 facade/主类可以独立成批，超过 1200 行只在类型强耦合、拆开反而制造混编风险时接受。
+文件数和行数都是审查面提示，不是硬门禁。**跨批不要留半个强耦合簇**：同包内互相引用的
+`internal` 类要一起迁（Kotlin `internal` 成员对 Java 调用方会改名，混编期会断）。
 
 ### 2. 每批的循环
 
@@ -129,6 +143,14 @@ class LineCommandService(lineManager: LineManager?) {
 **可选命令参数必须可空**：Cloud 与反射式 Bukkit fallback 都会给缺省的 `[optional]` 传 `null`。
 
 **回调引用**：不要 `::foo`（可能触发 `KFunction`，约定里排除了 reflect 实现），用普通 lambda。
+
+**Java record**：原类型已经是 record、且 Java 调用方仍使用 `component()` 访问器时，用
+`@JvmRecord data class` 保留 record 形状；不要直接改成普通 `data class`，否则 Java 访问器会从
+`spacing()` 变成 `getSpacing()`。这不属于“把普通领域类顺手 data class 化”。
+
+**仍被 Java 调用的 static**：放进 companion 后给入口加 `@JvmStatic`，并用 Java 测试或
+`compileJava` 验证真正的 static bridge。Kotlin 没有 package-private；包内 Java 测试仍需直接调用时，
+可让承载类保持 `internal`、把所需 bridge 声明为普通 JVM 可见方法，但不要把它当成新公共 API 承诺。
 
 **空值语义别改**：原来会 NPE 的路径，改成早返回/抛 `IllegalStateException` 都要在提交信息里说明；原来返回 null 的公开契约（如 GUI holder 的 `getInventory()`）必须保住。
 
