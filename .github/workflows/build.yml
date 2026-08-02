@@ -92,6 +92,9 @@ jobs:
       - name: Build plugin
         run: ./gradlew :${{ matrix.plugin }}:build
 
+      - name: Verify deployable jar
+        run: ./gradlew :${{ matrix.plugin }}:jarGate
+
       - name: Upload ${{ matrix.plugin }} jar
         uses: actions/upload-artifact@v4
         with:

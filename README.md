@@ -36,6 +36,8 @@ CubeX 服务器插件 monorepo。开发用单仓库，产物仍是 **N 个可独
 |------|------|
 | `.\gradlew.bat shadowJarAll` | 构建**所有插件**的部署 jar（modules 无 shadowJar，自动排除） |
 | `.\gradlew.bat buildAllPlugins` | 构建所有子项目（含测试） |
+| `.\gradlew.bat jarGateAll` | 对所有插件跑部署 jar 门禁 |
+| `.\gradlew.bat kotlinMigrationStatus` | 打印各子项目 Java/Kotlin 文件数与 Kotlin opt-in 状态 |
 | `.\gradlew.bat cleanAll` | 清理所有子项目 |
 | `.\gradlew.bat :RuleGems:clean` | 只清理单个子项目 |
 
@@ -88,4 +90,5 @@ plugins/
 
 - **`GradleWrapperMain not found`**：你在 git-bash 跑了 `./gradlew`。改用 PowerShell `.\gradlew.bat`。
 - **改了 `buildSrc` 后构建异常**：`buildSrc` 变更会触发全量重编，必要时 `.\gradlew.bat --stop` 后重试。
-- **验证 jar 内容**（relocate / 无 kotlin-reflect / sqlite 平台数 / bytecode 版本等）：解包 `build/libs/<Plugin>-<version>.jar` 自查；Kotlin 迁移的验收门禁见 `KOTLIN_STYLE_GUIDE.md`。
+- **验证 jar 内容**（Kotlin runtime relocate / 无 kotlin-reflect 实现 / 自有类字节码版本 / plugin.yml）：跑 `.\gradlew.bat :<Plugin>:jarGate`，不用再手工解包。门禁规则见 `KOTLIN_STYLE_GUIDE.md` 的 Jar Gate 一节；它**不查** plugin.yml 内容、bStats id、sqlite 平台数、adventure 是否单份，这些仍需人工确认。
+- **Kotlin 迁移怎么执行**：见 `KOTLIN_MIGRATION_RUNBOOK.md`（分批顺序、每批的验证循环、可空性处理模式、提交约定）。
