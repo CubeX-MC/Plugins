@@ -28,9 +28,11 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 72/167 已迁；当前计数为 96 Java / 72 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 75/167 已迁；当前计数为 93 Java / 75 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
+`service` 的叶子批次（`PriceService`、`TicketService`、`LineStatusService`）也已完成；下一批进入
+service 命令域。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -42,16 +44,15 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | service 叶子 | `PriceService` + `TicketService` + `LineStatusService`，3 文件 / 546 行 | 下一批；无发车引擎内部循环 |
-| 2 | service 命令域 | `LineCommandService` + `LineSelectionService` + `PortalCommandService` + `StopCommandService`，4 文件 / 868 行 | 与对应 service 测试一起验证 |
-| 3 | virtual service | `VirtualTrain` + `VirtualTrainPool`，2 文件 / 1184 行 | 强耦合，不拆开；跑 `VirtualTrainPoolTest` |
-| 4 | dispatch runtime | `LineService` + `LineServiceManager` + `TrainSpawner` + 两个 strategy，5 文件 / 1295 行 | 强耦合边界；完成后 service 包清空 Java |
-| 5 | `manager` | 7 文件 / 3126 行 | 继续拆批；`LineManager` 等超大类可单独提交 |
-| 6 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
-| 7 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 8 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 9 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 10 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | service 命令域 | `LineCommandService` + `LineSelectionService` + `PortalCommandService` + `StopCommandService`，4 文件 / 868 行 | 下一批；与对应 service 测试一起验证 |
+| 2 | virtual service | `VirtualTrain` + `VirtualTrainPool`，2 文件 / 1184 行 | 强耦合，不拆开；跑 `VirtualTrainPoolTest` |
+| 3 | dispatch runtime | `LineService` + `LineServiceManager` + `TrainSpawner` + 两个 strategy，5 文件 / 1295 行 | 强耦合边界；完成后 service 包清空 Java |
+| 4 | `manager` | 7 文件 / 3126 行 | 继续拆批；`LineManager` 等超大类可单独提交 |
+| 5 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
+| 6 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 7 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 8 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 9 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -64,6 +65,13 @@
 `MetroAPI` 的 Railway Java 与 Metro 迁移前 Java 仅差结尾换行，因此复用了迁移提交 `36ab5dc`
 当时的 Kotlin，而非后来被 `383f683` / `e726cad` 修改的版本。Railway 的 `VaultIntegration` 仍是
 Java，调用保留 `isEnabled()`；不要改成 Metro Kotlin 调用方的 property 写法。
+
+service 叶子批次的三个 Railway Java 都与各自 Metro 迁移前 Java 一致。`LineStatusService` 的 Kotlin
+迁移后没有功能提交，可直接复用；`PriceService` 与 `TicketService` 后来都被 `6e56184` 改过，因此
+只复用各自迁移提交（`284a177` / `52feeee`）中的 Kotlin。不要把 Metro 后来改成“环线只按配置方向
+计费”或“车主入账失败时退款”的行为混进 Railway 的纯迁移批次。`TicketService` 同样保留 Railway
+Java `VaultIntegration.isEnabled()` 的显式调用；`TicketTransaction.isCharged()` 继续是 Java 只读面，
+通过 `@JvmSynthetic internal set` 供外层 service 更新，不要照搬 Metro 版本而公开 `markCharged()`。
 
 ---
 
