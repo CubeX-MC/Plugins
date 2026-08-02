@@ -134,6 +134,20 @@ class LineCommandService(lineManager: LineManager?) {
 ## 下一轮（Railway）已知注意点
 
 - Railway 是 Metro 的同源 fork，Metro 这一轮的分批顺序、可空性模式、互操作坑**可整套复用**。对照 Metro 的同名文件改，通常八成能直接套。
+- **想直接抄 Metro 的 `.kt` 之前，先跑两步校验**，两步都过才可以照抄：
+
+  ```powershell
+  # ① Railway 的 .java 与 Metro 迁移前的 .java 是否一致（只差结尾换行 = 一致）
+  $p = "Metro/src/main/java/org/cubexmc/metro/<pkg>/<Name>.java"
+  $del = git log --diff-filter=D --format=%H -1 -- $p
+  git show "$del^:$p" > $env:TEMP\m.java
+  git diff --no-index -- $env:TEMP\m.java "Railway/src/main/java/org/cubexmc/metro/<pkg>/<Name>.java"
+
+  # ② Metro 的 .kt 自迁移后有没有被功能提交改过（>1 个提交就不能照抄）
+  git log --oneline -- "Metro/src/main/java/org/cubexmc/metro/<pkg>/<Name>.kt"
+  ```
+
+  只做 ① 会中招：`TrainScoreboardController` 两边 Java 一致，但 Metro 后来在 travel feedback 里让 `MOVING_BETWEEN_STATIONS` 也刷新记分板，Railway 仍然是空实现。照抄会把 Metro 的玩法改动偷渡进 Railway（Railway 的 `shouldDoNothingWhenMovingBetweenStations` 会当场报错，但别指望每个差异都有测试兜着）。
 - Railway 比 Metro 多：physics / 发车调度 / entity.yml，`tickAccessEnabled=true` 的调度差异。
 - **Railway 的源码包就是 `org.cubexmc.metro`（主类 `org.cubexmc.metro.Metro`），与 Metro 完全同名，这是有意保留的**——方便 Metro 的功能更新直接搬过来，两者本就不支持同时安装。`build.gradle.kts` 里 relocate 到 `org.cubexmc.metro.lib.*` 同理。**迁移时不要顺手改包名或 relocate 目标。**
 - 因为同包同名，改 Railway 时**务必确认自己打开的是 `Railway/src/...` 而不是 `Metro/src/...`**；提交前 `git status` 看一眼路径前缀。
