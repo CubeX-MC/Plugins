@@ -24,6 +24,26 @@ This guide is intentionally small. Kotlin migration is behavior-preserving first
 - Avoid callable references that can trigger Kotlin reflection types at runtime, such as `::foo` in contexts that generate `KFunction`. The convention excludes `kotlin/reflect/**`; use ordinary lambdas instead. Any real reflect need requires explicit review.
 - Do not mix Kotlin migration with gameplay, config, database, command, permission, or text changes.
 
+## Interop Traps Found During Migration
+
+- **Static mocks stop intercepting companion helpers.** `@JvmStatic` in a *companion* object still resolves to
+  `Foo.Companion.bar()` at Kotlin call sites, so an existing `mockStatic(Foo.class)` in a Java test silently stops
+  intercepting once the caller becomes Kotlin. Named `object` declarations do generate a real static that stays
+  interceptable. When a converted call site is covered by a static mock, either move the helper into a named object
+  (Metro: `GuiItemMarker`) or point the test at the real registry object (Metro: `TrainTaskRegistry`).
+- **`@JvmOverloads` bridges are for Java only.** A Kotlin caller that omits a default argument still invokes the
+  full-arity method, so `verify(mock).open(a, b, 0)` must become `verify(mock).open(a, b, 0, null)`.
+- **Bukkit `@NotNull` returns cannot be overridden as nullable.** `InventoryHolder#getInventory()` is annotated
+  `@NotNull`, but Metro holders legitimately report `null` before their inventory exists. Keep the nullable
+  declaration in a tiny Java base class (`NullableInventoryHolder`) rather than forcing `!!` or changing behaviour.
+- **Raw types have no Kotlin equivalent.** `PaperCommandManager.builder(...)` names a Paper class that is absent from
+  the Spigot compile classpath; Java raw types bypass it, Kotlin cannot. Isolate that single call in a documented Java
+  shim (`PaperCommandManagerBootstrap`) instead of resorting to reflection.
+- **Optional command arguments must be nullable.** Cloud and the reflective Bukkit fallback both pass `null` for an
+  absent `[optional]` argument; a non-null Kotlin parameter turns that into an intrinsics NPE.
+- **Managers that the old Java code null-checked stay nullable.** Use `lateinit` only where every caller already
+  assumed non-null; keep `T?` (plus the existing guards) wherever call sites test for null, so behaviour is preserved.
+
 ## Jar Gate
 
 For each opt-in plugin:
