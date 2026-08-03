@@ -30,6 +30,7 @@
 
 ### 4. 尽量模块化(沉淀可复用能力为 `cubex-*` 模块)
 - 候选:`cubex-i18n`(已存在,推广到所有插件)、**reputation 接入 helper 模块**(封装"取 ServicesManager 服务 + 注册字段 + 降级"的样板)、`cubex-scheduler`、`cubex-config`/迁移、把 Contract 的 `Menu`/`InventoryButton` 框架抽成 **`cubex-gui`**。
+- **`cubex-spatial` 候选（2026-08-02 审计）**：Metro/Railway 的 `Octree`、`Point3D`、`Range3D` 当前 blob 完全一致，且是无状态、领域无关的空间索引。另开重构提交先接入一个插件并过 shade/jarGate，再推广；不要把 `StopManager` 或 `Stop` 一并下沉。
 - **铁律(见架构讨论)**:**有状态的共享服务 = 独立插件**(单实例持有数据,如 Reputations);**无状态的共享代码 = shade 进各 jar 的模块**(如 `cubex-core`)。别把有状态服务做成 shade 模块(各插件会各持一份、互不共享)。
 - 配合 `ARCHITECTURE_PROPOSAL.md` 的 core API 边界设计,避免 god-module 与返工。
 

@@ -28,11 +28,11 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 91/167 已迁；当前计数为 77 Java / 91 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 92/167 已迁；当前计数为 76 Java / 92 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-叶子调用簇和保护/传送门调用簇已完成，下一批是 `StopManager`。
+叶子、保护/传送门与 `StopManager` 批次已完成，下一批是 `LineManager`。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -44,13 +44,12 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | `StopManager` | 1 文件 / 571 行 | **下一批**；单独提交，持久化与空间索引面较宽 |
-| 2 | `LineManager` | 1 文件 / 968 行 | manager 最后；调用 service/stop/route，单独提交 |
-| 3 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
-| 4 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 5 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 6 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 7 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | `LineManager` | 1 文件 / 1052 行 | **下一批**；manager 最后，调用 service/stop/route，单独提交 |
+| 2 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
+| 3 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 4 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 5 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 6 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -118,6 +117,17 @@ Java 为唯一行为基线：保留双向 `linkPortals`、删除时解除反向�
 `TrainMovementTask`、权限与保存语义，属于插件领域编排，不下沉 `cubex-*`。其中调度与挂载传送已经
 分别通过 `cubex-scheduler` 适配层和 Railway 的 `MountAwareTeleportUtil` 复用；为表面去重再抽一个
 “保护/传送门 manager”只会泄漏玩法模型，因此不建立新的公共 API。
+
+`StopManager` 也已通过历史双检：Railway Java 与 Metro 迁移前 Java 只差 Railway 独有的两个空兼容
+入口 `tick()` / `saveStops()`，Metro 的 `36ab5dc` Kotlin 版本此后没有功能提交，因此复用其迁移结构
+并补回这两个入口。`createStop` 继续接受可空 JVM 参数以兼容已迁的 `StopCommandService` 调用面，但
+对 null 显式抛 `NullPointerException`，保持旧 Java 最终构造 `Stop` 时的失败语义；其他原本以 map
+查询早返回的 ID、owner/admin 与位置参数继续可空。定向测试、完整构建与 jar 门禁均通过。
+
+共享能力审计中，`StopManager` 本身包含 stops.yml 持久化、线路解绑、地图刷新和 `Stop` 领域语义，
+继续留在插件内；但 `spatial/Octree.kt`、`Point3D.kt`、`Range3D.kt` 在 Metro 与 Railway 当前树中
+blob 完全一致，且本身无状态、不了解线路/站点模型，满足 `cubex-spatial` 候选条件。候选已记入
+`ROADMAP.md`；实际抽取必须另开重构提交，先让一个插件改用模块并验证 shade/jarGate，再推广另一侧。
 
 ---
 
