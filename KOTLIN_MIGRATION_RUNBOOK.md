@@ -28,11 +28,11 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 92/167 已迁；当前计数为 76 Java / 92 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 93/167 已迁；当前计数为 75 Java / 93 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-叶子、保护/传送门与 `StopManager` 批次已完成，下一批是 `LineManager`。
+已全部完成，下一批进入 `train` 的叶子 helper 调用簇。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -44,12 +44,15 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | `LineManager` | 1 文件 / 1052 行 | **下一批**；manager 最后，调用 service/stop/route，单独提交 |
-| 2 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
-| 3 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 4 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 5 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 6 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | train 叶子 helper | `TrainEventPublisher`、`TrainMovementAssistController`、`TrainNavigatorDecisions`、`TrainPassengerRegistry`、`TrainPhysicsController`、`TrainStateMath`、`TrainTaskRegistry`，7 文件 / 546 行 | **下一批**；先做历史复用审计 |
+| 2 | train session/navigation | `TrainSession` + `TrainNavigator`，2 文件 / 381 行 | 状态容器与导航决策同批验证 |
+| 3 | train display | `ScoreboardManager` + `TrainDisplayController`，2 文件 / 658 行 | scoreboard 与文案显示调用簇 |
+| 4 | `TrainMovementTask` | 1 文件 / 476 行 | 调度/传送/终点状态，单独提交 |
+| 5 | `TrainInstance` | 1 文件 / 988 行 | train 最后；调用面最宽，单独提交 |
+| 6 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 7 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 8 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 9 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -128,6 +131,19 @@ Java 为唯一行为基线：保留双向 `linkPortals`、删除时解除反向�
 继续留在插件内；但 `spatial/Octree.kt`、`Point3D.kt`、`Range3D.kt` 在 Metro 与 Railway 当前树中
 blob 完全一致，且本身无状态、不了解线路/站点模型，满足 `cubex-spatial` 候选条件。候选已记入
 `ROADMAP.md`；实际抽取必须另开重构提交，先让一个插件改用模块并验证 shade/jarGate，再推广另一侧。
+
+`LineManager` 已完成 manager 收口。Railway Java 与 Metro 迁移前 Java 的共同主体可复用 `36ab5dc`
+迁移结构，但 Railway 额外有约 140 行 service enabled/headway/dwell/train cars/control mode、实体类型、
+`tick()` / `saveLines()` / `saveStops()` 兼容入口，以及反向克隆时复制这些运行参数的逻辑，均已从
+Railway Java 补回；没有照抄 Metro 后续仅调整空安全与反向 yaw helper 的版本。`LineServiceManager`
+原先借 Java getter 使用的两个 `allLines` 属性调用，在 manager 迁为 Kotlin 后改为显式
+`getAllLines()`，JVM public 方法保持不变。新增回归覆盖 Railway 专属运行参数的反向克隆与三个兼容
+入口；定向测试、完整 `:Railway:build`、shadowJar 和 `:Railway:jarGate` 均通过。
+
+共享能力审计结论：`LineManager` 同时定义 lines.yml schema、站点反向索引、线路/传送门关联、票价、
+服务运行参数、反向克隆及铁路保护重建，是 Railway 领域聚合根，不下沉 `cubex-*`。加载/快照样板虽与
+Metro 同源，但两侧 schema 已因 Railway service/entity 字段分化；强抽通用 repository 会把领域字段
+重新暴露为回调和 map，调用点不会更简单，因此本批不新增公共模块候选。
 
 ---
 

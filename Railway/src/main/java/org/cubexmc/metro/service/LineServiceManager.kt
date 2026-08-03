@@ -23,7 +23,7 @@ class LineServiceManager(
     private var lastMetricsLogTick = -1L
 
     init {
-        for (line in plugin.lineManager.allLines) {
+        for (line in plugin.lineManager.getAllLines()) {
             if (line.isServiceEnabled) {
                 createAndRegisterService(line.id, line.headwaySeconds, line.dwellTicks, line.trainCars)
             }
@@ -137,7 +137,7 @@ class LineServiceManager(
         trainsById.clear()
         trainsByMinecart.clear()
 
-        for (line in plugin.lineManager.allLines) {
+        for (line in plugin.lineManager.getAllLines()) {
             if (line.isServiceEnabled) {
                 createAndRegisterService(line.id, line.headwaySeconds, line.dwellTicks, line.trainCars)
             }
