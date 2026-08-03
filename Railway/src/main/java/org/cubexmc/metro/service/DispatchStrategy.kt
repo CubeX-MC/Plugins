@@ -3,7 +3,7 @@ package org.cubexmc.metro.service
 interface DispatchStrategy {
     fun tick(service: LineService, currentTick: Long)
 
-    fun requestStop(service: LineService, stopId: String, currentTick: Long) {
+    fun requestStop(service: LineService, stopId: String?, currentTick: Long) {
     }
 
     /**
