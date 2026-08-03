@@ -45,7 +45,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 进行中的工作
 
-- **Railway Kotlin 迁移**在分支 `kotlin/railway`（origin 已有该分支），原始源码 79/167 已迁（当前 `89 Java / 79 Kotlin`，多出的 Java 是有意保留的 PlaceholderAPI 可空 shim）；下一批是强耦合的 virtual service：`VirtualTrain` + `VirtualTrainPool`，不要拆开。接力点、细化后的批次顺序、以及"能不能照抄 Metro 的 `.kt`"的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——已有多个同源文件在 Metro Kotlin 迁移后继续承载玩法变更，只比 Java 会把这些变化误带进 Railway。
+- **Railway Kotlin 迁移**在分支 `kotlin/railway`（origin 已有该分支），原始源码 81/167 已迁（当前 `87 Java / 81 Kotlin`，多出的 Java 是有意保留的 PlaceholderAPI 可空 shim）；下一批是强耦合的 dispatch runtime：`LineService` + `LineServiceManager` + `TrainSpawner` + `GlobalDispatchStrategy` + `LocalDispatchStrategy`，不要拆开。接力点、细化后的批次顺序、以及"能不能照抄 Metro 的 `.kt`"的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——Railway 独有运行时必须从自身 Java 机械迁移；同源文件也要检查 Metro Kotlin 后续玩法提交。
 
 ## 已知脆弱点
 
