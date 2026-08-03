@@ -28,11 +28,11 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 89/167 已迁；当前计数为 79 Java / 89 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 91/167 已迁；当前计数为 77 Java / 91 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-叶子调用簇已完成，下一批是保护/传送门调用簇。
+叶子调用簇和保护/传送门调用簇已完成，下一批是 `StopManager`。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -44,14 +44,13 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | manager 保护/传送门 | `RailProtectionManager` + `PortalManager`，2 文件 / 693 行 | **下一批**；两个 Bukkit 交互面独立审查 |
-| 2 | `StopManager` | 1 文件 / 571 行 | 单独提交；持久化与空间索引面较宽 |
-| 3 | `LineManager` | 1 文件 / 968 行 | manager 最后；调用 service/stop/route，单独提交 |
-| 4 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
-| 5 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 6 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 7 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 8 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | `StopManager` | 1 文件 / 571 行 | **下一批**；单独提交，持久化与空间索引面较宽 |
+| 2 | `LineManager` | 1 文件 / 968 行 | manager 最后；调用 service/stop/route，单独提交 |
+| 3 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
+| 4 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 5 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 6 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 7 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -106,6 +105,19 @@ manager 叶子已完成 Metro 复用预审：`RouteNormalizer` 与 Metro 迁移�
 既有语言文件缓存和 `MetroTextRenderer` 语义，不再抽一层；`RouteNormalizer` / `RouteRecorder` 包含
 轨道吸附、线路采样和 `LineManager` 持久化，属于 Railway 领域逻辑，不进入 `cubex-*`。本批没有
 发现应新增的无状态公共模块，也没有为了“去重”合并两套细节不同的共线简化算法。
+
+manager 保护/传送门批次也已完成历史双检。`RailProtectionManager` 的 Railway Java 与 Metro 迁移前
+实现一致，可借用 `36ab5dc` 的迁移结构；但 Metro 后来在 `1b93a47` 引入异步、分区扫描和 revision
+控制，这属于功能重构，Railway 本批没有带入。`ProtectionIndexStats` 继续用 `@JvmRecord data class`
+保留 Java record 的 `sampledPoints()` / `indexedBlocks()` 等访问器。`PortalManager` 则以 Railway 当前
+Java 为唯一行为基线：保留双向 `linkPortals`、删除时解除反向链接，以及 Railway 的
+`MountAwareTeleportUtil` 乘客传送路径；绝不能照抄 `383f683` 后删除配对能力的 Metro 版本。定向测试、
+完整 `:Railway:build` 与 `:Railway:jarGate` 均通过。
+
+本批共享能力审计结论：两者都直接依赖 Bukkit 实体/世界和 Railway 的 `Line`、`Portal`、
+`TrainMovementTask`、权限与保存语义，属于插件领域编排，不下沉 `cubex-*`。其中调度与挂载传送已经
+分别通过 `cubex-scheduler` 适配层和 Railway 的 `MountAwareTeleportUtil` 复用；为表面去重再抽一个
+“保护/传送门 manager”只会泄漏玩法模型，因此不建立新的公共 API。
 
 ---
 
