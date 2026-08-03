@@ -28,11 +28,11 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 86/167 已迁；当前计数为 82 Java / 86 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 89/167 已迁；当前计数为 79 Java / 89 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
-`service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；下一批进入
-`manager` 的叶子调用簇。
+`service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
+叶子调用簇已完成，下一批是保护/传送门调用簇。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -44,15 +44,14 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | manager 叶子 | `LanguageManager` + `RouteNormalizer` + `RouteRecorder`，3 文件 / 577 行 | **下一批**；route 两文件同簇，language 无 manager 反向依赖 |
-| 2 | manager 保护/传送门 | `RailProtectionManager` + `PortalManager`，2 文件 / 693 行 | 两个 Bukkit 交互面独立审查 |
-| 3 | `StopManager` | 1 文件 / 571 行 | 单独提交；持久化与空间索引面较宽 |
-| 4 | `LineManager` | 1 文件 / 968 行 | manager 最后；调用 service/stop/route，单独提交 |
-| 5 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
-| 6 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 7 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 8 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 9 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | manager 保护/传送门 | `RailProtectionManager` + `PortalManager`，2 文件 / 693 行 | **下一批**；两个 Bukkit 交互面独立审查 |
+| 2 | `StopManager` | 1 文件 / 571 行 | 单独提交；持久化与空间索引面较宽 |
+| 3 | `LineManager` | 1 文件 / 968 行 | manager 最后；调用 service/stop/route，单独提交 |
+| 4 | `train` | 13 文件 / 3049 行 | `TrainInstance`、movement/display 等按调用簇拆批 |
+| 5 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 6 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 7 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 8 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -95,11 +94,18 @@ Java getter/setter（包括 `isLoopLine()` / `isGlobalMode()`），`getActiveTra
 `DispatchStrategy.requestStop` 保留可空 `stopId`，避免 Java 调用方传 null 时在进入旧有早返回前被
 Kotlin 参数检查拦截。新增回归覆盖班距 ETA、车辆数下限和 GLOBAL 发车窗口。
 
-下一批 manager 叶子已完成 Metro 复用预审：`RouteNormalizer` 与 Metro 迁移前 Java 忽略空白后一致，
+manager 叶子已完成 Metro 复用预审：`RouteNormalizer` 与 Metro 迁移前 Java 忽略空白后一致，
 且迁移后无功能提交，可复用 `284a177` 中的 Kotlin；`RouteRecorder` 同样一致，但其 Kotlin 后来被
 `36ab5dc` 修改，只能取迁移提交 `52feeee` 当时的版本；`LanguageManager` 与 Metro 迁移前版本仅 import
 顺序和文件尾空白不同，去掉 imports 后实现完全一致，迁移后也无功能提交，可复用 `52feeee` 的 Kotlin。
-三者落地后仍须以 Railway 全量测试确认，不能直接复制当前 Metro 工作树版本。
+三者已按上述历史版本迁移并通过 Railway 全量测试。`RouteRecorder.FinishResult` 原本是 Java record，
+迁移时用 `@JvmRecord data class` 保留 `status()` / `lineId()` 等 component 访问器和 JVM record 形状；
+`LanguageManager.args()` / `put()` 的真实 Java static bridge 也有互操作回归测试。
+
+本批共享能力审计结论：`LanguageManager` 已经是 `cubex-i18n` 上的 Railway 兼容适配层，继续负责
+既有语言文件缓存和 `MetroTextRenderer` 语义，不再抽一层；`RouteNormalizer` / `RouteRecorder` 包含
+轨道吸附、线路采样和 `LineManager` 持久化，属于 Railway 领域逻辑，不进入 `cubex-*`。本批没有
+发现应新增的无状态公共模块，也没有为了“去重”合并两套细节不同的共线简化算法。
 
 ---
 
@@ -139,6 +145,16 @@ model / util / event  →  service / manager  →  integration / lifecycle
 git add -A -- <Plugin>
 git commit -m "refactor(<plugin>): migrate <这一批> to Kotlin"
 ```
+
+每批同时做一次**共享能力审计**，但审计结论与代码抽取分轨处理：
+
+1. `已接入`：调用簇已经委托给现有 `cubex-*`，保留插件侧兼容适配层；
+2. `候选公共能力`：至少两个插件存在同形、无状态、插件无关的实现，记入 runbook，另开重构批次；
+3. `领域内保留`：涉及玩法模型、持久化语义或插件专属运行时，不下沉公共模块；
+4. `有状态共享`：不得 shade；应通过独立插件与 ServicesManager API 提供。
+
+Java→Kotlin 提交只允许记录审计结论和接入已经存在的稳定模块；新模块 API、跨插件去重与玩法改动
+必须使用独立提交，并在一个试点插件验证后再推广。抽取后的调用点如果没有更简单，就不算有效封装。
 
 编译器是你的清单：`compileKotlin` 报的每一个 "Argument type mismatch: actual type is 'X?'" 都是一处**原本被平台类型掩盖的可空性**，逐个按下面的模式处理，不要用 `!!` 糊过去。
 
