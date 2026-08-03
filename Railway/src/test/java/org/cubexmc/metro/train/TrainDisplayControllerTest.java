@@ -2,16 +2,19 @@ package org.cubexmc.metro.train;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import org.bukkit.entity.Minecart;
 import org.bukkit.entity.Player;
@@ -23,11 +26,14 @@ import org.cubexmc.metro.manager.LineManager;
 import org.cubexmc.metro.manager.StopManager;
 import org.cubexmc.metro.model.Line;
 import org.cubexmc.metro.model.Stop;
+import org.cubexmc.metro.service.LineServiceManager;
 import org.cubexmc.metro.util.SoundUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.BaseComponent;
 
 class TrainDisplayControllerTest {
 
@@ -186,6 +192,49 @@ class TrainDisplayControllerTest {
         controller.onTrainArrival(event);
 
         verify(passenger).sendTitle(anyString(), anyString(), eq(0), eq(1000000), eq(0));
+    }
+
+    @Test
+    void shouldUseServiceTrainDwellAndPassengerRegistryForWaitingCountdown() {
+        when(configFacade.getWaitingActionbar()).thenReturn("&eLeaving in {countdown}");
+        LineServiceManager serviceManager = mock(LineServiceManager.class);
+        TrainInstance serviceTrain = mock(TrainInstance.class);
+        TrainMovementTask movementTask = mock(TrainMovementTask.class);
+        Minecart cart = mock(Minecart.class);
+        UUID cartId = UUID.randomUUID();
+        when(cart.getUniqueId()).thenReturn(cartId);
+        when(plugin.getLineServiceManager()).thenReturn(serviceManager);
+        when(serviceManager.getTrainByMinecart(cartId)).thenReturn(serviceTrain);
+        when(serviceTrain.isWaiting()).thenReturn(true);
+        when(serviceTrain.getRemainingDwellTicks(anyLong())).thenReturn(41);
+
+        Player passenger = createPlayerWithSpigot();
+        when(passenger.getVehicle()).thenReturn(null);
+        when(serviceTrain.isPassenger(passenger)).thenReturn(true);
+
+        Line line = createLineWithStops("l1", "A", "B", "C");
+        Stop stopB = new Stop("B", "Bravo");
+        Stop stopC = new Stop("C", "Charlie");
+        when(stopManager.getStop("B")).thenReturn(stopB);
+        when(stopManager.getStop("C")).thenReturn(stopC);
+
+        TrainTaskRegistry.register(cart, movementTask);
+        try {
+            TrainDisplayController controller = new TrainDisplayController(plugin);
+            MetroTrainArrivalEvent event = new MetroTrainArrivalEvent(
+                    cart, passenger, line, stopB, false, MetroTrainArrivalEvent.ArrivalType.DOCKED);
+
+            controller.onTrainArrival(event);
+
+            ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
+            verify(movementTask, times(4)).scheduleSessionTask(tasks.capture(), anyLong(), eq(-1L));
+            tasks.getAllValues().get(0).run();
+            verify(serviceTrain).isPassenger(passenger);
+            verify(passenger.spigot()).sendMessage(
+                    eq(ChatMessageType.ACTION_BAR), any(BaseComponent[].class));
+        } finally {
+            TrainTaskRegistry.unregister(cart);
+        }
     }
 
     @Test

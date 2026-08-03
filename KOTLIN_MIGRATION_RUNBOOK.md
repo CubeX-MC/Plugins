@@ -14,7 +14,7 @@
 .\gradlew.bat kotlinMigrationStatus
 ```
 
-截至 2026-08-02：
+截至 2026-08-03：
 
 | 插件 | 状态 |
 |------|------|
@@ -28,12 +28,12 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 102/167 已迁；当前计数为 66 Java / 102 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 104/167 已迁；当前计数为 64 Java / 104 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-与 `train` 的叶子 helper、session/navigation 调用簇已全部完成，下一批迁
-`ScoreboardManager` + `TrainDisplayController`。
+与 `train` 的叶子 helper、session/navigation、display 调用簇已全部完成，下一批迁
+`TrainMovementTask`。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -45,13 +45,12 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | train display | `ScoreboardManager` + `TrainDisplayController`，2 文件 / 658 行 | **下一批**；scoreboard 与文案显示调用簇 |
-| 2 | `TrainMovementTask` | 1 文件 / 476 行 | 调度/传送/终点状态，单独提交 |
-| 3 | `TrainInstance` | 1 文件 / 988 行 | train 最后；调用面最宽，单独提交 |
-| 4 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 5 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 6 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 7 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | `TrainMovementTask` | 1 文件 / 476 行 | **下一批**；调度/传送/终点状态，单独提交 |
+| 2 | `TrainInstance` | 1 文件 / 988 行 | train 最后；调用面最宽，单独提交 |
+| 3 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 4 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 5 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 6 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -174,6 +173,21 @@ Java API；定向测试、完整 `:Railway:build`、shadowJar 和 `:Railway:jarG
 直接编排 Railway 的 `LineService`、区段锁、consist 和 physics engine；两者都是有状态领域对象，
 不适合作为 shade 进多个插件的无状态 `cubex-*` API。可复用的调度、位置和物理小工具已经分别由
 现有模块/utility 承担，本批不新增公共模块候选。
+
+`ScoreboardManager` + `TrainDisplayController` 批次已完成。`ScoreboardManager` 的 Railway Java 与
+Metro 迁移前 Java blob 完全一致，采用 `52feeee` 的迁移结构并补入 `36ab5dc` 仅针对已迁
+`ConfigFacade` 的显式 getter 修正；没有带入 `383f683` 后新增的环线 display plan、hex serializer、
+颜色容错或公开 `DisplayPlan` API。`TrainDisplayController` 与 Metro 同源主体之外，还保留 Railway
+独有的 service train 剩余 dwell 倒计时、consist 乘客判定与动态等待音乐次数，因此以 Railway Java
+为行为基线机械迁移，只借用 Metro 的 Kotlin 写法与 ConfigFacade 互操作修正。新增回归覆盖玩家不再
+直接挂在传入 minecart、但仍属于 service train 时的倒计时执行，以及 41 tick dwell 生成 4 个
+0/20/40/60 tick 更新任务；完整显示/记分板定向测试、`:Railway:build`、shadowJar 与
+`:Railway:jarGate` 均通过。
+
+共享能力审计结论：`ScoreboardManager` 绑定 scoreboard-library sidebar 生命周期和 Railway 的线路/
+换乘文案，`TrainDisplayController` 绑定 Bukkit 事件、Railway dwell/consist 语义和配置模板；它们是
+插件显示适配层而非通用 UI API。文本替换、颜色、音符与调度已经由既有 utility / `cubex-scheduler`
+边界承接，本批不新增公共模块候选，也不把 Metro 后续玩法调整混入纯迁移提交。
 
 ---
 
