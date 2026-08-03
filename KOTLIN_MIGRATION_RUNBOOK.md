@@ -28,11 +28,11 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 93/167 已迁；当前计数为 75 Java / 93 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 100/167 已迁；当前计数为 68 Java / 100 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-已全部完成，下一批进入 `train` 的叶子 helper 调用簇。
+与 `train` 的叶子 helper 调用簇已全部完成，下一批迁 `TrainSession` + `TrainNavigator`。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -44,15 +44,14 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | train 叶子 helper | `TrainEventPublisher`、`TrainMovementAssistController`、`TrainNavigatorDecisions`、`TrainPassengerRegistry`、`TrainPhysicsController`、`TrainStateMath`、`TrainTaskRegistry`，7 文件 / 546 行 | **下一批**；先做历史复用审计 |
-| 2 | train session/navigation | `TrainSession` + `TrainNavigator`，2 文件 / 381 行 | 状态容器与导航决策同批验证 |
-| 3 | train display | `ScoreboardManager` + `TrainDisplayController`，2 文件 / 658 行 | scoreboard 与文案显示调用簇 |
-| 4 | `TrainMovementTask` | 1 文件 / 476 行 | 调度/传送/终点状态，单独提交 |
-| 5 | `TrainInstance` | 1 文件 / 988 行 | train 最后；调用面最宽，单独提交 |
-| 6 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 7 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 8 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 9 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | train session/navigation | `TrainSession` + `TrainNavigator`，2 文件 / 381 行 | **下一批**；状态容器与导航决策同批验证 |
+| 2 | train display | `ScoreboardManager` + `TrainDisplayController`，2 文件 / 658 行 | scoreboard 与文案显示调用簇 |
+| 3 | `TrainMovementTask` | 1 文件 / 476 行 | 调度/传送/终点状态，单独提交 |
+| 4 | `TrainInstance` | 1 文件 / 988 行 | train 最后；调用面最宽，单独提交 |
+| 5 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 6 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 7 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 8 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -144,6 +143,22 @@ Railway Java 补回；没有照抄 Metro 后续仅调整空安全与反向 yaw h
 服务运行参数、反向克隆及铁路保护重建，是 Railway 领域聚合根，不下沉 `cubex-*`。加载/快照样板虽与
 Metro 同源，但两侧 schema 已因 Railway service/entity 字段分化；强抽通用 repository 会把领域字段
 重新暴露为回调和 map，调用点不会更简单，因此本批不新增公共模块候选。
+
+`train` 叶子 helper 批次的 7 个文件也已完成。`TrainEventPublisher`、`TrainTaskRegistry` 与 Metro
+迁移前 Java 完全一致，复用 `284a177` 的迁移版本；`TrainMovementAssistController`、
+`TrainPhysicsController` 同样与 Metro 迁移前 Java 一致，只复用 `52feeee` 的迁移版本，没有带入
+后续 `c68de20` 的 ride-safety 玩法调整。Railway 独有的 `TrainNavigatorDecisions`、
+`TrainPassengerRegistry`、`TrainStateMath` 从自身 Java 机械迁移；其中决策结果用 `@JvmField` 保留
+剩余 Java 调用方的直接字段读取，`SegmentSecondsLookup` 保留 JVM SAM，三个静态 utility/registry
+都用真正的 `@JvmStatic` bridge。`TrainMovementAssistController` 对已迁 Kotlin `ConfigFacade` 使用
+显式 getter，避免同名私有 property 干扰互操作。新增 `TrainLeafHelpersTest` 覆盖导航、乘客注册表、
+ETA/progress 与重复终点环线规则；定向测试、完整 `:Railway:build`、shadowJar 和
+`:Railway:jarGate` 均通过。
+
+共享能力审计结论：这批 helper 都直接围绕 `TrainSession` / `TrainInstance`、Bukkit minecart/event、
+Railway 运行状态与 line stop 顺序工作，属于插件内领域内聚，不下沉 `cubex-*`。其中调度已经经由
+`TrainScheduler` / `cubex-scheduler` 复用；数学 helper 虽无 Bukkit import，但输入是 Railway 的
+`TrainState` 与环线重复终点约定，当前抽成公共 API 只会泄漏玩法模型，因此不新增模块候选。
 
 ---
 
