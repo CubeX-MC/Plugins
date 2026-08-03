@@ -254,6 +254,47 @@ class LineManagerTest {
         verify(railProtectionManager, org.mockito.Mockito.times(4)).rebuildLine("red");
     }
 
+    @Test
+    void shouldCloneRailwayServiceAndEntitySettings() throws IOException {
+        Files.writeString(tempDir.resolve("lines.yml"), "");
+        Metro plugin = createPluginMock(tempDir);
+        when(plugin.getStopManager()).thenReturn(mock(StopManager.class));
+        LineManager manager = new LineManager(plugin);
+
+        assertTrue(manager.createLine("red", "RedLine", UUID.randomUUID()));
+        assertTrue(manager.setLineServiceEnabled("red", true));
+        assertTrue(manager.setLineHeadwaySeconds("red", 75));
+        assertTrue(manager.setLineDwellTicks("red", 55));
+        assertTrue(manager.setLineTrainCars("red", 6));
+        assertTrue(manager.setLineControlMode("red", TrainControlMode.LEASHED));
+        assertTrue(manager.setLineEntityType("red", "PIG"));
+
+        assertTrue(manager.cloneReverseLine("red", "red_reverse", "_reverse", UUID.randomUUID()));
+
+        Line reverse = manager.getLine("red_reverse");
+        assertNotNull(reverse);
+        assertTrue(reverse.isServiceEnabled());
+        assertEquals(75, reverse.getHeadwaySeconds());
+        assertEquals(55, reverse.getDwellTicks());
+        assertEquals(6, reverse.getTrainCars());
+        assertEquals(TrainControlMode.LEASHED, reverse.getControlMode());
+        assertEquals("PIG", reverse.getEntityType());
+    }
+
+    @Test
+    void shouldPreserveNullableLookupAndLegacyEntryPoints() throws IOException {
+        Files.writeString(tempDir.resolve("lines.yml"), "");
+        LineManager manager = new LineManager(createPluginMock(tempDir));
+
+        manager.tick();
+        manager.saveLines();
+        manager.saveStops();
+
+        assertFalse(manager.createLine(null, null, null));
+        assertFalse(manager.deleteLine(null));
+        assertEquals(List.of(), manager.getLinesForStop(null));
+    }
+
     private Metro createPluginMock(Path dataDir) {
         Metro plugin = mock(Metro.class);
         Logger logger = Logger.getLogger("LineManagerTest");

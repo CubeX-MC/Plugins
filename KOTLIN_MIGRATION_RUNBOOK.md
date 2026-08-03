@@ -14,16 +14,180 @@
 .\gradlew.bat kotlinMigrationStatus
 ```
 
-截至 Metro 收尾（2026-08-02）：
+截至 2026-08-03：
 
 | 插件 | 状态 |
 |------|------|
-| BookLite / FAWEReplacer / MountLicense / Contract / EcoBalancer / RuleGems / Metro | ✅ main 源码全 Kotlin（仅留 vendored bStats `Metrics.java`） |
+| BookLite / FAWEReplacer / MountLicense / Contract / EcoBalancer / RuleGems | ✅ main 源码全 Kotlin（仅留 vendored bStats `Metrics.java`） |
+| Metro | ✅ 实现已全 Kotlin；保留 `Metrics.java` 与两个必要的 Java 互操作 shim |
 | Regions | ✅ 原生 Kotlin |
 | Reputations | ✅ 3 个 `.java` 是**故意**保留的 Java API 面（`org.cubexmc.reputations.api`），不要动 |
-| **Railway** | ⬜ 167 个 main `.java`，Metro 同源 fork，**下一个** |
+| **Railway** | 🚧 **进行中**，见下节 |
 | **Clarity** | ⬜ 8 个 main `.java`，且是唯一零 `cubex-*` 模块接入的插件 |
 | **modules** | ⬜ cubex-config(16) / cubex-i18n(9) / cubex-scheduler(5)；**cubex-core(9) 按既定最后迁** |
+
+### Railway 接力点
+
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 104/167 已迁；当前计数为 64 Java / 104 Kotlin，
+`:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
+`persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
+`service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
+与 `train` 的叶子 helper、session/navigation、display 调用簇已全部完成，下一批迁
+`TrainMovementTask`。
+`model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
+自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
+`spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
+`RailwayPlaceholders` 因 PlaceholderAPI 把 `params` 标成非空、而旧实现明确容忍 null，新增了一个
+`NullablePlaceholderExpansion.java` 兼容 shim。它是有意保留的 Java 文件，因此当前 main 文件总数
+为 168；进度分母 167 仍指迁移开始时的原始源码数，不要为了让计数好看而删除这个 shim。
+
+剩余（按建议顺序）：
+
+| 顺序 | 批次 | 文件 / 规模 | 边界说明 |
+|---|---|---:|---|
+| 1 | `TrainMovementTask` | 1 文件 / 476 行 | **下一批**；调度/传送/终点状态，单独提交 |
+| 2 | `TrainInstance` | 1 文件 / 988 行 | train 最后；调用面最宽，单独提交 |
+| 3 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
+| 4 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 5 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 6 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+
+这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
+`TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
+配置与 API 两个兼容性面混进同一提交。
+
+`ConfigFacade` 已完成 Metro 复用判定：Railway Java 与 Metro 迁移前 Java 不同，且 Metro Kotlin
+迁移后又被 `c68de20` 修改；两项条件都不满足。必须从 Railway 自己的 Java 机械迁移，Metro 版本
+只能参考写法，不能复制。
+
+`MetroAPI` 的 Railway Java 与 Metro 迁移前 Java 仅差结尾换行，因此复用了迁移提交 `36ab5dc`
+当时的 Kotlin，而非后来被 `383f683` / `e726cad` 修改的版本。Railway 的 `VaultIntegration` 仍是
+Java，调用保留 `isEnabled()`；不要改成 Metro Kotlin 调用方的 property 写法。
+
+service 叶子批次的三个 Railway Java 都与各自 Metro 迁移前 Java 一致。`LineStatusService` 的 Kotlin
+迁移后没有功能提交，可直接复用；`PriceService` 与 `TicketService` 后来都被 `6e56184` 改过，因此
+只复用各自迁移提交（`284a177` / `52feeee`）中的 Kotlin。不要把 Metro 后来改成“环线只按配置方向
+计费”或“车主入账失败时退款”的行为混进 Railway 的纯迁移批次。`TicketService` 同样保留 Railway
+Java `VaultIntegration.isEnabled()` 的显式调用；`TicketTransaction.isCharged()` 继续是 Java 只读面，
+通过 `@JvmSynthetic internal set` 供外层 service 更新，不要照搬 Metro 版本而公开 `markCharged()`。
+
+service 命令域批次中，`LineSelectionService`、`PortalCommandService`、`StopCommandService` 的 Railway
+Java 与 Metro 迁移前 Java 一致，但只有 `StopCommandService` 的 Kotlin 迁移后没有功能改动。
+`LineSelectionService` 必须保留迁移时的 world 过滤，`PortalCommandService` 必须保留 portal 配对入口；
+不要照抄 `383f683` 后的当前 Metro。`LineCommandService` 还多出 Railway 独有的 `setEntityType`，必须
+从 Railway Java 补回 `EntityModelController` 规范化流程，也不能带入 Metro 后来的跨世界线路与颜色
+trim 行为。六个 command result 原本都是 Java record，迁移后统一用 `@JvmRecord data class` 保留
+`status()` 等 Java 访问器和 record 形状；三个 `Stream.toList()` 结果以及 `TITLE_TYPES` / `TITLE_KEYS`
+继续对 Java 调用方不可修改。`MetroAPI` 作为 Kotlin 调用方则使用这些 record 的属性语法。
+
+`VirtualTrain` / `VirtualTrainPool` 在 Metro 历史中没有对应文件，是 Railway 独有的离散事件仿真层，
+因此完全从 Railway Java 机械迁移，不走 Metro 复用。事件队列仍是单线程 `PriorityQueue` + 普通
+`HashMap` / `HashSet`，没有顺手引入锁、协程或改变 tick 推进顺序；`getTargetStopIndex()` / setter、
+`getNextEventTick()` / setter 等 Java 调用面保持不变。新增回归覆盖 materialized 事件丢弃后由
+`releaseMaterialized` 重新排队、`getVirtualTrains()` 返回防御性副本，以及 Mockito 让 Kotlin `Line`
+的 stop 列表返回 null 时仍执行旧 Java 的早返回。
+
+dispatch runtime 的 5 个 Java 文件在 Metro 历史中都没有对应实现，是 Railway 独有的 GLOBAL/LOCAL
+实体化调度层，因此也全部从 Railway 自己的 Java 机械迁移。`LineService` 用 Kotlin 属性直接生成原有
+Java getter/setter（包括 `isLoopLine()` / `isGlobalMode()`），`getActiveTrains()` 继续返回防御性副本；
+`DispatchStrategy.requestStop` 保留可空 `stopId`，避免 Java 调用方传 null 时在进入旧有早返回前被
+Kotlin 参数检查拦截。新增回归覆盖班距 ETA、车辆数下限和 GLOBAL 发车窗口。
+
+manager 叶子已完成 Metro 复用预审：`RouteNormalizer` 与 Metro 迁移前 Java 忽略空白后一致，
+且迁移后无功能提交，可复用 `284a177` 中的 Kotlin；`RouteRecorder` 同样一致，但其 Kotlin 后来被
+`36ab5dc` 修改，只能取迁移提交 `52feeee` 当时的版本；`LanguageManager` 与 Metro 迁移前版本仅 import
+顺序和文件尾空白不同，去掉 imports 后实现完全一致，迁移后也无功能提交，可复用 `52feeee` 的 Kotlin。
+三者已按上述历史版本迁移并通过 Railway 全量测试。`RouteRecorder.FinishResult` 原本是 Java record，
+迁移时用 `@JvmRecord data class` 保留 `status()` / `lineId()` 等 component 访问器和 JVM record 形状；
+`LanguageManager.args()` / `put()` 的真实 Java static bridge 也有互操作回归测试。
+
+本批共享能力审计结论：`LanguageManager` 已经是 `cubex-i18n` 上的 Railway 兼容适配层，继续负责
+既有语言文件缓存和 `MetroTextRenderer` 语义，不再抽一层；`RouteNormalizer` / `RouteRecorder` 包含
+轨道吸附、线路采样和 `LineManager` 持久化，属于 Railway 领域逻辑，不进入 `cubex-*`。本批没有
+发现应新增的无状态公共模块，也没有为了“去重”合并两套细节不同的共线简化算法。
+
+manager 保护/传送门批次也已完成历史双检。`RailProtectionManager` 的 Railway Java 与 Metro 迁移前
+实现一致，可借用 `36ab5dc` 的迁移结构；但 Metro 后来在 `1b93a47` 引入异步、分区扫描和 revision
+控制，这属于功能重构，Railway 本批没有带入。`ProtectionIndexStats` 继续用 `@JvmRecord data class`
+保留 Java record 的 `sampledPoints()` / `indexedBlocks()` 等访问器。`PortalManager` 则以 Railway 当前
+Java 为唯一行为基线：保留双向 `linkPortals`、删除时解除反向链接，以及 Railway 的
+`MountAwareTeleportUtil` 乘客传送路径；绝不能照抄 `383f683` 后删除配对能力的 Metro 版本。定向测试、
+完整 `:Railway:build` 与 `:Railway:jarGate` 均通过。
+
+本批共享能力审计结论：两者都直接依赖 Bukkit 实体/世界和 Railway 的 `Line`、`Portal`、
+`TrainMovementTask`、权限与保存语义，属于插件领域编排，不下沉 `cubex-*`。其中调度与挂载传送已经
+分别通过 `cubex-scheduler` 适配层和 Railway 的 `MountAwareTeleportUtil` 复用；为表面去重再抽一个
+“保护/传送门 manager”只会泄漏玩法模型，因此不建立新的公共 API。
+
+`StopManager` 也已通过历史双检：Railway Java 与 Metro 迁移前 Java 只差 Railway 独有的两个空兼容
+入口 `tick()` / `saveStops()`，Metro 的 `36ab5dc` Kotlin 版本此后没有功能提交，因此复用其迁移结构
+并补回这两个入口。`createStop` 继续接受可空 JVM 参数以兼容已迁的 `StopCommandService` 调用面，但
+对 null 显式抛 `NullPointerException`，保持旧 Java 最终构造 `Stop` 时的失败语义；其他原本以 map
+查询早返回的 ID、owner/admin 与位置参数继续可空。定向测试、完整构建与 jar 门禁均通过。
+
+共享能力审计中，`StopManager` 本身包含 stops.yml 持久化、线路解绑、地图刷新和 `Stop` 领域语义，
+继续留在插件内；但 `spatial/Octree.kt`、`Point3D.kt`、`Range3D.kt` 在 Metro 与 Railway 当前树中
+blob 完全一致，且本身无状态、不了解线路/站点模型，满足 `cubex-spatial` 候选条件。候选已记入
+`ROADMAP.md`；实际抽取必须另开重构提交，先让一个插件改用模块并验证 shade/jarGate，再推广另一侧。
+
+`LineManager` 已完成 manager 收口。Railway Java 与 Metro 迁移前 Java 的共同主体可复用 `36ab5dc`
+迁移结构，但 Railway 额外有约 140 行 service enabled/headway/dwell/train cars/control mode、实体类型、
+`tick()` / `saveLines()` / `saveStops()` 兼容入口，以及反向克隆时复制这些运行参数的逻辑，均已从
+Railway Java 补回；没有照抄 Metro 后续仅调整空安全与反向 yaw helper 的版本。`LineServiceManager`
+原先借 Java getter 使用的两个 `allLines` 属性调用，在 manager 迁为 Kotlin 后改为显式
+`getAllLines()`，JVM public 方法保持不变。新增回归覆盖 Railway 专属运行参数的反向克隆与三个兼容
+入口；定向测试、完整 `:Railway:build`、shadowJar 和 `:Railway:jarGate` 均通过。
+
+共享能力审计结论：`LineManager` 同时定义 lines.yml schema、站点反向索引、线路/传送门关联、票价、
+服务运行参数、反向克隆及铁路保护重建，是 Railway 领域聚合根，不下沉 `cubex-*`。加载/快照样板虽与
+Metro 同源，但两侧 schema 已因 Railway service/entity 字段分化；强抽通用 repository 会把领域字段
+重新暴露为回调和 map，调用点不会更简单，因此本批不新增公共模块候选。
+
+`train` 叶子 helper 批次的 7 个文件也已完成。`TrainEventPublisher`、`TrainTaskRegistry` 与 Metro
+迁移前 Java 完全一致，复用 `284a177` 的迁移版本；`TrainMovementAssistController`、
+`TrainPhysicsController` 同样与 Metro 迁移前 Java 一致，只复用 `52feeee` 的迁移版本，没有带入
+后续 `c68de20` 的 ride-safety 玩法调整。Railway 独有的 `TrainNavigatorDecisions`、
+`TrainPassengerRegistry`、`TrainStateMath` 从自身 Java 机械迁移；其中决策结果用 `@JvmField` 保留
+剩余 Java 调用方的直接字段读取，`SegmentSecondsLookup` 保留 JVM SAM，三个静态 utility/registry
+都用真正的 `@JvmStatic` bridge。`TrainMovementAssistController` 对已迁 Kotlin `ConfigFacade` 使用
+显式 getter，避免同名私有 property 干扰互操作。新增 `TrainLeafHelpersTest` 覆盖导航、乘客注册表、
+ETA/progress 与重复终点环线规则；定向测试、完整 `:Railway:build`、shadowJar 和
+`:Railway:jarGate` 均通过。
+
+共享能力审计结论：这批 helper 都直接围绕 `TrainSession` / `TrainInstance`、Bukkit minecart/event、
+Railway 运行状态与 line stop 顺序工作，属于插件内领域内聚，不下沉 `cubex-*`。其中调度已经经由
+`TrainScheduler` / `cubex-scheduler` 复用；数学 helper 虽无 Bukkit import，但输入是 Railway 的
+`TrainState` 与环线重复终点约定，当前抽成公共 API 只会泄漏玩法模型，因此不新增模块候选。
+
+`TrainSession` + `TrainNavigator` 批次已完成。`TrainSession` 的 Railway Java 与 Metro 迁移前 Java
+完全一致，因此复用 `52feeee` 当时的 Kotlin 版本；没有带入 Metro 后续 `6e56184` 的
+`lastSettledStopId` / 里程结算或 `c68de20` 的整段票价累计字段，Railway 仍保留原有 `entryStopId` 与
+`distanceTraveled` 行为。`TrainNavigator` 在 Metro 历史中没有对应文件，是 Railway 独有的实体列车
+区段占用、发车、到站和终止编排，完全从 Railway Java 机械迁移。剩余 Java `TrainInstance` 调用的
+`getCurrentIndex()` / `setTargetIndex()` / `getStopIds()` 等访问器均由普通 Kotlin property 保持，
+可空 `sectionKey` / `travelDirection` 的 setter 也保持原签名。新增 `TrainNavigatorTest` 覆盖成功发车、
+区段释放、终点到站和无效发车终止，并扩展 `TrainSessionTest` 覆盖 entry stop、里程累计与方向的
+Java API；定向测试、完整 `:Railway:build`、shadowJar 和 `:Railway:jarGate` 均通过。
+
+共享能力审计结论：`TrainSession` 是包含 Bukkit 实体引用的可变单次乘车状态，`TrainNavigator` 则
+直接编排 Railway 的 `LineService`、区段锁、consist 和 physics engine；两者都是有状态领域对象，
+不适合作为 shade 进多个插件的无状态 `cubex-*` API。可复用的调度、位置和物理小工具已经分别由
+现有模块/utility 承担，本批不新增公共模块候选。
+
+`ScoreboardManager` + `TrainDisplayController` 批次已完成。`ScoreboardManager` 的 Railway Java 与
+Metro 迁移前 Java blob 完全一致，采用 `52feeee` 的迁移结构并补入 `36ab5dc` 仅针对已迁
+`ConfigFacade` 的显式 getter 修正；没有带入 `383f683` 后新增的环线 display plan、hex serializer、
+颜色容错或公开 `DisplayPlan` API。`TrainDisplayController` 与 Metro 同源主体之外，还保留 Railway
+独有的 service train 剩余 dwell 倒计时、consist 乘客判定与动态等待音乐次数，因此以 Railway Java
+为行为基线机械迁移，只借用 Metro 的 Kotlin 写法与 ConfigFacade 互操作修正。新增回归覆盖玩家不再
+直接挂在传入 minecart、但仍属于 service train 时的倒计时执行，以及 41 tick dwell 生成 4 个
+0/20/40/60 tick 更新任务；完整显示/记分板定向测试、`:Railway:build`、shadowJar 与
+`:Railway:jarGate` 均通过。
+
+共享能力审计结论：`ScoreboardManager` 绑定 scoreboard-library sidebar 生命周期和 Railway 的线路/
+换乘文案，`TrainDisplayController` 绑定 Bukkit 事件、Railway dwell/consist 语义和配置模板；它们是
+插件显示适配层而非通用 UI API。文本替换、颜色、音符与调度已经由既有 utility / `cubex-scheduler`
+边界承接，本批不新增公共模块候选，也不把 Metro 后续玩法调整混入纯迁移提交。
 
 ---
 
@@ -45,7 +209,10 @@ model / util / event  →  service / manager  →  integration / lifecycle
   →  command 层  →  GUI（core → view → controller）  →  listener  →  主类
 ```
 
-一批 5–20 个文件、控制在一次可验证的范围内。**跨批不要留半个包**：同包内互相引用的 `internal` 类要一起迁（Kotlin `internal` 成员对 Java 调用方会改名，混编期会断）。
+通常一批 5–20 个小文件；对 Railway 这类大类密集的插件，优先把一批控制在约 400–1200 行。
+单个 700+ 行 facade/主类可以独立成批，超过 1200 行只在类型强耦合、拆开反而制造混编风险时接受。
+文件数和行数都是审查面提示，不是硬门禁。**跨批不要留半个强耦合簇**：同包内互相引用的
+`internal` 类要一起迁（Kotlin `internal` 成员对 Java 调用方会改名，混编期会断）。
 
 ### 2. 每批的循环
 
@@ -60,6 +227,16 @@ model / util / event  →  service / manager  →  integration / lifecycle
 git add -A -- <Plugin>
 git commit -m "refactor(<plugin>): migrate <这一批> to Kotlin"
 ```
+
+每批同时做一次**共享能力审计**，但审计结论与代码抽取分轨处理：
+
+1. `已接入`：调用簇已经委托给现有 `cubex-*`，保留插件侧兼容适配层；
+2. `候选公共能力`：至少两个插件存在同形、无状态、插件无关的实现，记入 runbook，另开重构批次；
+3. `领域内保留`：涉及玩法模型、持久化语义或插件专属运行时，不下沉公共模块；
+4. `有状态共享`：不得 shade；应通过独立插件与 ServicesManager API 提供。
+
+Java→Kotlin 提交只允许记录审计结论和接入已经存在的稳定模块；新模块 API、跨插件去重与玩法改动
+必须使用独立提交，并在一个试点插件验证后再推广。抽取后的调用点如果没有更简单，就不算有效封装。
 
 编译器是你的清单：`compileKotlin` 报的每一个 "Argument type mismatch: actual type is 'X?'" 都是一处**原本被平台类型掩盖的可空性**，逐个按下面的模式处理，不要用 `!!` 糊过去。
 
@@ -112,6 +289,19 @@ class LineCommandService(lineManager: LineManager?) {
 
 **回调引用**：不要 `::foo`（可能触发 `KFunction`，约定里排除了 reflect 实现），用普通 lambda。
 
+**Java record**：原类型已经是 record、且 Java 调用方仍使用 `component()` 访问器时，用
+`@JvmRecord data class` 保留 record 形状；不要直接改成普通 `data class`，否则 Java 访问器会从
+`spacing()` 变成 `getSpacing()`。这不属于“把普通领域类顺手 data class 化”。
+
+**仍被 Java 调用的 static**：放进 companion 后给入口加 `@JvmStatic`，并用 Java 测试或
+`compileJava` 验证真正的 static bridge。Kotlin 没有 package-private；包内 Java 测试仍需直接调用时，
+可让承载类保持 `internal`、把所需 bridge 声明为普通 JVM 可见方法，但不要把它当成新公共 API 承诺。
+
+**第三方 `@NotNull` override 与旧 null 容错冲突**：如果 Java 实现明确检查过 null，而 Kotlin 因
+第三方注解不允许把 override 参数声明成可空，不要删守卫或接受 Intrinsics NPE。增加一个最小 Java
+抽象 shim，在 override 参数上显式 `@Nullable`，让 Kotlin 子类继续实现可空契约；
+`NullablePlaceholderExpansion` 是 Railway 的现成例子。
+
 **空值语义别改**：原来会 NPE 的路径，改成早返回/抛 `IllegalStateException` 都要在提交信息里说明；原来返回 null 的公开契约（如 GUI holder 的 `getInventory()`）必须保住。
 
 ---
@@ -133,7 +323,57 @@ class LineCommandService(lineManager: LineManager?) {
 
 ## 下一轮（Railway）已知注意点
 
-- Railway 是 Metro 的同源 fork，Metro 这一轮的分批顺序、可空性模式、互操作坑**可整套复用**。
+- Railway 是 Metro 的同源 fork，Metro 这一轮的分批顺序、可空性模式、互操作坑**可整套复用**。对照 Metro 的同名文件改，通常八成能直接套。
+- **想直接抄 Metro 的 `.kt` 之前，先跑两步校验**，两步都过才可以照抄：
+
+  ```powershell
+  # ① Railway 的 .java 与 Metro 迁移前的 .java 是否一致（只差结尾换行 = 一致）
+  $p = "Metro/src/main/java/org/cubexmc/metro/<pkg>/<Name>.java"
+  $del = git log --diff-filter=D --format=%H -1 -- $p
+  git show "$del^:$p" > $env:TEMP\m.java
+  git diff --no-index -- $env:TEMP\m.java "Railway/src/main/java/org/cubexmc/metro/<pkg>/<Name>.java"
+
+  # ② Metro 的 .kt 自迁移后有没有被功能提交改过（>1 个提交就不能照抄）
+  git log --oneline -- "Metro/src/main/java/org/cubexmc/metro/<pkg>/<Name>.kt"
+  ```
+
+  只做 ① 会中招，已实际踩到三次（14 个候选里只有 6 个真正合格）：
+
+  | 文件 | Java 一致？ | Metro 迁移后又改了什么 | 后果 |
+  |---|---|---|---|
+  | `TrainScoreboardController` | 是 | travel feedback 让 `MOVING_BETWEEN_STATIONS` 也刷新记分板 | 把 Metro 玩法偷渡进 Railway（Railway 的测试当场报错） |
+  | `update/DataFileUpdater` | 是 | 删掉了 `linkedPortalId → linked` 字段重命名 | **静默丢一步数据迁移**，无测试兜底 |
+  | `integration/VaultIntegration` | 是 | 重写成会动态重解析经济服务的 `Listener` | 引入 Railway 没有的行为，无测试兜底 |
+
+  后两个都没有测试会报警——所以 ② 是硬要求，不是可选检查。
 - Railway 比 Metro 多：physics / 发车调度 / entity.yml，`tickAccessEnabled=true` 的调度差异。
-- Railway 的 `build.gradle.kts` 把 cloud / scoreboardlibrary / geantyref relocate 到了 **`org.cubexmc.metro.lib.*`**（从 Metro 抄来时没改）。ClassLoader 隔离下不影响运行，但命名是错的；要改就单独一个提交、单独验收，**不要混进 Kotlin 迁移批次**。
+- **Railway 的源码包就是 `org.cubexmc.metro`（主类 `org.cubexmc.metro.Metro`），与 Metro 完全同名，这是有意保留的**——方便 Metro 的功能更新直接搬过来，两者本就不支持同时安装。`build.gradle.kts` 里 relocate 到 `org.cubexmc.metro.lib.*` 同理。**迁移时不要顺手改包名或 relocate 目标。**
+- 因为同包同名，改 Railway 时**务必确认自己打开的是 `Railway/src/...` 而不是 `Metro/src/...`**；提交前 `git status` 看一眼路径前缀。
 - `Railway/.claude/worktrees/` 下有两份历史 agent worktree 副本（已 gitignore，未跟踪）。它们会污染"数文件"和全目录 grep——统计一律以 `kotlinMigrationStatus` 或 `Railway/src` 为准。
+
+### 什么时候可以直接复用 Metro 的 `.kt`
+
+同源 fork 让"把 Metro 的 `.kt` 拷过来"很诱人，但**只有同时满足两个条件才安全**：
+
+1. **Railway 的 `.java` 与 Metro 迁移当时的 `.java` 一致**（`git diff -w`，忽略空白）；
+2. **Metro 的 `.kt` 在迁移提交之后没有再被改过**（`git log <migrationCommit>..HEAD -- <ktPath>` 为空）。
+
+条件 2 是真正的坑：Metro 的 Kotlin 文件后来被玩法提交改过（例如 `c68de20` 改了 `PriceRule`/`TextUtil`/`MetroConstants`，`383f683` 删掉了整套传送门配对）。直接拷当前版本 = 把 Metro 的玩法变更偷偷带进 Railway。
+
+两条都满足才拷当前 `.kt`；条件 1 满足、条件 2 不满足时，拷**迁移当时那一版**：
+
+```powershell
+git show <migrationCommit>:Metro/src/main/java/org/cubexmc/metro/<Path>.kt
+```
+
+条件 1 不满足（Railway 有自己的差异，如 `MetroTextRenderer` 多一个 trusted 占位符 `color_code`、`OwnershipUtil` 权限节点是 `railway.*`、`SchedulerUtil` 开了 tick 计数、`Portal` 多了 `linkedPortalId` 与 `linked` 配置键）→ **从 Railway 自己的 `.java` 转**，Metro 的 `.kt` 只当写法参考。
+
+判定脚本（一次看一批）：
+
+```powershell
+$del = (git log --diff-filter=D --format=%H -1 -- "Metro/src/main/java/org/cubexmc/metro/<Path>.java")
+git diff --no-index -w -- <metro-java-at-$del^> <railway-java>   # 条件 1
+git log --oneline "$del..HEAD" -- "Metro/src/main/java/org/cubexmc/metro/<Path>.kt"  # 条件 2:输出为空才安全
+```
+
+**别用"只差 1 行 = 只差换行"这类速判**——`MetroTextRenderer` 的 trusted 列表就写在一行里，只差 1 行恰恰是实质差异。最终以 `:Railway:build`（全部单测）为准。

@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import org.bukkit.entity.Minecart;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 import org.cubexmc.metro.Metro;
 import org.cubexmc.metro.model.Line;
 import org.junit.jupiter.api.Test;
@@ -207,5 +208,27 @@ class TrainSessionTest {
         assertEquals(original, session.getMinecart());
         session.setMinecart(replacement);
         assertEquals(replacement, session.getMinecart());
+    }
+
+    @Test
+    void shouldTrackEntryStopDistanceAndTravelDirectionThroughJavaApi() {
+        Metro plugin = mockPlugin();
+        Line line = new Line("l1", "L");
+        line.addStop("A", -1);
+        line.addStop("B", -1);
+        Vector direction = new Vector(0, 0, 1);
+
+        TrainSession session = new TrainSession(plugin, mock(Minecart.class), mock(Player.class),
+                line, "A", TrainMovementTask.TrainState.MOVING_BETWEEN_STATIONS);
+
+        assertEquals("A", session.getEntryStopId());
+        assertEquals(2.5, session.addDistance(2.5));
+        assertEquals(1.5, session.addDistance(-1.0));
+        assertEquals(1.5, session.getDistanceTraveled());
+
+        session.setEntryStopId("B");
+        session.setLastTravelDirection(direction);
+        assertEquals("B", session.getEntryStopId());
+        assertEquals(direction, session.getLastTravelDirection());
     }
 }

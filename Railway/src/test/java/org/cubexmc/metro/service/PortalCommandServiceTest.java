@@ -2,6 +2,7 @@ package org.cubexmc.metro.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -128,6 +129,13 @@ class PortalCommandServiceTest {
         when(portalManager.getAllPortals()).thenReturn(List.of(beta, alpha));
 
         assertEquals(List.of(alpha, beta), service.listPortals());
+        assertThrows(UnsupportedOperationException.class, () -> service.listPortals().add(beta));
+    }
+
+    @Test
+    void resultTypesShouldRemainJvmRecords() {
+        assertTrue(PortalWriteResult.class.isRecord());
+        assertTrue(PortalCommandService.ReloadResult.class.isRecord());
     }
 
     @Test

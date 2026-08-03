@@ -7,6 +7,19 @@ This guide is intentionally small. Kotlin migration is behavior-preserving first
 - Treat Bukkit, Vault, WorldEdit, Cloud, Adventure, and other server/library API returns as nullable unless the API contract is explicit and locally verified.
 - Do not use `!!` to hide uncertainty. Prefer early return, `?:`, local `val` snapshots, or explicit failure with a useful message when a missing value is truly impossible.
 - Snapshot mutable nullable fields into local values before use instead of relying on smart casts.
+- Bukkit annotates many returns `@NotNull` (`Player#getUniqueId`, `Block#getRelative`, `World#getName`, …). Kotlin then emits
+  `checkNotNullExpressionValue`, so a Mockito mock that was never stubbed turns a previously harmless `null` into
+  `NullPointerException: getX(...) must not be null` — a failure the Java version did not have. When the Java source guarded the
+  value with an explicit `!= null`, keep that tolerance: widen the local (`val uuid: UUID? = player.uniqueId`) or route the call
+  through a helper whose return type is nullable:
+
+  ```kotlin
+  /** Bukkit 标注 getRelative 为非空，这里刻意放宽成可空以保留 Java 版本的防御性判断。 */
+  private fun relativeBlockOrNull(block: Block, x: Int, y: Int, z: Int): Block? = block.getRelative(x, y, z)
+  ```
+
+  Passing the value straight into a nullable parameter also avoids the check. Where the Java source dereferenced the value
+  without a guard, leave it non-null — a NPE there is the original behavior.
 
 ## Java-Friendly Public API
 
