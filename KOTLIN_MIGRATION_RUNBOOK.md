@@ -14,7 +14,7 @@
 .\gradlew.bat kotlinMigrationStatus
 ```
 
-截至 2026-08-03：
+截至 2026-08-04：
 
 | 插件 | 状态 |
 |------|------|
@@ -28,12 +28,12 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 105/167 已迁；当前计数为 63 Java / 105 Kotlin，
+**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 106/167 已迁；当前计数为 62 Java / 106 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-与 `train` 的叶子 helper、session/navigation、display、movement 调用簇已全部完成，下一批迁
-`TrainInstance`。
+与 `train` 包已全部完成，下一批迁 Railway 独有的 `physics`，按 Kinematic / Reactive / bridge
+拆分。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -45,11 +45,10 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | `TrainInstance` | 1 文件 / 988 行 | **下一批**；train 最后且调用面最宽，单独提交 |
-| 2 | `physics` | 18 文件 / 2451 行 | Railway 独有；Kinematic / Reactive / bridge 分批 |
-| 3 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 4 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 5 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
+| 1 | `physics` | 18 文件 / 2451 行 | **下一批**；Railway 独有，Kinematic / Reactive / bridge 分批 |
+| 2 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
+| 3 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
+| 4 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
 
 这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
@@ -200,6 +199,20 @@ Metro 迁移前 Java blob 完全一致，采用 `52feeee` 的迁移结构并补�
 票价、记分板和 route recorder，是插件内有状态应用服务，不适合 shade 成多插件共享 API。其无状态
 物理计算、任务调度和注册表边界已分别落在 `TrainPhysicsController`、`TrainScheduler` /
 `cubex-scheduler` 与 `TrainTaskRegistry`，继续抽取只会把 Railway 领域模型泄漏到 `cubex-*`。
+
+`TrainInstance` 已作为 train 收口批次独立完成。Metro 历史中没有同名实现，因此完全从 Railway 自己
+的 988 行 Java 机械迁移，保留 tick 状态机、Folia entity/region 调度、区段 reservation 释放、区块
+强加载、乘客事件、travel-time sample、实体模型与本地虚拟化的原有顺序。`getService()` /
+`getConsist()` / `isFinished()` 等 Java getter 继续由普通 Kotlin property 生成，`forceArrivingState`
+用 `@JvmOverloads` 保留两个 Java overload；`VirtualizationState` 用 `@JvmField` 保留四个 public final
+字段而没有改成 Kotlin-only DTO。新增 Java 回归覆盖构造失败类型、dwell 下限、getter、reservation
+释放和嵌套状态字段形状；定向测试、完整 `:Railway:build`、shadowJar、`:Railway:jarGate` 与
+`kotlinMigrationStatus` 均通过。
+
+共享能力审计结论：`TrainInstance` 是 Railway 实体列车的有状态聚合根，直接依赖 `LineService`、
+`TrainConsist`、Bukkit entity/world/event、physics engine、chunk lifecycle 与虚拟列车回收，不下沉
+`cubex-*`。可独立复用的纯决策已经在此前拆到 `TrainNavigatorDecisions`、`TrainRuntimeDecisions`、
+`TrainStateMath`，调度走 `cubex-scheduler`；本批继续抽象只会把 Railway 运行时接口扩散到共享模块。
 
 ---
 
