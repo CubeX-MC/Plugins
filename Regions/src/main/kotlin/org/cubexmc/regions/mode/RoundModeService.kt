@@ -250,7 +250,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
                     plugin.triggers().fire(RegionTrigger.ON_ROLE_ASSIGNED, player, region)
                     plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
                 }.onFailure { error ->
-                    plugin.logger.severe("Failed to start round ${region.id} for ${player.name}: ${error.message}")
+                    plugin.log().severe("Failed to start round ${region.id} for ${player.name}: ${error.message}")
                     end(region.id, "start-failed")
                 }
             })
@@ -272,7 +272,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
                 }
             }, roundSeconds * 20L)
         }
-        plugin.logger.fine("Started round ${region.id}: $reason")
+        plugin.log().debug("Started round ${region.id}: $reason")
     }
 
     private fun assignHideAndSeekRoles(region: RegionDefinition, state: RoundState) {
@@ -339,7 +339,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
         plugin.triggers().fire(RegionTrigger.ON_FOUND, hider, region)
         broadcast(state, plugin.gameText("game.round.found", mapOf("player" to hider.name, "seeker" to seeker.name)))
-        plugin.logger.fine("Hide-and-seek found ${hider.name} by ${seeker.name} in ${state.regionId}: $reason")
+        plugin.log().debug("Hide-and-seek found ${hider.name} by ${seeker.name} in ${state.regionId}: $reason")
         maybeEndHideAndSeek(state, "all-found-check")
     }
 
@@ -402,14 +402,14 @@ class RoundModeService(private val plugin: RegionsPlugin) {
                 runCatching {
                     if (immediate) restore.run() else plugin.regionScheduler().runAtEntity(player, restore)
                 }.onFailure {
-                    plugin.logger.severe("Failed to schedule round cleanup for ${player.name} in $regionId: ${it.message}")
+                    plugin.log().severe("Failed to schedule round cleanup for ${player.name} in $regionId: ${it.message}")
                     if (!immediate && remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
                 }
             }
         } else {
             endingRegions.remove(regionId)
         }
-        plugin.logger.fine("Ended round $regionId: $reason")
+        plugin.log().debug("Ended round $regionId: $reason")
     }
 
     private fun restoreRoundState(player: Player, state: RoundState, teleportOut: Boolean, reason: String) {
@@ -420,7 +420,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             if (teleportOut) {
                 snapshot.respawn?.let { plugin.regionScheduler().teleportAsync(player, it) }
             }
-            plugin.logger.fine("Restored round gear for ${player.name} in ${state.regionId}: $reason")
+            plugin.log().debug("Restored round gear for ${player.name} in ${state.regionId}: $reason")
         }
     }
 
@@ -478,7 +478,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         player.gameMode = stored.gameMode
         player.updateInventory()
         stored.respawn?.let { plugin.regionScheduler().teleportAsync(player, it) }
-        plugin.logger.warning("Restored persisted round escrow for ${player.name}: $reason")
+        plugin.log().warn("Restored persisted round escrow for ${player.name}: $reason")
         return true
     }
 

@@ -160,7 +160,7 @@ class RegionAuditService(private val plugin: RegionsPlugin) : Reloadable, Termin
 
     private fun runSafely(operation: String, block: () -> Unit) {
         runCatching(block).onFailure {
-            plugin.logger.severe("Regions audit $operation failed: ${it.message}")
+            plugin.log().severe("Regions audit $operation failed: ${it.message}")
         }
     }
 }

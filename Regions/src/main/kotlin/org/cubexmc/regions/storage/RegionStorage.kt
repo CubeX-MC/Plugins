@@ -58,7 +58,7 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
                     val region = parseRegion(id, section)
                     regions[region.id] = region
                 } catch (ex: RuntimeException) {
-                    plugin.logger.warning("Failed to load region $id: ${ex.message}")
+                    plugin.log().warn("Failed to load region $id: ${ex.message}")
                 }
             }
         }
@@ -68,7 +68,7 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
                 val section = draftRoot.getConfigurationSection(id) ?: continue
                 runCatching { parseRegion(id, section) }
                     .onSuccess { drafts[id] = it.copy(lifecycle = RegionLifecycle.DRAFT) }
-                    .onFailure { plugin.logger.warning("Failed to load draft $id: ${it.message}") }
+                    .onFailure { plugin.log().warn("Failed to load draft $id: ${it.message}") }
             }
         }
         val historyRoot = yaml.getConfigurationSection("history")
@@ -81,7 +81,7 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
                     val section = regionHistory.getConfigurationSection(revisionKey) ?: continue
                     runCatching { parseRegion(id, section) }
                         .onSuccess { revisions[revision] = it.copy(revision = revision) }
-                        .onFailure { plugin.logger.warning("Failed to load region $id revision $revision: ${it.message}") }
+                        .onFailure { plugin.log().warn("Failed to load region $id revision $revision: ${it.message}") }
                 }
                 if (revisions.isNotEmpty()) history[id] = revisions
             }
@@ -183,7 +183,7 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
             dirty = false
             return true
         } catch (ex: IOException) {
-            plugin.logger.warning("Failed to save regions.yml: ${ex.message}")
+            plugin.log().warn("Failed to save regions.yml: ${ex.message}")
             return false
         }
     }
@@ -319,7 +319,7 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
         for (triggerKey in section.getKeys(false)) {
             val trigger = RegionTrigger.fromKey(triggerKey)
             if (trigger == null) {
-                plugin.logger.warning(
+                plugin.log().warn(
                     "Ignoring unknown trigger '$triggerKey'; it will never fire. " +
                         "Known triggers: ${RegionTrigger.entries.joinToString { it.key }}.",
                 )

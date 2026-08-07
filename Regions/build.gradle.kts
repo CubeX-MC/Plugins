@@ -23,15 +23,7 @@ dependencies {
 
 tasks.shadowJar {
     archiveBaseName.set("regions")
-    relocate("com.tcoded.folialib", "org.cubexmc.regions.libs.folialib")
-    dependencies {
-        include(project(":modules:cubex-core"))
-        include(project(":modules:cubex-config"))
-        include(project(":modules:cubex-i18n"))
-        include(project(":modules:cubex-scheduler"))
-        include(dependency("com.tcoded:FoliaLib:.*"))
-        include(dependency("org.jetbrains.kotlin:.*:.*"))
-    }
+    relocate("com.tcoded.folialib", "${CubexRelocations.libsNamespace(project.name)}.folialib")
 }
 
 tasks.processResources {

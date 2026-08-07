@@ -51,7 +51,7 @@ class RegionSessionService(
         val applied = effects.applyDeclaredSet(player, requests)
         if (!applied.success) {
             effectSignatures.remove(player.uniqueId)
-            plugin.logger.warning(
+            plugin.log().warn(
                 "Unable to apply the complete resolved effect set for ${player.name}; " +
                     "declared region effects were rolled back: ${applied.reason}",
             )
@@ -190,7 +190,7 @@ class RegionSessionService(
             effectSignatures.remove(playerId)
         }
         if (offline.isNotEmpty()) {
-            plugin.logger.fine("Regions watchdog cleared ${offline.size} offline player session bucket(s).")
+            plugin.log().debug("Regions watchdog cleared ${offline.size} offline player session bucket(s).")
         }
     }
 

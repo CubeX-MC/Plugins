@@ -161,7 +161,7 @@ class RegionsPlugin : CubexPlugin() {
         scheduleTimerTriggers()
         restoreOnlinePlayersAfterEnable()
 
-        logger.info("Regions enabled with ${regions().all().size} configured regions.")
+        log().info("Regions enabled with ${regions().all().size} configured regions.")
     }
 
     override fun disablePlugin() {

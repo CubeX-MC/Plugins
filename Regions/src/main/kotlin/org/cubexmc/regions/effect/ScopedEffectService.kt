@@ -31,7 +31,7 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
     private var batchDirty = false
     private val leaseStore: EffectLeaseStore? = runCatching { plugin.dataFolder }
         .getOrNull()
-        ?.let { EffectLeaseStore(it, plugin.logger) }
+        ?.let { EffectLeaseStore(it, plugin.log()) }
 
     init {
         val persisted = leaseStore?.load().orEmpty()
@@ -117,7 +117,7 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
             else -> ServiceResult.fail("Effect ${config.type} is registered but not implemented yet.")
         }
         if (!result.success) {
-            plugin.logger.warning("Failed to apply effect ${config.type} to ${player.name} in ${region.id}: ${result.reason}")
+            plugin.log().warn("Failed to apply effect ${config.type} to ${player.name} in ${region.id}: ${result.reason}")
         }
         return result
     }
@@ -131,7 +131,7 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
     fun restoreIfPending(player: Player, reason: String): Int {
         val count = cleanupPlayer(player, reason)
         if (count > 0) {
-            plugin.logger.warning("Restored $count persisted Regions effect lease(s) for ${player.name}: $reason")
+            plugin.log().warn("Restored $count persisted Regions effect lease(s) for ${player.name}: $reason")
         }
         return count
     }
@@ -176,12 +176,12 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         if (!persisted) {
             // The player state is already back to its snapshot; the escrow just still lists the
             // leases. That errs towards restoring twice on the next start, which is idempotent.
-            plugin.logger.severe(
+            plugin.log().severe(
                 "Restored $restored $describe for ${player.name} ($reason) but could not update " +
                     "effect-escrow.yml; those records will be replayed on the next start.",
             )
         } else if (restored > 0) {
-            plugin.logger.fine("Cleaned $restored $describe for ${player.name}: $reason")
+            plugin.log().debug("Cleaned $restored $describe for ${player.name}: $reason")
         }
         return restored
     }
@@ -206,7 +206,7 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
             }
         }
         if (!persisted) {
-            plugin.logger.severe(
+            plugin.log().severe(
                 "Refreshed effect leases for ${player.name} but could not update effect-escrow.yml; " +
                     "expired records will be replayed on the next start.",
             )
@@ -576,7 +576,7 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
     private fun warnExternalVanish(player: Player) {
         val keys = plugin.config.getStringList("vanish.metadata-keys")
         if (keys.any { key -> player.hasMetadata(key) }) {
-            plugin.logger.fine("Player ${player.name} has external vanish metadata; Regions only suppresses vanilla invisibility by default.")
+            plugin.log().debug("Player ${player.name} has external vanish metadata; Regions only suppresses vanilla invisibility by default.")
         }
     }
 

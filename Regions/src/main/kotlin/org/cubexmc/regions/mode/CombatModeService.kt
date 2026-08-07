@@ -186,7 +186,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                     plugin.sendGame(player, plugin.gameText("game.combat.started"))
                     plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
                 }.onFailure { error ->
-                    plugin.logger.severe("Failed to start combat ${region.id} for ${player.name}: ${error.message}")
+                    plugin.log().severe("Failed to start combat ${region.id} for ${player.name}: ${error.message}")
                     end(region.id, "start-failed")
                 }
             })
@@ -236,7 +236,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                 runCatching {
                     if (immediate) restore.run() else plugin.regionScheduler().runAtEntity(player, restore)
                 }.onFailure {
-                    plugin.logger.severe("Failed to schedule combat cleanup for ${player.name} in $regionId: ${it.message}")
+                    plugin.log().severe("Failed to schedule combat cleanup for ${player.name} in $regionId: ${it.message}")
                     if (!immediate && remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
                 }
             }
@@ -251,7 +251,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         if (teleportOut) {
             snapshot.respawn?.let { plugin.regionScheduler().teleportAsync(player, it) }
         }
-        plugin.logger.fine("Restored combat gear for ${player.name} in ${state.regionId}: $reason")
+        plugin.log().debug("Restored combat gear for ${player.name} in ${state.regionId}: $reason")
     }
 
     private fun restoreSnapshot(player: Player, snapshot: GearSnapshot) {
@@ -275,7 +275,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         player.gameMode = stored.gameMode
         player.updateInventory()
         stored.respawn?.let { plugin.regionScheduler().teleportAsync(player, it) }
-        plugin.logger.warning("Restored persisted combat escrow for ${player.name}: $reason")
+        plugin.log().warn("Restored persisted combat escrow for ${player.name}: $reason")
         return true
     }
 

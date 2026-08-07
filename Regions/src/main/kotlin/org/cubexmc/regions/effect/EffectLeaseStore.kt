@@ -1,6 +1,7 @@
 package org.cubexmc.regions.effect
 
 import org.bukkit.configuration.file.YamlConfiguration
+import org.cubexmc.core.CubexLogger
 import org.cubexmc.regions.model.EffectLease
 import org.cubexmc.regions.model.EffectScope
 import org.cubexmc.regions.model.PlayerStateSnapshot
@@ -9,11 +10,10 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.UUID
-import java.util.logging.Logger
 
 internal class EffectLeaseStore(
     dataFolder: File,
-    private val logger: Logger,
+    private val logger: CubexLogger,
 ) {
     private val file = File(dataFolder, "effect-escrow.yml")
 

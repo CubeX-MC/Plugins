@@ -2,6 +2,7 @@ package org.cubexmc.regions.effect
 
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
+import org.cubexmc.core.CubexLogger
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.EffectConfig
 import org.cubexmc.regions.model.EffectScope
@@ -41,7 +42,7 @@ class ScopedEffectServiceTest {
             set("effects.default-duration-ticks", 400)
         }
         `when`(plugin.config).thenReturn(config)
-        `when`(plugin.logger).thenReturn(Logger.getLogger("ScopedEffectServiceTest"))
+        `when`(plugin.log()).thenReturn(CubexLogger(Logger.getLogger("ScopedEffectServiceTest")))
         `when`(plugin.dataFolder).thenReturn(tempDir.toFile())
         `when`(player.uniqueId).thenReturn(playerId)
         `when`(player.name).thenReturn("Tester")

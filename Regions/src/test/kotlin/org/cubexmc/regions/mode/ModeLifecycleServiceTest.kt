@@ -4,6 +4,7 @@ import org.bukkit.Server
 import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.inventory.PlayerInventory
+import org.cubexmc.core.CubexLogger
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.config.LanguageManager
 import org.cubexmc.regions.effect.ScopedEffectService
@@ -199,7 +200,7 @@ class ModeLifecycleServiceTest {
 
         `when`(plugin.server).thenReturn(server)
         `when`(plugin.dataFolder).thenReturn(tempDir.toFile())
-        `when`(plugin.logger).thenReturn(Logger.getLogger("ModeLifecycleServiceTest"))
+        `when`(plugin.log()).thenReturn(CubexLogger(Logger.getLogger("ModeLifecycleServiceTest")))
         `when`(plugin.regionScheduler()).thenReturn(scheduler)
         `when`(plugin.regions()).thenReturn(registry)
         `when`(plugin.sessions()).thenReturn(sessions)

@@ -35,7 +35,7 @@ class RegionTriggerService(private val plugin: RegionsPlugin) {
             val actions = if (matches(player, region, block)) block.thenActions else block.elseActions
             for (action in actions) {
                 if (executed >= limit) {
-                    plugin.logger.warning("Trigger ${trigger.key} in region ${region.id} hit max action limit $limit.")
+                    plugin.log().warn("Trigger ${trigger.key} in region ${region.id} hit max action limit $limit.")
                     return
                 }
                 execute(action, player, region)
@@ -121,7 +121,7 @@ class RegionTriggerService(private val plugin: RegionsPlugin) {
             "clear_metadata" -> clearMetadata(action, player, region)
             "cleanup_region" -> plugin.sessions().leave(player, region.id, "trigger-cleanup-region")
             "mode_command" -> modeCommand(action, player, region)
-            else -> plugin.logger.fine("Action ${action.type} is registered but has no runtime yet.")
+            else -> plugin.log().debug("Action ${action.type} is registered but has no runtime yet.")
         }
     }
 

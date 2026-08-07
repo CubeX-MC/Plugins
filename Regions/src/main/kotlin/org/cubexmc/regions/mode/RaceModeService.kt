@@ -240,7 +240,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
                 }
             }, timeoutSeconds * 20L)
         }
-        plugin.logger.fine("Started race ${region.id}: $reason")
+        plugin.log().debug("Started race ${region.id}: $reason")
     }
 
     private fun end(
@@ -283,7 +283,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
                     }
                     if (immediate) restore.run() else plugin.regionScheduler().runAtEntity(player, restore)
                 }.onFailure {
-                    plugin.logger.severe("Failed to schedule race cleanup for ${player.name} in $regionId: ${it.message}")
+                    plugin.log().severe("Failed to schedule race cleanup for ${player.name} in $regionId: ${it.message}")
                     if (!immediate && remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
                 }
             }
@@ -291,7 +291,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
             endingRegions.remove(regionId)
         }
         broadcast(state, plugin.gameText("game.race.ended"))
-        plugin.logger.fine("Ended race $regionId: $reason")
+        plugin.log().debug("Ended race $regionId: $reason")
     }
 
     private fun tickRaceProgress(player: Player, region: RegionDefinition, state: RaceState) {

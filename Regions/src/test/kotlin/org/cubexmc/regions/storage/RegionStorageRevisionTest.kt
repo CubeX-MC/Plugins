@@ -1,5 +1,6 @@
 package org.cubexmc.regions.storage
 
+import org.cubexmc.core.CubexLogger
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.ActionBlockConfig
 import org.cubexmc.regions.model.ActionConfig
@@ -82,7 +83,7 @@ class RegionStorageRevisionTest {
     private fun plugin(): RegionsPlugin {
         val plugin = mock(RegionsPlugin::class.java)
         `when`(plugin.dataFolder).thenReturn(tempDir.toFile())
-        `when`(plugin.logger).thenReturn(Logger.getLogger("RegionStorageRevisionTest"))
+        `when`(plugin.log()).thenReturn(CubexLogger(Logger.getLogger("RegionStorageRevisionTest")))
         return plugin
     }
 

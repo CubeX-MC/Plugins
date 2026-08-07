@@ -110,7 +110,7 @@ class LandsUnionProvider(private val plugin: RegionsPlugin) : UnionProvider {
 
     private fun warnApi(message: String) {
         if (!warnedUnavailableApi) {
-            plugin.logger.warning(message)
+            plugin.log().warn(message)
             warnedUnavailableApi = true
         }
     }

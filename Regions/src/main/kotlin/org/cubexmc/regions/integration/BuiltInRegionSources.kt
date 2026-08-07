@@ -219,7 +219,7 @@ class LandsRegionSource(private val plugin: RegionsPlugin) : RegionSource {
 
     private fun warnApi(message: String) {
         if (!warnedUnavailableApi) {
-            plugin.logger.warning(message)
+            plugin.log().warn(message)
             warnedUnavailableApi = true
         }
     }

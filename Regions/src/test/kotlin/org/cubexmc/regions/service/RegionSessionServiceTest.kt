@@ -3,6 +3,7 @@ package org.cubexmc.regions.service
 import org.bukkit.GameMode
 import org.bukkit.Server
 import org.bukkit.entity.Player
+import org.cubexmc.core.CubexLogger
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.effect.DeclaredEffect
 import org.cubexmc.regions.effect.ScopedEffectService
@@ -35,7 +36,7 @@ class RegionSessionServiceTest {
             effects = listOf(EffectConfig("walk_speed", values = mapOf("value" to "0.4"))),
         )
         `when`(plugin.overlaps()).thenReturn(RegionOverlapResolver())
-        `when`(plugin.logger).thenReturn(Logger.getLogger("RegionSessionServiceTest"))
+        `when`(plugin.log()).thenReturn(CubexLogger(Logger.getLogger("RegionSessionServiceTest")))
         `when`(player.uniqueId).thenReturn(playerId)
         `when`(player.name).thenReturn("Tester")
         val expected = listOf(DeclaredEffect(region, region.effects.single()))
@@ -62,7 +63,7 @@ class RegionSessionServiceTest {
             flags = mapOf("fly" to FlagConfig("fly", "deny")),
         )
         `when`(plugin.overlaps()).thenReturn(RegionOverlapResolver())
-        `when`(plugin.logger).thenReturn(Logger.getLogger("RegionSessionServiceTest"))
+        `when`(plugin.log()).thenReturn(CubexLogger(Logger.getLogger("RegionSessionServiceTest")))
         `when`(player.uniqueId).thenReturn(playerId)
         `when`(player.name).thenReturn("Tester")
         `when`(player.hasPermission("regions.bypass.flags")).thenReturn(true)
@@ -87,7 +88,7 @@ class RegionSessionServiceTest {
             flags = mapOf("fly" to FlagConfig("fly", "deny"), "vanish" to FlagConfig("vanish", "deny")),
         )
         `when`(plugin.overlaps()).thenReturn(RegionOverlapResolver())
-        `when`(plugin.logger).thenReturn(Logger.getLogger("RegionSessionServiceTest"))
+        `when`(plugin.log()).thenReturn(CubexLogger(Logger.getLogger("RegionSessionServiceTest")))
         `when`(player.uniqueId).thenReturn(playerId)
         `when`(player.name).thenReturn("Tester")
         `when`(player.gameMode).thenReturn(GameMode.CREATIVE)

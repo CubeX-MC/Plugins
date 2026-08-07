@@ -2,6 +2,7 @@ package org.cubexmc.regions.service
 
 import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
+import org.cubexmc.core.CubexLogger
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.integration.RegionSource
 import org.cubexmc.regions.integration.RegionSourceRegistry
@@ -46,7 +47,7 @@ class RegionPublishingServiceTest {
     fun setUp() {
         plugin = mock(RegionsPlugin::class.java)
         `when`(plugin.dataFolder).thenReturn(tempDir.toFile())
-        `when`(plugin.logger).thenReturn(Logger.getLogger("RegionPublishingServiceTest"))
+        `when`(plugin.log()).thenReturn(CubexLogger(Logger.getLogger("RegionPublishingServiceTest")))
         storage = RegionStorage(plugin)
         registry = mock(RegionRegistry::class.java)
         authority = mock(RegionAuthorityService::class.java)
