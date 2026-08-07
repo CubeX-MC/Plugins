@@ -8,7 +8,6 @@ import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.regions.RegionsPlugin
-import org.cubexmc.regions.config.sendLegacyMessage
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionTrigger
 import java.util.UUID
@@ -30,17 +29,17 @@ class CombatModeService(private val plugin: RegionsPlugin) {
             return
         }
         if (endingRegions.contains(region.id)) {
-            player.sendLegacyMessage(plugin.gameText("game.combat.restoring", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.combat.restoring", mapOf("name" to region.name)))
             return
         }
         val state = state(region)
         if (state.active) {
-            player.sendLegacyMessage(plugin.gameText("game.combat.in-progress", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.combat.in-progress", mapOf("name" to region.name)))
             return
         }
         val maxPlayers = maxPlayers(region)
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
-            player.sendLegacyMessage(plugin.gameText("game.combat.full", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.combat.full", mapOf("name" to region.name)))
             return
         }
         state.players.add(player.uniqueId)
@@ -72,22 +71,22 @@ class CombatModeService(private val plugin: RegionsPlugin) {
     fun ready(player: Player, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isCombatMode(region)) {
-            player.sendLegacyMessage(plugin.gameText("game.combat.not-combat"))
+            plugin.sendGame(player, plugin.gameText("game.combat.not-combat"))
             return true
         }
         val state = state(region)
         if (!state.players.contains(player.uniqueId)) {
-            player.sendLegacyMessage(plugin.gameText("game.combat.not-inside"))
+            plugin.sendGame(player, plugin.gameText("game.combat.not-inside"))
             return true
         }
         if (state.active) {
-            player.sendLegacyMessage(plugin.gameText("game.combat.already-started"))
+            plugin.sendGame(player, plugin.gameText("game.combat.already-started"))
             return true
         }
         state.ready.add(player.uniqueId)
         broadcast(state, plugin.gameText("game.combat.ready", mapOf("player" to player.name, "current" to state.ready.size.toString(), "total" to state.players.size.toString())))
         if (!canPromptReady(region, state)) {
-            player.sendLegacyMessage(startRequirementMessage(region, state))
+            plugin.sendGame(player, startRequirementMessage(region, state))
             return true
         }
         if (state.ready.containsAll(state.players)) {
@@ -115,7 +114,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         }
         state.players.remove(player.uniqueId)
         state.ready.remove(player.uniqueId)
-        player.sendLegacyMessage(plugin.gameText("game.combat.removed"))
+        plugin.sendGame(player, plugin.gameText("game.combat.removed"))
         maybeEndAfterRosterChange(state, "death")
         return true
     }
@@ -184,7 +183,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                             applyKit(player, region)
                         }
                     }
-                    player.sendLegacyMessage(plugin.gameText("game.combat.started"))
+                    plugin.sendGame(player, plugin.gameText("game.combat.started"))
                     plugin.triggers().fire(RegionTrigger.ON_MODE_START, player, region)
                 }.onFailure { error ->
                     plugin.logger.severe("Failed to start combat ${region.id} for ${player.name}: ${error.message}")
@@ -229,7 +228,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                         }
                         plugin.effects().cleanupModeEffects(player, regionId, "mode-end:$reason")
                         restoreGear(player, state, teleportOut = true, reason = reason)
-                        player.sendLegacyMessage(plugin.gameText("game.combat.ended"))
+                        plugin.sendGame(player, plugin.gameText("game.combat.ended"))
                     } finally {
                         if (remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
                     }
@@ -372,7 +371,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         for (playerId in state.players) {
             val player = plugin.server.getPlayer(playerId) ?: continue
             plugin.regionScheduler().runAtEntity(player, Runnable {
-                player.sendLegacyMessage(message)
+                plugin.sendGame(player, message)
             })
         }
     }

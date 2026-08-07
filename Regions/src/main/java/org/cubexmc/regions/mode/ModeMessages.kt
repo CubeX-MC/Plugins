@@ -1,5 +1,6 @@
 package org.cubexmc.regions.mode
 
+import org.bukkit.command.CommandSender
 import org.cubexmc.regions.RegionsPlugin
 
 /**
@@ -10,3 +11,8 @@ import org.cubexmc.regions.RegionsPlugin
  */
 internal fun RegionsPlugin.gameText(key: String, placeholders: Map<String, String> = emptyMap()): String =
     lang().message(key, placeholders)
+
+/** Sends a line already resolved by [gameText] to one participant. */
+internal fun RegionsPlugin.sendGame(recipient: CommandSender, message: String) {
+    lang().sendRaw(recipient, message)
+}

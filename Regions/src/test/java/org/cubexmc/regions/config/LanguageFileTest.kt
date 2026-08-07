@@ -1,5 +1,8 @@
 package org.cubexmc.regions.config
 
+import net.kyori.adventure.text.minimessage.MiniMessage
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.configuration.file.YamlConfiguration
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -48,6 +51,38 @@ class LanguageFileTest {
         }
     }
 
+    @Test
+    fun `every value is MiniMessage, with no legacy colour codes left behind`() {
+        for (path in listOf("/lang/zh_CN.yml", "/lang/en_US.yml")) {
+            val yaml = load(path)
+            for (key in yaml.getKeys(true).filterNot { yaml.isConfigurationSection(it) }) {
+                for (value in values(yaml, key)) {
+                    // A leftover &-code renders as literal "&a" text under MiniMessage rather than
+                    // as a colour, and nothing else in the pipeline would notice.
+                    assertTrue(!LEGACY_CODE.containsMatchIn(value), "$path:$key still uses legacy colours: $value")
+                    MiniMessage.miniMessage().deserialize(value)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `usage syntax stays literal instead of resolving as a placeholder`() {
+        val yaml = load("/lang/zh_CN.yml")
+
+        // `/regions rollback <id>` is help text, but `id` is also a real placeholder name elsewhere.
+        // Only the escape keeps the two apart, so assert on the rendered output rather than the file.
+        val rendered = PlainTextComponentSerializer.plainText().serialize(
+            MiniMessage.miniMessage().deserialize(
+                yaml.getString("gui.history.rollback-hint")!!,
+                Placeholder.unparsed("id", "arena"),
+            ),
+        )
+
+        assertTrue(rendered.contains("<revision>"), "expected a literal <revision> in: $rendered")
+        assertTrue(rendered.contains("arena"), "expected the id placeholder to resolve in: $rendered")
+    }
+
     private fun values(yaml: YamlConfiguration, key: String): List<String> =
         if (yaml.isList(key)) yaml.getStringList(key) else listOfNotNull(yaml.getString(key))
 
@@ -60,5 +95,6 @@ class LanguageFileTest {
 
     private companion object {
         val CJK = Regex("[\\u4e00-\\u9fff]")
+        val LEGACY_CODE = Regex("(?i)&(#[0-9a-f]{6}|[0-9a-fk-or])")
     }
 }

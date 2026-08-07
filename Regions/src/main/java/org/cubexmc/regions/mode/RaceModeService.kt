@@ -4,7 +4,6 @@ import org.bukkit.Location
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.cubexmc.regions.RegionsPlugin
-import org.cubexmc.regions.config.sendLegacyMessage
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionTrigger
 import java.util.Locale
@@ -30,22 +29,22 @@ class RaceModeService(private val plugin: RegionsPlugin) {
             return
         }
         if (endingRegions.contains(region.id)) {
-            player.sendLegacyMessage(plugin.gameText("game.race.restoring", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.race.restoring", mapOf("name" to region.name)))
             return
         }
         val state = state(region)
         if (state.active) {
-            player.sendLegacyMessage(plugin.gameText("game.race.in-progress", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.race.in-progress", mapOf("name" to region.name)))
             return
         }
         val maxPlayers = region.mode?.values?.get("max-players")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
-            player.sendLegacyMessage(plugin.gameText("game.race.full", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.race.full", mapOf("name" to region.name)))
             return
         }
         state.players.add(player.uniqueId)
         state.ready.remove(player.uniqueId)
-        player.sendLegacyMessage(plugin.gameText("game.race.joined", mapOf("name" to region.name, "id" to region.id)))
+        plugin.sendGame(player, plugin.gameText("game.race.joined", mapOf("name" to region.name, "id" to region.id)))
     }
 
     fun onLeave(player: Player, regionId: String, reason: String) {
@@ -81,20 +80,20 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         }
         val state = state(region)
         if (!state.players.contains(player.uniqueId)) {
-            player.sendLegacyMessage(plugin.gameText("game.race.not-inside"))
+            plugin.sendGame(player, plugin.gameText("game.race.not-inside"))
             return true
         }
         if (state.active) {
-            player.sendLegacyMessage(plugin.gameText("game.race.already-started"))
+            plugin.sendGame(player, plugin.gameText("game.race.already-started"))
             return true
         }
         val startConstraint = vehicleConstraint(region, "start", 0)
         if (!validRaceState(player, startConstraint)) {
-            player.sendLegacyMessage(raceStateMessage(startConstraint))
+            plugin.sendGame(player, raceStateMessage(startConstraint))
             return true
         }
         if (!nearStart(player, region)) {
-            player.sendLegacyMessage(plugin.gameText("game.race.start-required"))
+            plugin.sendGame(player, plugin.gameText("game.race.start-required"))
             return true
         }
         state.ready.add(player.uniqueId)
@@ -308,7 +307,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
                 val next = index + 1
                 state.progress[player.uniqueId] = next
                 plugin.sessions().setMetadata(player, region.id, "race_checkpoint", next.toString())
-                player.sendLegacyMessage(plugin.gameText("game.race.checkpoint", mapOf("index" to next.toString(), "total" to checkpoints.size.toString())))
+                plugin.sendGame(player, plugin.gameText("game.race.checkpoint", mapOf("index" to next.toString(), "total" to checkpoints.size.toString())))
                 plugin.triggers().fire(RegionTrigger.ON_CHECKPOINT, player, region)
             }
             return
@@ -336,7 +335,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
                 "elapsed-ms" to elapsed.toString(),
             ),
         )
-        player.sendLegacyMessage(plugin.gameText("game.race.your-result", mapOf("rank" to rank.toString(), "time" to (elapsed / 1000.0).toString())))
+        plugin.sendGame(player, plugin.gameText("game.race.your-result", mapOf("rank" to rank.toString(), "time" to (elapsed / 1000.0).toString())))
         plugin.triggers().fire(RegionTrigger.ON_FINISH, player, region)
         broadcast(state, plugin.gameText("game.race.finished", mapOf("player" to player.name, "rank" to rank.toString())))
         if (state.finished.containsAll(state.players)) {
@@ -456,7 +455,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         for (playerId in state.players.toList()) {
             val player = plugin.server.getPlayer(playerId) ?: continue
             plugin.regionScheduler().runAtEntity(player, Runnable {
-                player.sendLegacyMessage(message)
+                plugin.sendGame(player, message)
             })
         }
     }

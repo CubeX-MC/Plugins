@@ -4,7 +4,6 @@ import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.regions.RegionsPlugin
-import org.cubexmc.regions.config.PaperText
 
 /**
  * Every string the GUI shows comes from the active language file.
@@ -17,7 +16,7 @@ class GuiText(private val plugin: RegionsPlugin) {
         plugin.lang().message(key, placeholders)
 
     fun component(key: String, placeholders: Map<String, String> = emptyMap()): Component =
-        PaperText.parse(text(key, placeholders))
+        plugin.lang().component(key, placeholders)
 
     fun lore(key: String, placeholders: Map<String, String> = emptyMap()): List<String> =
         plugin.lang().messageList(key, placeholders)
@@ -38,8 +37,8 @@ class GuiText(private val plugin: RegionsPlugin) {
         val item = ItemStack(material)
         val meta = item.itemMeta
         if (meta != null) {
-            meta.displayName(PaperText.parse(name))
-            meta.lore(lore.map { PaperText.parse(it) })
+            meta.displayName(plugin.lang().render(name))
+            meta.lore(lore.map { plugin.lang().render(it) })
             item.itemMeta = meta
         }
         return item
@@ -53,6 +52,14 @@ class GuiText(private val plugin: RegionsPlugin) {
     fun label(key: String, fallback: String): String =
         if (plugin.lang().has(key)) text(key) else fallback
 
+    /**
+     * Colours for labels the code assembles rather than reads whole from the language file — a
+     * status tint in front of a translated name, for example.
+     *
+     * Deliberately `&` codes and not MiniMessage tags: these are concatenated with strings the i18n
+     * service has *already* rendered, so they are read back by
+     * [org.cubexmc.regions.config.LanguageManager.render] and never re-parsed as MiniMessage.
+     */
     object Ui {
         const val DARK_GREEN = "&2"
         const val AQUA = "&b"

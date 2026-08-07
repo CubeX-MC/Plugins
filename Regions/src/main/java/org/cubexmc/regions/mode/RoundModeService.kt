@@ -9,7 +9,6 @@ import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.regions.RegionsPlugin
-import org.cubexmc.regions.config.sendLegacyMessage
 import org.cubexmc.regions.model.EffectConfig
 import org.cubexmc.regions.model.EffectScope
 import org.cubexmc.regions.model.RegionDefinition
@@ -41,22 +40,22 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             return
         }
         if (endingRegions.contains(region.id)) {
-            player.sendLegacyMessage(plugin.gameText("game.round.restoring", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.round.restoring", mapOf("name" to region.name)))
             return
         }
         val state = state(region)
         if (state.active) {
-            player.sendLegacyMessage(plugin.gameText("game.round.in-progress", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.round.in-progress", mapOf("name" to region.name)))
             return
         }
         val maxPlayers = region.mode?.values?.get("max-players")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
-            player.sendLegacyMessage(plugin.gameText("game.round.full", mapOf("name" to region.name)))
+            plugin.sendGame(player, plugin.gameText("game.round.full", mapOf("name" to region.name)))
             return
         }
         state.players.add(player.uniqueId)
         state.ready.remove(player.uniqueId)
-        player.sendLegacyMessage(plugin.gameText("game.round.joined", mapOf("name" to region.name, "id" to region.id)))
+        plugin.sendGame(player, plugin.gameText("game.round.joined", mapOf("name" to region.name, "id" to region.id)))
     }
 
     fun onLeave(player: Player, regionId: String, reason: String) {
@@ -87,7 +86,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
             return false
         }
         event.isCancelled = true
-        player.sendLegacyMessage(plugin.gameText("game.round.wait-hiding"))
+        plugin.sendGame(player, plugin.gameText("game.round.wait-hiding"))
         return true
     }
 
@@ -118,7 +117,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         state.ready.remove(player.uniqueId)
         state.roles.remove(player.uniqueId)
         state.found.remove(player.uniqueId)
-        player.sendLegacyMessage(plugin.gameText("game.round.removed"))
+        plugin.sendGame(player, plugin.gameText("game.round.removed"))
         maybeEndHideAndSeek(state, "death")
         return true
     }
@@ -136,11 +135,11 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
         val state = state(region)
         if (!state.players.contains(player.uniqueId)) {
-            player.sendLegacyMessage(plugin.gameText("game.round.not-inside"))
+            plugin.sendGame(player, plugin.gameText("game.round.not-inside"))
             return true
         }
         if (state.active) {
-            player.sendLegacyMessage(plugin.gameText("game.round.already-started"))
+            plugin.sendGame(player, plugin.gameText("game.round.already-started"))
             return true
         }
         state.ready.add(player.uniqueId)
@@ -300,14 +299,14 @@ class RoundModeService(private val plugin: RegionsPlugin) {
                 if (shouldReplaceGear(region)) {
                     applyKit(player, region.mode?.values?.get("seeker-kit") ?: region.mode?.values?.get("kit"))
                 }
-                player.sendLegacyMessage(plugin.gameText("game.round.role-seeker"))
+                plugin.sendGame(player, plugin.gameText("game.round.role-seeker"))
             }
             RoundRole.HIDER -> {
                 applyHiderVisual(player, region)
                 if (shouldReplaceGear(region)) {
                     applyKit(player, region.mode?.values?.get("hider-kit") ?: region.mode?.values?.get("kit"))
                 }
-                player.sendLegacyMessage(plugin.gameText("game.round.role-hider"))
+                plugin.sendGame(player, plugin.gameText("game.round.role-hider"))
             }
         }
     }
@@ -332,11 +331,11 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         if (region.mode?.values?.get("found-becomes-seeker")?.toBooleanStrictOrNull() != false) {
             state.roles[hider.uniqueId] = RoundRole.SEEKER
             applySeekerVisual(hider, region)
-            hider.sendLegacyMessage(plugin.gameText("game.round.found-become-seeker", mapOf("seeker" to seeker.name)))
+            plugin.sendGame(hider, plugin.gameText("game.round.found-become-seeker", mapOf("seeker" to seeker.name)))
         } else {
             state.roles.remove(hider.uniqueId)
             outsideLocation(region)?.let { plugin.regionScheduler().teleportAsync(hider, it) }
-            hider.sendLegacyMessage(plugin.gameText("game.round.found-eliminated", mapOf("seeker" to seeker.name)))
+            plugin.sendGame(hider, plugin.gameText("game.round.found-eliminated", mapOf("seeker" to seeker.name)))
         }
         plugin.triggers().fire(RegionTrigger.ON_FOUND, hider, region)
         broadcast(state, plugin.gameText("game.round.found", mapOf("player" to hider.name, "seeker" to seeker.name)))
@@ -395,7 +394,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
                             plugin.triggers().fire(RegionTrigger.ON_MODE_END, player, region)
                         }
                         restoreRoundState(player, state, teleportOut = false, reason = reason)
-                        player.sendLegacyMessage(plugin.gameText("game.round.ended"))
+                        plugin.sendGame(player, plugin.gameText("game.round.ended"))
                     } finally {
                         if (remaining.decrementAndGet() == 0) endingRegions.remove(regionId)
                     }
@@ -548,7 +547,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         for (playerId in state.players.toList()) {
             val player = plugin.server.getPlayer(playerId) ?: continue
             plugin.regionScheduler().runAtEntity(player, Runnable {
-                player.sendLegacyMessage(message)
+                plugin.sendGame(player, message)
             })
         }
     }

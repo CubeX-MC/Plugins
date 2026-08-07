@@ -11,7 +11,6 @@ import org.bukkit.attribute.Attribute
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.regions.RegionsPlugin
-import org.cubexmc.regions.config.PaperText
 import org.cubexmc.regions.model.ActionBlockConfig
 import org.cubexmc.regions.model.ActionConfig
 import org.cubexmc.regions.model.ConditionConfig
@@ -139,8 +138,8 @@ class RegionTriggerService(private val plugin: RegionsPlugin) {
         val fadeOut = action.values["fade-out"]?.toIntOrNull() ?: 10
         player.showTitle(
             Title.title(
-                PaperText.parse(title),
-                PaperText.parse(subtitle),
+                plugin.lang().render(title),
+                plugin.lang().render(subtitle),
                 Title.Times.times(
                     Duration.ofMillis(fadeIn.coerceAtLeast(0) * TICK_MILLIS),
                     Duration.ofMillis(stay.coerceAtLeast(0) * TICK_MILLIS),
