@@ -33,12 +33,34 @@ public final class LegacyTextToMiniMessageStep implements MigrationStep {
             Map.entry('o', "italic"),
             Map.entry('r', "reset"));
 
+    /** What to do with `<...>` tokens already present in the source text. */
+    public enum AngleBrackets {
+        /**
+         * Escape them as {@code \<} so MiniMessage renders them literally. Correct for text that
+         * predates MiniMessage entirely, where any angle bracket was plain punctuation.
+         */
+        ESCAPE,
+
+        /**
+         * Leave them alone. Correct for text that already used {@code <name>} placeholders — for
+         * example a section that was substituted by hand before being moved onto the i18n service.
+         * Escaping those would turn live placeholders into literal text.
+         */
+        PRESERVE
+    }
+
     private final int fromVersion;
     private final int toVersion;
+    private final AngleBrackets angleBrackets;
 
     public LegacyTextToMiniMessageStep(int fromVersion, int toVersion) {
+        this(fromVersion, toVersion, AngleBrackets.ESCAPE);
+    }
+
+    public LegacyTextToMiniMessageStep(int fromVersion, int toVersion, AngleBrackets angleBrackets) {
         this.fromVersion = fromVersion;
         this.toVersion = toVersion;
+        this.angleBrackets = angleBrackets == null ? AngleBrackets.ESCAPE : angleBrackets;
     }
 
     @Override
@@ -153,7 +175,7 @@ public final class LegacyTextToMiniMessageStep implements MigrationStep {
     }
 
     private void appendLiteral(StringBuilder output, char current) {
-        if (current == '<') {
+        if (current == '<' && angleBrackets == AngleBrackets.ESCAPE) {
             output.append('\\');
         }
         output.append(current);

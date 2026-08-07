@@ -70,6 +70,16 @@ final class SimpleI18nService implements I18nService {
     }
 
     @Override
+    public String rawOrNull(String key) {
+        return rawOrNull(key, currentLocale);
+    }
+
+    @Override
+    public String rawOrNull(String key, String locale) {
+        return lookup(locale, key);
+    }
+
+    @Override
     public String raw(String key, String locale) {
         String resolved = lookup(locale, key);
         if (resolved != null) {

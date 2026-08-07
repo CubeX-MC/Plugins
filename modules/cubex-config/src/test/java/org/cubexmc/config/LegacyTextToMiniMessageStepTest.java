@@ -43,4 +43,31 @@ class LegacyTextToMiniMessageStepTest {
         // Assert
         assertEquals("<yellow>/booklite info \\<id>", converted);
     }
+
+    @Test
+    void preservePolicyKeepsExistingPlaceholderTokens() {
+        // Arrange: a section that already used <name> placeholders before moving onto the i18n
+        // service — escaping those would turn live placeholders into literal text.
+        LegacyTextToMiniMessageStep preserving = new LegacyTextToMiniMessageStep(
+                2, 3, LegacyTextToMiniMessageStep.AngleBrackets.PRESERVE);
+
+        // Act
+        String converted = preserving.convert("&#CFD8DC描述: &#FFFFFF<value>");
+
+        // Assert
+        assertEquals("<#CFD8DC>描述: <#FFFFFF><value>", converted);
+    }
+
+    @Test
+    void preservePolicyStillConvertsLegacyColourCodes() {
+        // Arrange
+        LegacyTextToMiniMessageStep preserving = new LegacyTextToMiniMessageStep(
+                2, 3, LegacyTextToMiniMessageStep.AngleBrackets.PRESERVE);
+
+        // Act
+        String converted = preserving.convert("&aDone &#69DB7C<count>");
+
+        // Assert
+        assertEquals("<green>Done <#69DB7C><count>", converted);
+    }
 }
