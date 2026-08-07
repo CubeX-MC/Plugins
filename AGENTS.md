@@ -37,6 +37,20 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 - 推 `main` 会触发 CI 与 9 个公开镜像仓同步 —— **推送前先跟用户确认**。
 - 改了 `buildSrc` 会触发全量重编；异常时 `.\gradlew.bat --stop` 后重试。
 
+## 共享模块的参考实现
+
+**Contract 是 `modules/cubex-*` 的参考适配插件**（2026-08-06 确立）。写别的插件时按它抄；两边不一致以 Contract 为准。
+
+具体含义：
+
+- 插件里**不留共享工具的本地副本**。Contract 已删掉自己的 `Text`，改用 `CubexText`（`plugin.text()`）。发现共享模块缺能力，**改 `modules/`，不要在插件里绕过**。
+- Kotlin 源码放 `src/main/kotlin`（Contract 已迁；其余插件仍在 `src/main/java`，迁移时一并改）。厂商 vendored 的 `Metrics.java` 留在 `src/main/java`。
+- 有状态的 store 实现 `Reloadable` + `Terminable`，直接 `bind(store)`，别再手写 `bind(Runnable { store.flush() })`。
+- reload 用 `ReloadChain`：分阶段命名、`addIf` 表达"上一步失败就别跑这几步"、`ReloadReport` 告诉服主是哪一段炸的。
+- 语言文件所有段（不只 `messages.*`）都走 `I18nService`，值用 MiniMessage。
+
+这一轮为此补的共享 API（都带测试）：`CubexPlugin.text()/log()/messager()` 放开为 public；`ReloadChain` 加 `ReloadFailurePolicy`/`addIf`/`ReloadReport`；`I18nService.rawOrNull`；`LegacyTextToMiniMessageStep.AngleBrackets.PRESERVE`。
+
 ## 已定决策（别"顺手修"）
 
 - **Railway 的源码包就是 `org.cubexmc.metro`，主类 `org.cubexmc.metro.Metro`，与 Metro 完全同名——这是有意保留的**（2026-08-02 用户确认）。理由：Metro 的线路控制等功能更新可以直接搬到 Railway；Metro 与 Railway **本就不支持同时安装**。同理 Railway 的 `build.gradle.kts` 把 cloud / scoreboardlibrary / geantyref relocate 到 `org.cubexmc.metro.lib.*` 也**不要改**。
