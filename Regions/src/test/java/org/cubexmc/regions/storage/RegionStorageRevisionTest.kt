@@ -67,6 +67,18 @@ class RegionStorageRevisionTest {
         assertEquals(listOf(3L, 4L, 5L), storage.revisionHistory("arena").map { it.revision })
     }
 
+    @Test
+    fun `closing the store flushes edits that were only in memory`() {
+        // The plugin binds the store as a Terminable rather than flushing by hand, so shutdown
+        // durability now rests entirely on close().
+        val storage = RegionStorage(plugin())
+        storage.put(region(1, "Published"))
+
+        storage.close()
+
+        assertEquals("Published", RegionStorage(plugin()).apply { load() }.find("arena")?.name)
+    }
+
     private fun plugin(): RegionsPlugin {
         val plugin = mock(RegionsPlugin::class.java)
         `when`(plugin.dataFolder).thenReturn(tempDir.toFile())

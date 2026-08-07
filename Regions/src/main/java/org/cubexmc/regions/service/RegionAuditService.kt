@@ -3,6 +3,8 @@ package org.cubexmc.regions.service
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.configuration.file.YamlConfiguration
+import org.cubexmc.core.Reloadable
+import org.cubexmc.core.Terminable
 import org.cubexmc.regions.RegionsPlugin
 import java.io.File
 import java.io.IOException
@@ -114,7 +116,7 @@ class RegionAuditStore(
     }
 }
 
-class RegionAuditService(private val plugin: RegionsPlugin) {
+class RegionAuditService(private val plugin: RegionsPlugin) : Reloadable, Terminable {
     private val store = RegionAuditStore(
         File(plugin.dataFolder, "audit.yml"),
         plugin.config.getInt("audit.max-events", 2_000),
@@ -123,6 +125,15 @@ class RegionAuditService(private val plugin: RegionsPlugin) {
     fun load() = runSafely("load") { store.load() }
 
     fun save() = runSafely("save") { store.save() }
+
+    override fun reload() {
+        load()
+    }
+
+    /** Terminable: the audit trail is only in memory until it is written back. */
+    override fun close() {
+        save()
+    }
 
     fun record(
         sender: CommandSender?,

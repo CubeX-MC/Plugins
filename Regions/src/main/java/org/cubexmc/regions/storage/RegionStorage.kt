@@ -2,6 +2,8 @@ package org.cubexmc.regions.storage
 
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
+import org.cubexmc.core.Reloadable
+import org.cubexmc.core.Terminable
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.ActionBlockConfig
 import org.cubexmc.regions.model.ActionConfig
@@ -24,7 +26,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Locale
 
-class RegionStorage(private val plugin: RegionsPlugin) {
+class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable {
     private val file = File(plugin.dataFolder, "regions.yml")
     private val regions: MutableMap<String, RegionDefinition> = LinkedHashMap()
     private val drafts: MutableMap<String, RegionDefinition> = LinkedHashMap()
@@ -140,6 +142,15 @@ class RegionStorage(private val plugin: RegionsPlugin) {
     }
 
     fun flushIfDirty(): Boolean = if (dirty) save() else true
+
+    override fun reload() {
+        load()
+    }
+
+    /** Terminable: flush pending writes when the plugin shuts down. */
+    override fun close() {
+        flushIfDirty()
+    }
 
     fun save(): Boolean {
         val yaml = YamlConfiguration()

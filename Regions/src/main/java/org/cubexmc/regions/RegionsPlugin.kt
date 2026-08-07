@@ -1,9 +1,14 @@
 package org.cubexmc.regions
 
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
+import org.cubexmc.config.ConfigReload
 import org.cubexmc.config.MigrationException
+import org.cubexmc.config.ReloadChain
+import org.cubexmc.config.ReloadFailurePolicy
+import org.cubexmc.config.ReloadReport
 import org.cubexmc.config.ResourceFiles
 import org.cubexmc.core.CubexPlugin
+import org.cubexmc.core.Reloadable
 import org.cubexmc.regions.command.RegionsCommand
 import org.cubexmc.regions.capability.BuiltInRegionCapabilities
 import org.cubexmc.regions.capability.CapabilityCatalog
@@ -134,20 +139,19 @@ class RegionsPlugin : CubexPlugin() {
         templateService = RegionTemplateService(File(dataFolder, "templates.yml"))
         templates().load()
         guiService = RegionsGui(this)
-        regionStorage = RegionStorage(this)
+        // Every store is a Terminable, so bind() owns shutdown flushing; TerminableRegistry closes
+        // them in reverse registration order.
+        regionStorage = bind(RegionStorage(this))
         storage().load()
         overlapResolver = RegionOverlapResolver()
         validationService = RegionValidationService(sources(), modes(), flags(), effects(), actions(), conditions(), capabilities(), overlaps())
         regionRegistry = RegionRegistry(storage(), validation())
-        auditService = RegionAuditService(this)
+        auditService = bind(RegionAuditService(this))
         audit().load()
         lifecycleService = RegionLifecycleService(this)
         publishingService = RegionPublishingService(this)
         trialService = RegionTrialService(this)
         lifecycle().reconcile()
-
-        bind { storage().flushIfDirty() }
-        bind { audit().save() }
 
         registerListener(PlayerLifecycleListener(this))
         registerListener(gui())
@@ -169,30 +173,67 @@ class RegionsPlugin : CubexPlugin() {
         storage().flushIfDirty()
     }
 
-    fun reloadRegions() {
-        if (config.getBoolean("safety.cleanup-on-reload", true)) {
-            trials().cleanupAll("reload")
-            combatModes().cleanupAll("reload")
-            roundModes().cleanupAll("reload")
-            raceModes().cleanupAll("reload")
-            sessions().cleanupAll("reload")
+    /**
+     * Reloads config, language and on-disk data as a named [ReloadChain].
+     *
+     * Two ordering rules make this more than a list of calls, and both are expressed by the chain
+     * rather than by hand-rolled flags:
+     *
+     * - the data stages are **gated** on the flush succeeding. `regions.yml` is only written on
+     *   shutdown or when a flush is asked for, so a draft edited through the GUI lives in memory
+     *   until then; reloading it from disk after a failed flush silently discards that edit;
+     * - the baseline check uses [ReloadFailurePolicy.ABORT], because reloading config or language on
+     *   top of a data set this build cannot read is worse than leaving the running state alone.
+     *
+     * Returns the report so the command layer can tell the operator which stage failed.
+     */
+    fun reloadRegions(): ReloadReport {
+        var flushed = true
+
+        val report = ReloadChain.create()
+            .failurePolicy(ReloadFailurePolicy.ABORT)
+            .add("mode-cleanup", Reloadable { cleanupModesForReload() })
+            .add("flush-stores", Reloadable {
+                if (!storage().flushIfDirty()) {
+                    flushed = false
+                    log().warn("Reload: could not flush regions.yml; keeping in-memory state and skipping the data stages.")
+                }
+            })
+            .add("default-files", Reloadable { saveDefaultFiles() })
+            .add("baseline", Reloadable { verifyBaselineFiles() })
+            .add("config", ConfigReload.bukkitConfig(this))
+            .add("authority", Reloadable { configureAuthority() })
+            .add("language", lang())
+            .addIf("templates", { flushed }, templates())
+            .addIf("regions", { flushed }, storage())
+            .addIf("lifecycle", { flushed }, Reloadable { lifecycle().reconcile() })
+            .addIf("validate", { flushed }, Reloadable { warnOnValidationIssues() })
+            .run()
+
+        for (summary in report.failureSummaries()) {
+            log().severe("Regions reload stage failed — $summary")
         }
-        saveDefaultFiles()
-        try {
-            verifyBaselineFiles()
-        } catch (ex: MigrationException) {
-            logger.severe("Regions reload aborted: unsupported data baseline. ${ex.message}")
+        if (report.skipped().isNotEmpty()) {
+            log().warn("Regions reload skipped stages: ${report.skipped().joinToString(", ")}")
+        }
+        return report
+    }
+
+    private fun cleanupModesForReload() {
+        if (!config.getBoolean("safety.cleanup-on-reload", true)) {
             return
         }
-        reloadConfig()
-        configureAuthority()
-        lang().load()
-        templates().load()
-        storage().load()
-        lifecycle().reconcile()
+        trials().cleanupAll("reload")
+        combatModes().cleanupAll("reload")
+        roundModes().cleanupAll("reload")
+        raceModes().cleanupAll("reload")
+        sessions().cleanupAll("reload")
+    }
+
+    private fun warnOnValidationIssues() {
         val issues = validation().validateAll(regions().all())
         if (issues.isNotEmpty()) {
-            logger.warning("Regions reloaded with ${issues.size} validation issue(s).")
+            log().warn("Regions reloaded with ${issues.size} validation issue(s).")
         }
     }
 

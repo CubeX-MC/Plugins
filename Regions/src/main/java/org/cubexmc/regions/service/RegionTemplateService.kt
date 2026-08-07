@@ -2,6 +2,7 @@ package org.cubexmc.regions.service
 
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
+import org.cubexmc.core.Reloadable
 import org.cubexmc.regions.model.ActionBlockConfig
 import org.cubexmc.regions.model.ActionConfig
 import org.cubexmc.regions.model.ConditionConfig
@@ -64,8 +65,12 @@ data class TemplateApplyResult(
     val success: Boolean get() = region != null && errors.isEmpty()
 }
 
-class RegionTemplateService(private val file: File) {
+class RegionTemplateService(private val file: File) : Reloadable {
     private val templates = LinkedHashMap<String, RegionTemplate>()
+
+    override fun reload() {
+        load()
+    }
 
     fun load() {
         templates.clear()

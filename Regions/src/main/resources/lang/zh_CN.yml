@@ -25,6 +25,7 @@ help-publishing: |
   <#69DB7C>/regions archive \<id> <#CFD8DC>- 归档场地
 help-player: "<#CFD8DC>进入被设置过的领地或场地即可体验 Regions；对战、比赛、小游戏场地会在需要确认时提示你使用 <#69DB7C>/regions game \\<场地> ready<#CFD8DC>。"
 reloaded: "<#69DB7C>Regions 已重载。"
+reload-failed: "<#E63946>Regions 重载失败，运行中的状态保持不变。失败阶段: <stages>"
 no-permission: "<#E63946>你没有权限。"
 authority-not-ruler: "<#E63946>只有 RuleGems 统治者可以管理场地。"
 authority-not-source-owner: "<#E63946>你不是该场地所绑定区域的当前主人。"

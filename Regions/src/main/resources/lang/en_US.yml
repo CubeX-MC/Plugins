@@ -25,6 +25,7 @@ help-publishing: |
   <#69DB7C>/regions archive \<id> <#CFD8DC>- Archive a venue
 help-player: "<#CFD8DC>Walk into a configured land or venue to experience Regions. Duel, race, and mini-game venues will prompt you to run <#69DB7C>/regions game \\<venue> ready<#CFD8DC> when confirmation is needed."
 reloaded: "<#69DB7C>Regions reloaded."
+reload-failed: "<#E63946>Regions reload failed; the running state is unchanged. Failed stages: <stages>"
 no-permission: "<#E63946>You do not have permission."
 authority-not-ruler: "<#E63946>Only RuleGems rulers can manage venues."
 authority-not-source-owner: "<#E63946>You are not the current owner of the area this venue is bound to."

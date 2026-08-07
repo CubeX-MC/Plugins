@@ -651,9 +651,19 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
             return true
         }
-        plugin.reloadRegions()
+        val report = plugin.reloadRegions()
         plugin.audit().record(sender, "<global>", "plugin.reload")
-        plugin.lang().send(sender, "reloaded")
+        if (report.ok()) {
+            plugin.lang().send(sender, "reloaded")
+        } else {
+            // Name the stage: a half-applied reload that reports success is how an operator ends up
+            // debugging the wrong file.
+            plugin.lang().send(
+                sender,
+                "reload-failed",
+                mapOf("stages" to report.failureSummaries().joinToString("; ")),
+            )
+        }
         return true
     }
 
