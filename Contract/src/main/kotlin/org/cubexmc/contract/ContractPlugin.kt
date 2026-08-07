@@ -1,7 +1,7 @@
 package org.cubexmc.contract
 
-import org.bukkit.command.PluginCommand
 import org.bukkit.configuration.file.YamlConfiguration
+import org.cubexmc.config.ConfigReload
 import org.cubexmc.config.LegacyTextToMiniMessageStep
 import org.cubexmc.config.MigrationContext
 import org.cubexmc.config.MigrationException
@@ -9,20 +9,28 @@ import org.cubexmc.config.MigrationPlan
 import org.cubexmc.config.MigrationRunner
 import org.cubexmc.config.MigrationStep
 import org.cubexmc.config.NoOpMigrationStep
+import org.cubexmc.config.ReloadChain
+import org.cubexmc.config.ReloadFailurePolicy
+import org.cubexmc.config.ReloadReport
 import org.cubexmc.config.ResourceFiles
 import org.cubexmc.contract.command.ContractCommand
 import org.cubexmc.contract.config.LanguageManager
+import org.cubexmc.contract.config.ContractsConfigMigrations
+import org.cubexmc.contract.config.LangV2ToV3Step
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.gui.ContractGui
 import org.cubexmc.contract.listener.ObjectiveListener
 import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.service.ContractService
+import org.cubexmc.contract.service.ContractTemplateService
 import org.cubexmc.contract.storage.ContractStorage
+import org.cubexmc.contract.storage.ContractTemplateStore
 import org.cubexmc.contract.storage.BatchAcceptanceStore
 import org.cubexmc.contract.storage.EventLog
 import org.cubexmc.contract.storage.PendingTransactionStore
 import org.cubexmc.contract.storage.ReputationStore
 import org.cubexmc.core.CubexPlugin
+import org.cubexmc.core.Reloadable
 import org.cubexmc.scheduler.CubexScheduler
 import java.io.IOException
 import kotlin.math.max
@@ -33,6 +41,8 @@ class ContractPlugin : CubexPlugin() {
     private var contractStorage: ContractStorage? = null
     private var reputationStore: ReputationStore? = null
     private var batchAcceptanceStore: BatchAcceptanceStore? = null
+    private var templateStore: ContractTemplateStore? = null
+    private var templateService: ContractTemplateService? = null
     private var pendingStore: PendingTransactionStore? = null
     private var eventLog: EventLog? = null
     private var contractService: ContractService? = null
@@ -47,7 +57,7 @@ class ContractPlugin : CubexPlugin() {
         try {
             migrateConfigAndLang()
         } catch (ex: MigrationException) {
-            logger.severe("Contracts enable aborted: migration failed. ${ex.message}")
+            log().severe("Contracts enable aborted: migration failed. ${ex.message}")
             abortEnable("Contracts migration failed. See logs for details.")
         }
         reloadConfig()
@@ -60,89 +70,105 @@ class ContractPlugin : CubexPlugin() {
             abortEnable("Vault economy provider not found. Contracts will be disabled.")
         }
 
-        contractStorage = ContractStorage(this)
+        // Every store is a Terminable, so bind() owns shutdown flushing; TerminableRegistry closes
+        // them in reverse registration order.
+        contractStorage = bind(ContractStorage(this))
         storage().load()
-        val saveContractStorage = Runnable {
-            val activeStorage = contractStorage
-            if (activeStorage != null) {
-                try {
-                    activeStorage.save()
-                } catch (ex: IOException) {
-                    logger.warning("Failed to save contracts on disable: ${ex.message}")
-                }
+        // Contracts flush on a full save rather than the incremental flushIfDirty the others use.
+        bind(Runnable {
+            try {
+                contractStorage?.save()
+            } catch (ex: IOException) {
+                log().warn("Failed to save contracts on disable: ${ex.message}")
             }
-        }
-        bind(saveContractStorage)
+        })
 
-        reputationStore = ReputationStore(this)
+        reputationStore = bind(ReputationStore(this))
         reputation().load()
-        bind(Runnable { reputationStore?.flushIfDirty() })
 
-        batchAcceptanceStore = BatchAcceptanceStore(this)
+        batchAcceptanceStore = bind(BatchAcceptanceStore(this))
         batchAcceptances().load()
         reconcileBatchAcceptances()
-        bind(Runnable { batchAcceptanceStore?.flushIfDirty() })
+
+        templateStore = bind(ContractTemplateStore(this))
+        templates().load()
+        rebuildTemplateService()
 
         pendingStore = PendingTransactionStore(this)
         eventLog = EventLog(this)
         contractService = ContractService(this, storage(), economy(), pending(), eventLog(), batchAcceptances())
         contracts().recoverPendingTransactions()
-        contractGui = ContractGui(this)
-        val closeContractGui = Runnable {
-            contractGui?.closeSessions()
-        }
-        bind(closeContractGui)
-        server.pluginManager.registerEvents(gui(), this)
-        server.pluginManager.registerEvents(gui().registry, this)
-        server.pluginManager.registerEvents(gui().input, this)
-        server.pluginManager.registerEvents(ObjectiveListener(this), this)
+        val overdue = contracts().activateScheduled()
+        if (overdue > 0) log().info("Published $overdue overdue scheduled contracts during startup.")
+        contractGui = bind(ContractGui(this))
+        registerListener(gui())
+        registerListener(gui().registry)
+        registerListener(gui().input)
+        registerListener(ObjectiveListener(this))
 
-        val command = ContractCommand(this)
-        val pluginCommand: PluginCommand? = getCommand("contract")
-        if (pluginCommand != null) {
-            pluginCommand.setExecutor(command)
-            pluginCommand.tabCompleter = command
-        }
+        registerCommand("contract", ContractCommand(this))
 
         scheduleCleanup()
+        schedulePublication()
         scheduleFlush()
         Metrics(this, 31491)
-        logger.info("Contract enabled with ${storage().all().size} stored contracts.")
+        log().info("Contract enabled with ${storage().all().size} stored contracts.")
     }
 
     override fun disablePlugin() {
     }
 
-    fun reloadContracts() {
-        contractGui?.closeSessions()
-        var canReloadData = true
-        try {
-            storage().flushIfDirty()
-            batchAcceptances().flushIfDirty()
-        } catch (ex: IOException) {
-            canReloadData = false
-            logger.warning(
-                "Reload: could not flush contracts; keeping in-memory state and skipping data reload. ${ex.message}",
-            )
+    /**
+     * Reloads config, language and on-disk data as a named [ReloadChain].
+     *
+     * Two ordering rules make this more than a list of calls, and both are expressed by the chain
+     * rather than by hand-rolled flags:
+     *
+     * - the data stages are **gated** on the flush succeeding. Reloading contracts from disk after a
+     *   failed flush would silently discard whatever was still only in memory;
+     * - migration uses [ReloadFailurePolicy.ABORT], because reloading config or language on top of a
+     *   half-migrated file is worse than leaving the running state alone.
+     *
+     * Returns the report so the command layer can tell the operator exactly which stage failed.
+     */
+    fun reloadContracts(): ReloadReport {
+        var flushed = true
+
+        val report = ReloadChain.create()
+            .failurePolicy(ReloadFailurePolicy.ABORT)
+            .add("gui-sessions", Reloadable { contractGui?.closeSessions() })
+            .add("flush-stores", Reloadable {
+                try {
+                    storage().flushIfDirty()
+                    batchAcceptances().flushIfDirty()
+                    templates().flushIfDirty()
+                } catch (ex: IOException) {
+                    flushed = false
+                    log().warn("Reload: could not flush contracts; keeping in-memory state and skipping the data stages. ${ex.message}")
+                }
+            })
+            .add("default-files", Reloadable { saveDefaultFiles() })
+            .add("migrations", Reloadable { migrateConfigAndLang() })
+            .add("config", ConfigReload.bukkitConfig(this))
+            .add("language", lang())
+            .add("template-service", Reloadable { rebuildTemplateService() })
+            .addIf("contracts", { flushed }, storage())
+            .addIf("batch-acceptances", { flushed }, batchAcceptances())
+            .addIf("templates", { flushed }, templates())
+            .addIf("batch-reconcile", { flushed }, Reloadable { reconcileBatchAcceptances() })
+            .run()
+
+        for (summary in report.failureSummaries()) {
+            log().severe("Contracts reload stage failed — $summary")
         }
-        saveDefaultFiles()
-        try {
-            migrateConfigAndLang()
-        } catch (ex: MigrationException) {
-            logger.severe("Contracts reload aborted: migration failed. ${ex.message}")
-            return
+        if (report.skipped().isNotEmpty()) {
+            log().warn("Contracts reload skipped stages: ${report.skipped().joinToString(", ")}")
         }
-        reloadConfig()
-        lang().load()
-        if (canReloadData) {
-            try {
-                storage().load()
-                batchAcceptances().load()
-                reconcileBatchAcceptances()
-            } catch (ex: RuntimeException) {
-                logger.severe("Reload: contract data unreadable (${ex.message}); keeping current in-memory contracts.")
-            }
-        }
+        return report
+    }
+
+    private fun rebuildTemplateService() {
+        templateService = ContractTemplateService(templates(), config.getInt("limits.max-templates-per-player", 32))
     }
 
     fun lang(): LanguageManager = languageManager ?: throw IllegalStateException("languageManager not initialized")
@@ -157,6 +183,10 @@ class ContractPlugin : CubexPlugin() {
         batchAcceptanceStore ?: throw IllegalStateException("batchAcceptanceStore not initialized")
 
     fun contracts(): ContractService = contractService ?: throw IllegalStateException("contractService not initialized")
+
+    fun templates(): ContractTemplateStore = templateStore ?: throw IllegalStateException("templateStore not initialized")
+
+    fun templateService(): ContractTemplateService = templateService ?: throw IllegalStateException("templateService not initialized")
 
     fun gui(): ContractGui = contractGui ?: throw IllegalStateException("contractGui not initialized")
 
@@ -180,7 +210,7 @@ class ContractPlugin : CubexPlugin() {
             }
         }
         if (recovered > 0) {
-            logger.info("Recovered $recovered batch acceptance history entries from stored contracts.")
+            log().info("Recovered $recovered batch acceptance history entries from stored contracts.")
         }
     }
 
@@ -194,11 +224,12 @@ class ContractPlugin : CubexPlugin() {
         migrations.run(
             MigrationPlan.yaml("Contracts config", "config.yml")
                 .versionKey("config-version")
-                .targetVersion(5)
+                .targetVersion(6)
                 .addStep(NoOpMigrationStep(1, 2, "Add Contracts config-version."))
                 .addStep(deadlineHoursToDaysStep())
                 .addStep(batchContractLimitStep())
-                .addStep(repeatCooldownLimitStep()),
+                .addStep(repeatCooldownLimitStep())
+                .addStep(ContractsConfigMigrations.schedulingAndTemplatesStep()),
         )
         migrateLang(migrations, "zh_CN")
         migrateLang(migrations, "en_US")
@@ -233,8 +264,9 @@ class ContractPlugin : CubexPlugin() {
         migrations.run(
             MigrationPlan.yaml("Contracts lang $locale", "lang/$locale.yml")
                 .versionKey("lang-version")
-                .targetVersion(2)
-                .addStep(LegacyTextToMiniMessageStep(1, 2)),
+                .targetVersion(3)
+                .addStep(LegacyTextToMiniMessageStep(1, 2))
+                .addStep(LangV2ToV3Step(this)),
         )
     }
 
@@ -245,7 +277,7 @@ class ContractPlugin : CubexPlugin() {
             try {
                 contracts().flushStores()
             } catch (ex: IOException) {
-                logger.warning("Contract flush failed: ${ex.message}")
+                log().warn("Contract flush failed: ${ex.message}")
             }
         }, periodTicks, periodTicks)
     }
@@ -286,8 +318,18 @@ class ContractPlugin : CubexPlugin() {
         scheduler().runGlobalTimer(Runnable {
             val changed = contracts().cleanupExpired()
             if (changed > 0) {
-                logger.info("Processed $changed contract cleanup actions.")
+                log().info("Processed $changed contract cleanup actions.")
             }
+        }, periodTicks, periodTicks)
+    }
+
+
+    private fun schedulePublication() {
+        val intervalSeconds = max(5, config.getLong("scheduling.scan-interval-seconds", 30))
+        val periodTicks = intervalSeconds * 20L
+        scheduler().runGlobalTimer(Runnable {
+            val activated = contracts().activateScheduled()
+            if (activated > 0) log().info("Published $activated scheduled contracts.")
         }, periodTicks, periodTicks)
     }
 }

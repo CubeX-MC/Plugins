@@ -16,7 +16,6 @@ import org.cubexmc.contract.model.PayoutCondition
 import org.cubexmc.contract.model.PayoutRecipient
 import org.cubexmc.contract.model.PayoutRule
 import org.cubexmc.contract.service.ServiceResult
-import org.cubexmc.contract.util.Text
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
@@ -82,7 +81,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 6) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract wager <对方> <押注> <天> <仲裁者> <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-wager"))))
             return true
         }
         val opponentName = args[1]
@@ -95,7 +94,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val text = parseContractText(args, 5, false)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract wager <对方> <押注> <天> <仲裁者> <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-wager"))))
             return true
         }
         val result = plugin.contracts().createWager(
@@ -126,7 +125,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 6) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract partner <对方> <我押注> <对方押注> <天> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-partner"))))
             return true
         }
         val partnerName = args[1]
@@ -139,7 +138,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val text = parseContractText(args, 5, true)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract partner <对方> <我押注> <对方押注> <天> [--mediator <中间人>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-partner"))))
             return true
         }
         val result = plugin.contracts().createPartnership(
@@ -226,7 +225,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 4) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--count <份数>] [--repeat <unlimited|once|cooldown>] [--cooldown <小时>] [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-service"))))
             return true
         }
         val itemReward = args[1].equals("item", ignoreCase = true)
@@ -238,7 +237,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val text = parseContractText(args, 3, true, true, true)
         if (text == null) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract service <奖金|item> <天> [--count <份数>] [--repeat <unlimited|once|cooldown>] [--cooldown <小时>] [--mediator <中间人>] [--objective <类型> <目标> <数量>] <标题>|<描述>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-service"))))
             return true
         }
         val result =
@@ -404,7 +403,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 3) {
-            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract dispute <id> <原因>")))
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-dispute"))))
             return true
         }
         val contract = findContract(sender, args)
@@ -429,11 +428,11 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         val fallbackName = if (args.size >= 2) args[1] else sender.name
         if (record == null) {
-            send(sender, Text.color("&#FFE066$fallbackName 暂无合同履约记录。"))
+            send(sender, plugin.lang().ui("rep-empty", mapOf("name" to fallbackName)))
             return true
         }
-        send(sender, Text.color("&#F4D03F${record.name.ifBlank { fallbackName }} 的履约档案:"))
-        send(sender, Text.color("&#CFD8DC完成 &#69DB7C${record.completed} &#CFD8DC· 取消 &#FFE066${record.cancelled} &#CFD8DC· 逾期 &#E63946${record.expired} &#CFD8DC· 争议 &#E63946${record.disputed}"))
+        send(sender, plugin.lang().ui("rep-header", mapOf("name" to record.name.ifBlank { fallbackName })))
+        send(sender, plugin.lang().ui("rep-line", mapOf("completed" to record.completed.toString(), "cancelled" to record.cancelled.toString(), "expired" to record.expired.toString(), "disputed" to record.disputed.toString())))
         return true
     }
 
@@ -457,7 +456,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return true
         }
         if (args.size < 2) {
-            send(sender, Text.color("&#FFE066/contract admin reload|pay|refund|close <id>"))
+            send(sender, plugin.lang().ui("usage-admin"))
             return true
         }
         val action = args[1].lowercase(Locale.ROOT)
@@ -466,8 +465,17 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
                 send(sender, plugin.lang().message("no-permission"))
                 return true
             }
-            plugin.reloadContracts()
-            send(sender, plugin.lang().message("reloaded"))
+            val report = plugin.reloadContracts()
+            if (report.ok()) {
+                send(sender, plugin.lang().message("reloaded"))
+            } else {
+                // Naming the stage matters: a failed migration and a failed data reload need
+                // different operator responses, and the console may be far from whoever ran this.
+                send(sender, plugin.lang().message("reload-failed", mapOf("stages" to report.failureSummaries().joinToString("; "))))
+            }
+            if (report.skipped().isNotEmpty()) {
+                send(sender, plugin.lang().message("reload-skipped", mapOf("stages" to report.skipped().joinToString(", "))))
+            }
             return true
         }
         if (!sender.hasPermission("contract.admin.settle")) {
@@ -500,7 +508,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
                 successKey = "admin-close-success"
             }
             else -> {
-                send(sender, Text.color("&#FFE066/contract admin reload|pay|refund|close <id>"))
+                send(sender, plugin.lang().ui("usage-admin"))
                 return true
             }
         }
@@ -565,20 +573,20 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             "description" to contract.description(),
         )))
         if (privileged && contract.status() == ContractStatus.DISPUTED && contract.disputeReason() != null) {
-            send(sender, Text.color("&#E63946争议原因: &#F1F5F9${contract.disputeReason()}"))
+            send(sender, plugin.lang().ui("info-dispute-reason", mapOf("value" to (contract.disputeReason() ?: ""))))
         }
         val objective = contract.objective()
         if (objective != null) {
-            send(sender, Text.color("&#69DB7C系统目标: &#FFFFFF${objective.type().name} ${objective.target()} ${objective.progressText()}"))
+            send(sender, plugin.lang().ui("info-objective", mapOf("type" to plugin.lang().objective(objective.type()), "target" to objective.target(), "progress" to objective.progressText())))
         }
         batchRepeatSummary(contract)?.let { summary ->
-            send(sender, Text.color("&#69DB7C重复接取: &#FFFFFF$summary"))
+            send(sender, plugin.lang().ui("info-repeat", mapOf("value" to summary)))
         }
         if (contract.hasDeliveryItems()) {
-            send(sender, Text.color("&#69DB7C合同暂存: &#FFFFFF${contract.deliveryItemCount()} 个交付物品"))
+            send(sender, plugin.lang().ui("info-stored-delivery", mapOf("count" to contract.deliveryItemCount().toString())))
         }
         if (contract.hasRewardItems()) {
-            send(sender, Text.color("&#69DB7C奖励暂存: &#FFFFFF${contract.rewardItemCount()} 个物品"))
+            send(sender, plugin.lang().ui("info-stored-reward", mapOf("count" to contract.rewardItemCount().toString())))
         }
     }
 
@@ -587,11 +595,11 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return null
         }
         return when (BatchRepeatPolicy.fromStored(contract.metadata["repeat-policy"])) {
-            BatchRepeatPolicy.UNLIMITED -> "不限制"
-            BatchRepeatPolicy.ONCE -> "每名玩家仅一次，且同时只能进行一份"
+            BatchRepeatPolicy.UNLIMITED -> plugin.lang().ui("repeat-summary-unlimited")
+            BatchRepeatPolicy.ONCE -> plugin.lang().ui("repeat-summary-once")
             BatchRepeatPolicy.COOLDOWN -> {
                 val hours = contract.metadata["repeat-cooldown-hours"]?.toIntOrNull() ?: DEFAULT_REPEAT_COOLDOWN_HOURS
-                "每 $hours 小时可接一次，且同时只能进行一份"
+                plugin.lang().ui("repeat-summary-cooldown", mapOf("hours" to hours.toString()))
             }
         }
     }
@@ -612,8 +620,8 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             val name = visibleParticipantName(participant, privileged)
             val stake = stakeSummary(participant)
             val stakeText =
-                if (stake.isNotBlank()) " &#CFD8DC${plugin.lang().term("stake", "Stake")}: &#69DB7C$stake" else ""
-            lines.add("    &#CFD8DC- &#FFE066${plugin.lang().role(participant.role())}&#CFD8DC: &#FFFFFF$name$stakeText")
+                if (stake.isNotBlank()) ui("info-stake", mapOf("label" to plugin.lang().term("stake", "Stake"), "value" to stake)) else ""
+            lines.add(ui("info-participant", mapOf("role" to plugin.lang().role(participant.role()), "name" to name)) + stakeText)
         }
         return lines.joinToString("\n")
     }
@@ -624,7 +632,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             parts.add(plugin.economy().format(contract.reward()))
         }
         if (contract.hasRewardItems()) {
-            parts.add("${contract.rewardItemCount()} 个物品")
+            parts.add(plugin.lang().ui("item-count", mapOf("count" to contract.rewardItemCount().toString())))
         }
         return if (parts.isEmpty()) plugin.economy().format(BigDecimal.ZERO) else parts.joinToString(" + ")
     }
@@ -636,7 +644,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             parts.add(plugin.economy().format(money))
         }
         if (participant.itemStakeCount() > 0) {
-            parts.add("${participant.itemStakeCount()} 项物品")
+            parts.add(plugin.lang().ui("item-stake-count", mapOf("count" to participant.itemStakeCount().toString())))
         }
         return parts.joinToString(" + ")
     }
@@ -665,7 +673,10 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         val name = if (privileged) arbiter.displayName() else plugin.lang().term("assigned", "Assigned")
         val accepted =
             if (contract.arbiterAccepted()) plugin.lang().term("mediator-accepted", "Mediator accepted") else plugin.lang().term("mediator-pending", "Mediator pending")
-        return "    &#CFD8DC- &#FFE066${plugin.lang().role(arbiter.role())}&#CFD8DC: &#FFFFFF$name &#CFD8DC($accepted)\n"
+        return ui(
+            "info-arbiter",
+            mapOf("role" to plugin.lang().role(arbiter.role()), "name" to (name ?: ""), "state" to accepted),
+        ) + "\n"
     }
 
     private fun payoutLines(contract: Contract): String {
@@ -675,9 +686,9 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             if (rules.isEmpty()) {
                 continue
             }
-            lines.add("    &#CFD8DC- &#FFE066${plugin.lang().condition(condition)}&#CFD8DC: ${summarizeRules(rules)}")
+            lines.add(ui("info-payout", mapOf("condition" to plugin.lang().condition(condition), "value" to summarizeRules(rules))))
         }
-        return if (lines.isEmpty()) "    &#CFD8DC- ${plugin.lang().term("none", "None")}" else lines.joinToString("\n")
+        return if (lines.isEmpty()) ui("info-payout-none", mapOf("value" to plugin.lang().term("none", "None"))) else lines.joinToString("\n")
     }
 
     private fun summarizeRules(rules: List<PayoutRule>): String {
@@ -700,7 +711,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         if (approved.isNullOrBlank()) {
             return ""
         }
-        return "&#FFE066${plugin.lang().term("approved-roles", "Approved roles")}: &#FFFFFF$approved\n"
+        return ui("info-approved", mapOf("label" to plugin.lang().term("approved-roles", "Approved roles"), "value" to approved)) + "\n"
     }
 
     private fun sendResult(sender: CommandSender, result: ServiceResult, successKey: String) {
@@ -732,10 +743,12 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         return false
     }
 
+    private fun ui(key: String, placeholders: Map<String, String> = emptyMap()): String =
+        plugin.lang().ui(key, placeholders)
+
+    /** Multi-line aware delivery; [org.cubexmc.core.Messager] splits on any line separator. */
     private fun send(sender: CommandSender, message: String) {
-        for (line in message.split(Regex("\\R"))) {
-            sender.sendMessage(line)
-        }
+        plugin.messager().send(sender, message)
     }
 
     private fun join(args: Array<String>, start: Int): String {

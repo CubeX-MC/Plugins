@@ -2,6 +2,7 @@ package org.cubexmc.contract.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Logger;
+import org.cubexmc.core.CubexLogger;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.cubexmc.config.LegacyTextToMiniMessageStep;
 import org.cubexmc.config.MigrationPlan;
@@ -78,10 +80,85 @@ class ContractsMigrationTest {
                 lang.getString("messages.create-success"));
     }
 
+    @Test
+    void migratesVersionFiveToTemplateAndSchedulingDefaultsWithoutOverwritingOperators() throws Exception {
+        Files.writeString(tempDir.resolve("config.yml"), """
+                config-version: 5
+                limits:
+                  max-templates-per-player: 7
+                """);
+        MigrationRunner runner = new MigrationRunner(mockPlugin());
+
+        MigrationReport report = runner.run(MigrationPlan.yaml("Contracts config", "config.yml")
+                .versionKey("config-version")
+                .targetVersion(6)
+                .addStep(ContractsConfigMigrations.schedulingAndTemplatesStep()));
+
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(tempDir.resolve("config.yml").toFile());
+        assertTrue(report.migrated());
+        assertEquals(6, config.getInt("config-version"));
+        assertEquals(7, config.getInt("limits.max-templates-per-player"));
+        assertEquals(64, config.getInt("limits.max-scheduled-contracts"));
+        assertEquals(30, config.getInt("scheduling.max-days-ahead"));
+        assertEquals(30, config.getInt("scheduling.scan-interval-seconds"));
+    }
+
+    @Test
+    void langVersionTwoConvertsUiSectionsToMiniMessageAndAddsTheNewKeys() throws Exception {
+        // Arrange: a v2 language file from before the GUI/service strings were externalized and
+        // before ui.* moved onto the i18n service. Its ui values still use legacy &#RRGGBB, and
+        // `ui.batch-card-title` shows the <name> placeholders v2 already substituted by hand.
+        Path langFile = tempDir.resolve("lang").resolve("zh_CN.yml");
+        Files.createDirectories(langFile.getParent());
+        Files.writeString(langFile, """
+                lang-version: 2
+                status:
+                  open: "&a公开中"
+                ui:
+                  batch-accept: "&#69DB7C我改过的领取按钮"
+                  batch-card-title: "&#F4D03F<title> &#FFFFFF×<total>"
+                messages:
+                  reloaded: "<prefix><#69DB7C>配置已重新加载。"
+                """);
+        ContractPlugin plugin = mockPlugin();
+        when(plugin.getResource("lang/zh_CN.yml"))
+                .thenAnswer(invocation -> Files.newInputStream(bundledLang()));
+        MigrationRunner runner = new MigrationRunner(plugin);
+
+        // Act
+        MigrationReport report = runner.run(MigrationPlan.yaml("Contracts lang zh_CN", "lang/zh_CN.yml")
+                .versionKey("lang-version")
+                .targetVersion(3)
+                .addStep(new LangV2ToV3Step(plugin)));
+
+        // Assert
+        YamlConfiguration lang = YamlConfiguration.loadConfiguration(langFile.toFile());
+        assertTrue(report.migrated());
+        assertEquals(3, lang.getInt("lang-version"));
+        // The operator's own wording survives; only its colour syntax is modernised.
+        assertEquals("<#69DB7C>我改过的领取按钮", lang.getString("ui.batch-accept"));
+        assertEquals("<green>公开中", lang.getString("status.open"));
+        // Placeholders that v2 already used must not be escaped into literal text.
+        assertEquals("<#F4D03F><title> <#FFFFFF>×<total>", lang.getString("ui.batch-card-title"));
+        // messages.* was already MiniMessage in v2 and must be left exactly as-is.
+        assertEquals("<prefix><#69DB7C>配置已重新加载。", lang.getString("messages.reloaded"));
+        // Keys that only exist in the new bundle are filled in.
+        assertNotNull(lang.getString("ui.hall-title-open"));
+        assertNotNull(lang.getString("ui.err-insufficient-funds"));
+        assertNotNull(lang.getString("objectives.kill_entity"));
+    }
+
+    private Path bundledLang() {
+        return Path.of("src", "main", "resources", "lang", "zh_CN.yml");
+    }
+
     private ContractPlugin mockPlugin() {
         ContractPlugin plugin = mock(ContractPlugin.class);
+        // Mockito's inline mock maker intercepts final methods too, so log() would otherwise
+        // return null for anything that logs through the framework logger.
+        when(plugin.log()).thenReturn(new CubexLogger(Logger.getLogger("ContractsMigrationTest")));
         when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
-        when(plugin.getLogger()).thenReturn(Logger.getLogger("ContractsMigrationTest"));
+        when(plugin.getLogger()).thenReturn((Logger.getLogger("ContractsMigrationTest")));
         return plugin;
     }
 }

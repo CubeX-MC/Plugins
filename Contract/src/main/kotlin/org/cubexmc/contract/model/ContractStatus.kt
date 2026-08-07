@@ -1,6 +1,9 @@
 package org.cubexmc.contract.model
 
 enum class ContractStatus {
+    /** Escrow is reserved, but the contract is hidden until its one-time publication time. */
+    SCHEDULED,
+
     /** Service contract waiting for any contractor to accept. */
     OPEN,
 
@@ -17,7 +20,7 @@ enum class ContractStatus {
     fun isFinal(): Boolean = this == COMPLETED || this == CANCELLED || this == EXPIRED
 
     fun countsAsOwnerActive(): Boolean =
-        this == OPEN || this == PENDING_ACCEPT || this == IN_PROGRESS || this == SUBMITTED || this == DISPUTED
+        this == SCHEDULED || this == OPEN || this == PENDING_ACCEPT || this == IN_PROGRESS || this == SUBMITTED || this == DISPUTED
 
     fun countsAsContractorActive(): Boolean = this == IN_PROGRESS || this == SUBMITTED || this == DISPUTED
 

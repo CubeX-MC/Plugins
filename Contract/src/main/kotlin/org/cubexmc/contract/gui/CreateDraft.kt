@@ -2,6 +2,7 @@ package org.cubexmc.contract.gui
 
 import org.cubexmc.contract.model.ContractType
 import org.cubexmc.contract.model.BatchRepeatPolicy
+import org.cubexmc.contract.model.ContractSpec
 import org.cubexmc.contract.model.ObjectiveType
 
 /**
@@ -24,6 +25,7 @@ class CreateDraft(private val type: ContractType) {
     private var contractCount: Int = 1
     private var repeatPolicy: BatchRepeatPolicy = BatchRepeatPolicy.ONCE
     private var repeatCooldownHours: Int = DEFAULT_REPEAT_COOLDOWN_HOURS
+    private var publishAt: Long? = null
 
     fun type(): ContractType = type
 
@@ -122,6 +124,30 @@ class CreateDraft(private val type: ContractType) {
         this.repeatCooldownHours = repeatCooldownHours
     }
 
+    fun publishAt(): Long? = publishAt
+
+    fun publishAt(publishAt: Long?) {
+        this.publishAt = publishAt
+    }
+
+    fun toSpec(): ContractSpec = ContractSpec(
+        type,
+        title,
+        description,
+        days,
+        amount,
+        itemReward,
+        partnerStake,
+        counterparty,
+        mediator,
+        objectiveType,
+        objectiveTarget,
+        objectiveRequired,
+        contractCount,
+        repeatPolicy,
+        repeatCooldownHours,
+    )
+
     fun systemVerified(): Boolean = type == ContractType.SERVICE && objectiveType != null
 
     fun needsCounterparty(): Boolean = type == ContractType.WAGER || type == ContractType.PARTNERSHIP
@@ -130,12 +156,17 @@ class CreateDraft(private val type: ContractType) {
 
     fun mediatorRequired(): Boolean = type == ContractType.WAGER
 
-    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int): String? =
+    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int): DraftProblem? =
         validate(minAmount, maxAmount, minDays, maxDays, DEFAULT_MAX_BATCH_CONTRACTS, DEFAULT_MAX_REPEAT_COOLDOWN_HOURS)
 
-    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int, maxBatchContracts: Int): String? =
+    fun validate(minAmount: Double, maxAmount: Double, minDays: Int, maxDays: Int, maxBatchContracts: Int): DraftProblem? =
         validate(minAmount, maxAmount, minDays, maxDays, maxBatchContracts, DEFAULT_MAX_REPEAT_COOLDOWN_HOURS)
 
+    /**
+     * Returns the first rule the draft violates as a translatable [DraftProblem], or `null` when the
+     * draft is ready to sign. Deliberately returns a key + placeholders rather than a rendered
+     * sentence so this stays a pure function and the caller owns the player's locale.
+     */
     fun validate(
         minAmount: Double,
         maxAmount: Double,
@@ -143,50 +174,50 @@ class CreateDraft(private val type: ContractType) {
         maxDays: Int,
         maxBatchContracts: Int,
         maxRepeatCooldownHours: Int,
-    ): String? {
+    ): DraftProblem? {
         if (title.isNullOrBlank()) {
-            return "请先填写标题"
+            return DraftProblem("draft-need-title")
         }
-        val currentDays = days ?: return "请先填写期限"
+        val currentDays = days ?: return DraftProblem("draft-need-days")
         if (currentDays < minDays || currentDays > maxDays) {
-            return "有效期必须在 $minDays 到 $maxDays 天之间"
+            return DraftProblem("draft-days-range", mapOf("min" to minDays.toString(), "max" to maxDays.toString()))
         }
         if (type == ContractType.SERVICE && (contractCount < 1 || contractCount > maxBatchContracts.coerceAtLeast(1))) {
-            return "发布份数必须在 1 到 ${maxBatchContracts.coerceAtLeast(1)} 之间"
+            return DraftProblem("draft-count-range", mapOf("max" to maxBatchContracts.coerceAtLeast(1).toString()))
         }
         if (
             type == ContractType.SERVICE && contractCount > 1 && repeatPolicy == BatchRepeatPolicy.COOLDOWN &&
             repeatCooldownHours !in 1..maxRepeatCooldownHours.coerceAtLeast(1)
         ) {
-            return "重复接取冷却必须在 1 到 ${maxRepeatCooldownHours.coerceAtLeast(1)} 小时之间"
+            return DraftProblem("draft-cooldown-range", mapOf("max" to maxRepeatCooldownHours.coerceAtLeast(1).toString()))
         }
         val currentAmount = amount
         if (!(type == ContractType.SERVICE && itemReward)) {
-            val requiredAmount = currentAmount ?: return "请先填写金额"
+            val requiredAmount = currentAmount ?: return DraftProblem("draft-need-amount")
             if (requiredAmount < minAmount || requiredAmount > maxAmount) {
-                return "金额必须在 $minAmount 到 $maxAmount 之间"
+                return DraftProblem("draft-amount-range", mapOf("min" to trim(minAmount), "max" to trim(maxAmount)))
             }
         }
         if (needsCounterparty() && counterparty.isNullOrBlank()) {
-            return "请先填写对方玩家"
+            return DraftProblem("draft-need-counterparty")
         }
         if (mediatorRequired() && mediator.isNullOrBlank()) {
-            return "请先填写仲裁者"
+            return DraftProblem("draft-need-arbiter")
         }
         if (needsPartnerStake()) {
-            val currentPartnerStake = partnerStake ?: return "请先填写对方押注"
+            val currentPartnerStake = partnerStake ?: return DraftProblem("draft-need-partner-stake")
             if (currentPartnerStake < minAmount || currentPartnerStake > maxAmount) {
-                return "对方押注必须在 $minAmount 到 $maxAmount 之间"
+                return DraftProblem("draft-partner-stake-range", mapOf("min" to trim(minAmount), "max" to trim(maxAmount)))
             }
         }
         if (systemVerified()) {
-            val currentType = objectiveType ?: return "请先选择系统验收目标"
+            val currentType = objectiveType ?: return DraftProblem("draft-need-objective-type")
             if (!objectiveAllowsAny(currentType) && objectiveTarget.isNullOrBlank()) {
-                return "请先填写系统验收目标"
+                return DraftProblem("draft-need-objective-target")
             }
-            val required = objectiveRequired ?: return "请先填写目标数量"
+            val required = objectiveRequired ?: return DraftProblem("draft-need-objective-amount")
             if (required <= 0) {
-                return "目标数量必须大于 0"
+                return DraftProblem("draft-objective-amount-positive")
             }
         }
         return null
@@ -210,7 +241,28 @@ class CreateDraft(private val type: ContractType) {
             else -> false
         }
 
-    private companion object {
+    companion object {
+        private fun trim(value: Double): String =
+            if (value == Math.floor(value) && !value.isInfinite()) value.toLong().toString() else value.toString()
+
+        @JvmStatic
+        fun fromSpec(spec: ContractSpec): CreateDraft = CreateDraft(spec.type).also { draft ->
+            draft.title(spec.title)
+            draft.description(spec.description)
+            draft.days(spec.days)
+            draft.amount(spec.amount)
+            draft.itemReward(spec.itemReward)
+            draft.partnerStake(spec.partnerStake)
+            draft.counterparty(spec.counterparty)
+            draft.mediator(spec.mediator)
+            draft.objectiveType(spec.objectiveType)
+            draft.objectiveTarget(spec.objectiveTarget)
+            draft.objectiveRequired(spec.objectiveRequired)
+            draft.contractCount(spec.contractCount)
+            draft.repeatPolicy(spec.repeatPolicy)
+            draft.repeatCooldownHours(spec.repeatCooldownHours)
+        }
+
         const val DEFAULT_MAX_BATCH_CONTRACTS = 64
         const val DEFAULT_REPEAT_COOLDOWN_HOURS = 24
         const val DEFAULT_MAX_REPEAT_COOLDOWN_HOURS = 8760

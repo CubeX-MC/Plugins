@@ -2,20 +2,26 @@ package org.cubexmc.contract.storage
 
 import org.bukkit.configuration.file.YamlConfiguration
 import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.core.Reloadable
+import org.cubexmc.core.Terminable
 import java.io.File
 import java.io.IOException
 import java.util.UUID
-import java.util.logging.Logger
+import org.cubexmc.core.CubexLogger
 
-class BatchAcceptanceStore {
+/**
+ * Implements [Reloadable] so it can be a named stage in the plugin's reload chain, and
+ * [Terminable] so `bind(this)` flushes it on disable without a hand-written lambda.
+ */
+class BatchAcceptanceStore : Reloadable, Terminable {
     private val file: File
-    private val logger: Logger
+    private val logger: CubexLogger
     private val records: MutableMap<String, MutableMap<UUID, AcceptanceRecord>> = HashMap()
     private var dirty = false
 
-    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "batch-acceptance.yml"), plugin.logger)
+    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "batch-acceptance.yml"), plugin.log())
 
-    constructor(file: File, logger: Logger) {
+    constructor(file: File, logger: CubexLogger) {
         this.file = file
         this.logger = logger
     }
@@ -66,7 +72,7 @@ class BatchAcceptanceStore {
                     val uuid = try {
                         UUID.fromString(uuidText)
                     } catch (ex: IllegalArgumentException) {
-                        logger.warning("Skipping malformed batch acceptance player $uuidText in batch $batchId")
+                        logger.warn("Skipping malformed batch acceptance player $uuidText in batch $batchId")
                         continue
                     }
                     val section = batch.getConfigurationSection(uuidText) ?: continue
@@ -106,4 +112,15 @@ class BatchAcceptanceStore {
         yaml.save(file)
         dirty = false
     }
+
+    /** Reload stage: re-read the backing file. */
+    override fun reload() {
+        load()
+    }
+
+    /** Terminable: flush pending writes when the plugin shuts down. */
+    override fun close() {
+        flushIfDirty()
+    }
+
 }

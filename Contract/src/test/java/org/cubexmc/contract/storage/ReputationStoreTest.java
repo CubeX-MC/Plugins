@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.logging.Logger;
+import org.cubexmc.core.CubexLogger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -17,7 +18,7 @@ class ReputationStoreTest {
     void withdrawingDisputeRollsBackCountWithoutGoingNegative() {
         ReputationStore store = new ReputationStore(
             tempDir.resolve("reputation.yml").toFile(),
-            Logger.getLogger("ReputationStoreTest")
+            new CubexLogger(Logger.getLogger("ReputationStoreTest"))
         );
         UUID player = UUID.randomUUID();
 

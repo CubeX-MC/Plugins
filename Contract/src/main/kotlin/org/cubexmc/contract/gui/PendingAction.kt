@@ -10,7 +10,7 @@ internal class PendingAction(
     private val title: String,
     private val consequences: List<String>,
 ) {
-    enum class Kind { CREATE, ACCEPT, APPROVE, RESOLVE, MEDIATE, CANCEL, ADMIN_PAY, ADMIN_REFUND, ADMIN_CLOSE }
+    enum class Kind { CREATE, ACCEPT, ACCEPT_BATCH, APPROVE, RESOLVE, MEDIATE, CANCEL, ADMIN_PAY, ADMIN_REFUND, ADMIN_CLOSE }
 
     fun kind(): Kind = kind
     fun contractId(): String = contractId ?: throw NullPointerException("contractId")
@@ -22,11 +22,12 @@ internal class PendingAction(
         fun simple(kind: Kind, contract: Contract, arg: String?, title: String, consequences: List<String>): PendingAction =
             PendingAction(kind, contract.id(), arg, title, consequences)
 
-        fun create(draft: CreateDraft, preview: List<String>): PendingAction {
+        /** [title] and [lead] arrive already localized; this class never resolves language keys. */
+        fun create(title: String, lead: String, preview: List<String>): PendingAction {
             val lines = ArrayList<String>()
-            lines.add("即将创建一份${draft.type().name}合同。")
+            lines.add(lead)
             lines.addAll(preview)
-            return PendingAction(Kind.CREATE, null, null, "创建合同", lines)
+            return PendingAction(Kind.CREATE, null, null, title, lines)
         }
     }
 }

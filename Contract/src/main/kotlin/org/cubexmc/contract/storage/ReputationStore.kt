@@ -2,28 +2,34 @@ package org.cubexmc.contract.storage
 
 import org.bukkit.configuration.file.YamlConfiguration
 import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.core.Reloadable
+import org.cubexmc.core.Terminable
 import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.ContractStatus
 import org.cubexmc.contract.model.ParticipantRole
 import java.io.File
 import java.io.IOException
 import java.util.UUID
-import java.util.logging.Logger
+import org.cubexmc.core.CubexLogger
 
 /**
  * Per-player track record, so trust can form between traders without the plugin coding the roles
  * themselves: how many contracts a player completed, walked away from (cancelled), let expire, or
  * took to dispute. Updated at settlement and at cancel/dispute; persisted to `reputation.yml`.
  */
-class ReputationStore {
+/**
+ * Implements [Reloadable] so it can be a named stage in the plugin's reload chain, and
+ * [Terminable] so `bind(this)` flushes it on disable without a hand-written lambda.
+ */
+class ReputationStore : Reloadable, Terminable {
     private val file: File
-    private val logger: Logger
+    private val logger: CubexLogger
     private val records: MutableMap<UUID, Record> = HashMap()
     private var dirty = false
 
-    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "reputation.yml"), plugin.logger)
+    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "reputation.yml"), plugin.log())
 
-    constructor(file: File, logger: Logger) {
+    constructor(file: File, logger: CubexLogger) {
         this.file = file
         this.logger = logger
     }
@@ -133,7 +139,18 @@ class ReputationStore {
             yaml.save(file)
             dirty = false
         } catch (ex: IOException) {
-            logger.warning("Failed to save reputation: ${ex.message}")
+            logger.warn("Failed to save reputation: ${ex.message}")
         }
     }
+
+    /** Reload stage: re-read the backing file. */
+    override fun reload() {
+        load()
+    }
+
+    /** Terminable: flush pending writes when the plugin shuts down. */
+    override fun close() {
+        flushIfDirty()
+    }
+
 }

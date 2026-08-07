@@ -16,7 +16,7 @@ class EconomyService(private val plugin: ContractPlugin) {
         }
         val provider = Bukkit.getServicesManager().getRegistration(Economy::class.java) ?: return false
         economy = provider.provider
-        plugin.logger.info("Vault economy hooked: ${provider.provider.name}")
+        plugin.log().info("Vault economy hooked: ${provider.provider.name}")
         return true
     }
 

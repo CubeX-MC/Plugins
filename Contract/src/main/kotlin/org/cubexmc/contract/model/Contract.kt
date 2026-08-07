@@ -20,6 +20,7 @@ class Contract(
     payouts: List<PayoutRule>,
     private var status: ContractStatus,
     private val createdAt: Long,
+    private val publishAt: Long?,
     private var acceptedAt: Long?,
     private var submittedAt: Long?,
     private var completedAt: Long?,
@@ -188,6 +189,8 @@ class Contract(
     }
 
     fun createdAt(): Long = createdAt
+
+    fun publishAt(): Long? = publishAt
 
     fun acceptedAt(): Long? = acceptedAt
 
@@ -359,6 +362,37 @@ class Contract(
             now: Long,
             expiresAt: Long,
             objective: ContractObjective?,
+        ): Contract = createScheduledService(
+            id,
+            ownerUuid,
+            ownerName,
+            title,
+            description,
+            reward,
+            rewardItems,
+            creationFee,
+            commissionPercent,
+            now,
+            expiresAt,
+            objective,
+            null,
+        )
+
+        @JvmStatic
+        fun createScheduledService(
+            id: String,
+            ownerUuid: UUID,
+            ownerName: String,
+            title: String,
+            description: String,
+            reward: BigDecimal,
+            rewardItems: List<ItemStack>,
+            creationFee: BigDecimal,
+            commissionPercent: BigDecimal,
+            now: Long,
+            expiresAt: Long,
+            objective: ContractObjective?,
+            publishAt: Long?,
         ): Contract {
             val ownerStake = ArrayList<Asset>()
             if (reward.signum() > 0) {
@@ -432,8 +466,9 @@ class Contract(
                 null,
                 if (objective == null) ResolutionRule.OWNER_APPROVE else ResolutionRule.SYSTEM_OBJECTIVE,
                 rules,
-                ContractStatus.OPEN,
+                if (publishAt == null) ContractStatus.OPEN else ContractStatus.SCHEDULED,
                 now,
+                publishAt,
                 null,
                 null,
                 null,
@@ -532,6 +567,7 @@ class Contract(
                 null,
                 null,
                 null,
+                null,
                 expiresAt,
                 null,
                 null,
@@ -621,6 +657,7 @@ class Contract(
                 rules,
                 ContractStatus.PENDING_ACCEPT,
                 now,
+                null,
                 null,
                 null,
                 null,

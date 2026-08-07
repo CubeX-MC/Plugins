@@ -6,8 +6,8 @@ import java.util.LinkedHashMap
 import java.util.Objects
 
 /**
- * 描述某个 condition 触发时,从哪个 source 把多少份额转给哪个 recipient.
- * sharePercent 是源 stake 池的百分比(0-100)。
+ * Describes, for a given condition, how much of which source stake pool moves to which recipient.
+ * [sharePercent] is a percentage (0-100) of the source stake pool.
  */
 class PayoutRule(
     private val condition: PayoutCondition,

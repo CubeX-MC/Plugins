@@ -24,7 +24,6 @@ import org.bukkit.inventory.EquipmentSlot
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.ObjectiveType
 import org.cubexmc.contract.service.ObjectiveProgressUpdate
-import org.cubexmc.contract.util.Text
 import java.util.Locale
 
 class ObjectiveListener(private val plugin: ContractPlugin) : Listener {
@@ -136,15 +135,15 @@ class ObjectiveListener(private val plugin: ContractPlugin) : Listener {
         if (update.completed()) {
             val result = update.result()
             if (result.success()) {
-                player.sendMessage(Text.color("&#69DB7C目标完成: &#FFFFFF${contract.title()} &#69DB7C已由系统自动结算。"))
+                player.sendMessage(plugin.lang().ui("objective-settled", mapOf("title" to contract.title())))
             } else {
-                player.sendMessage(Text.color("&#E63946目标已达成,但自动结算失败: &#FFFFFF${result.reason()}"))
+                player.sendMessage(plugin.lang().ui("objective-settle-failed", mapOf("reason" to result.reason())))
             }
             return
         }
         player.spigot().sendMessage(
             ChatMessageType.ACTION_BAR,
-            TextComponent(Text.color("&#69DB7C${contract.title()} &#CFD8DC${objective.progressText()}")),
+            TextComponent(plugin.lang().ui("objective-actionbar", mapOf("title" to contract.title(), "progress" to objective.progressText()))),
         )
     }
 }

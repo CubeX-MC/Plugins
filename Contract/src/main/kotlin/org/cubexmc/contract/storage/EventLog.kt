@@ -24,7 +24,7 @@ class EventLog(private val plugin: ContractPlugin) {
         try {
             FileWriter(file, true).use { writer -> writer.write(line) }
         } catch (ex: IOException) {
-            plugin.logger.warning("Failed to append event log: ${ex.message}")
+            plugin.log().warn("Failed to append event log: ${ex.message}")
         }
     }
 

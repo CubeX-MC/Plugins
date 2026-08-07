@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
+import org.cubexmc.core.CubexLogger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,7 +23,7 @@ class BatchAcceptanceStoreTest {
     void acceptanceHistorySurvivesReload() throws Exception {
         File file = tempDir.resolve("batch-acceptance.yml").toFile();
         UUID player = UUID.randomUUID();
-        BatchAcceptanceStore store = new BatchAcceptanceStore(file, Logger.getLogger("BatchAcceptanceStoreTest"));
+        BatchAcceptanceStore store = new BatchAcceptanceStore(file, new CubexLogger(Logger.getLogger("BatchAcceptanceStoreTest")));
 
         store.record("batch-a", player, 12_345L, "contract-a");
         store.record("batch-a", player, 10_000L, "older-contract");
@@ -30,7 +31,7 @@ class BatchAcceptanceStoreTest {
         store.save();
         assertFalse(store.isDirty());
 
-        BatchAcceptanceStore reloaded = new BatchAcceptanceStore(file, Logger.getLogger("BatchAcceptanceStoreTest"));
+        BatchAcceptanceStore reloaded = new BatchAcceptanceStore(file, new CubexLogger(Logger.getLogger("BatchAcceptanceStoreTest")));
         reloaded.load();
         assertEquals(12_345L, reloaded.lastAcceptedAt("batch-a", player));
     }
@@ -39,14 +40,14 @@ class BatchAcceptanceStoreTest {
     void cleanupDropsHistoryForPurgedBatches() throws Exception {
         File file = tempDir.resolve("batch-acceptance.yml").toFile();
         UUID player = UUID.randomUUID();
-        BatchAcceptanceStore store = new BatchAcceptanceStore(file, Logger.getLogger("BatchAcceptanceStoreTest"));
+        BatchAcceptanceStore store = new BatchAcceptanceStore(file, new CubexLogger(Logger.getLogger("BatchAcceptanceStoreTest")));
         store.record("keep", player, 100L, "contract-keep");
         store.record("purge", player, 200L, "contract-purge");
 
         store.retainBatches(Set.of("keep"));
         store.save();
 
-        BatchAcceptanceStore reloaded = new BatchAcceptanceStore(file, Logger.getLogger("BatchAcceptanceStoreTest"));
+        BatchAcceptanceStore reloaded = new BatchAcceptanceStore(file, new CubexLogger(Logger.getLogger("BatchAcceptanceStoreTest")));
         reloaded.load();
         assertEquals(100L, reloaded.lastAcceptedAt("keep", player));
         assertNull(reloaded.lastAcceptedAt("purge", player));

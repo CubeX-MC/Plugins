@@ -9,19 +9,21 @@
 - Vault
 - 任意 Vault 经济插件，例如 CMI Economy
 
-运行时不依赖 CMI、QuickShop、Lands、RuleGems 或数据库驱动。GUI 铁砧输入使用的 AnvilGUI 已 shade 并重定位打包进插件 jar，无需单独安装；升级 Minecraft/Paper 大版本时需同步确认该内置 AnvilGUI 版本支持目标服端。
+运行时目标为 Paper，不依赖 QuickShop、Lands、RuleGems 或数据库驱动。CMI、Essentials/EssentialsX 仅作为可选的 Vault 经济提供者和加载顺序提示，不是 Contract 的硬依赖。Paper 1.21.6+ 使用原生 Dialog 创建/确认界面；较旧 Paper 版本自动回退到库存 GUI 与聊天输入。插件不再打包 AnvilGUI，Adventure 由 Paper 提供。
 
 ## 构建
 
-```bash
-mvn package
+```powershell
+.\gradlew.bat :Contract:build
 ```
 
-生成文件：
+从 monorepo 根目录执行。部署产物：
 
 ```text
-target/contract-0.1.0.jar
+Contract/build/libs/contract-0.1.0.jar
 ```
+
+同目录的 `Contract-0.1.0-plain.jar` 是未 shade 的原始 jar，不要部署到服务器。需要检查部署 jar 的 Kotlin relocation、字节码版本和 `plugin.yml` 时运行 `.\gradlew.bat :Contract:jarGate`。
 
 ## 玩家命令
 
@@ -64,24 +66,61 @@ target/contract-0.1.0.jar
 - **铁砧签署确认**：创建、接受邀请、接单、确认付款、中间人/仲裁裁决、取消合同、管理员强制付款/退款/关闭等资金动作，都会先进入确认页展示资金后果，再打开铁砧要求输入玩家名或“同意”完成签署。关闭铁砧或签名不符即视为取消，不会产生任何资金动作。
 - **管理员工作台**：`contract.admin.view` 可见，按争议/中断结算、进行中、全部分栏检索合同，强制付款/退款/关闭同样需要签署确认。
 
+### 批量任务、模板池与定时发布
+
+- **批次堆叠**：只有带相同显式 `batch-id` 的 SERVICE 子合同才会合并显示；标题、奖励相同但批次不同的合同不会误合并。卡片标题显示 `×总数`，物品堆叠数量显示当前可领取数，并同时展示 `可领取/总数`、`已接取/总数`、`已提交/总数` 和 `已完成/总数`。
+- **领取一份**：点击批次卡片后使用“领取一个任务”。服务层会在同步锁内重新选择一份仍为 `OPEN` 的子合同，因此并发点击不会把同一份任务发给两个人；领取后批次可用数量递减。每份子合同仍独立提交、结算、争议和留档。
+- **合同模板池**：大厅左下角进入模板池。创建器中可把当前条款保存为私有模板，载入后仍可修改再签署；模板只保存条款，不保存合同 ID、参与进度、托管资金/物品或定时时间。管理员可将模板切换为全服可见。
+- **一次性定时发布**：SERVICE 创建器可输入服务器时区的 `yyyy-MM-dd HH:mm`。签署时立即托管全部奖励和创建费，合同先进入 `SCHEDULED`，到点后使用原合同 ID 幂等切换为 `OPEN`；接单截止时间从实际发布时间开始计算。发布前由雇主取消会退回奖励与创建费，且不计入取消信誉。
+
 命令保留为高级/脚本入口，资金逻辑与 GUI 完全共用同一 `ContractService` 路径。
 
 ## 权限
 
-```text
-contract.use
-contract.create
-contract.accept
-contract.submit
-contract.approve
-contract.cancel
-contract.dispute
-contract.mediate
-contract.admin
-contract.admin.reload
-contract.admin.settle
-contract.admin.view
-```
+默认 `true`（普通玩家开箱即用）：
+
+| 权限 | 作用 |
+| :-- | :-- |
+| `contract.use` | 打开并浏览合同大厅 |
+| `contract.create` | 创建委托/对赌/合作合同 |
+| `contract.template.use` | 保存、载入、删除自己的私有模板 |
+| `contract.accept` | 接单或接受邀请 |
+| `contract.submit` | 提交完成、交付系统目标物品或货币 |
+| `contract.claim` | 领取合同暂存的交付物品或奖励物品 |
+| `contract.approve` | 确认自己发布的合同并付款 |
+| `contract.cancel` | 取消可取消的合同 |
+| `contract.dispute` | 发起或撤销争议 |
+| `contract.mediate` | 接受中间人职责并裁决自己负责的合同 |
+
+默认 `op`（需要显式授予）：
+
+| 权限 | 解锁什么 |
+| :-- | :-- |
+| `contract.create.batch` | 创建器里的「发布份数」「重复接取」「重复冷却」，以及命令的 `--count/--repeat/--cooldown` |
+| `contract.schedule.create` | SERVICE 创建器的一次性定时发布 |
+| `contract.template.manage` | 把模板发布为全服模板、管理他人模板 |
+| `contract.template.admin` | 模板库完整管理（含上面两个模板权限） |
+| `contract.bypass.limit` | 绕过雇主 `max-open-contracts`、接单方 `max-active-accepted-contracts` 和 `max-scheduled-contracts` 上限 |
+| `contract.bypass.fee` | 创建合同不收取 `economy.creation-fee` |
+| `contract.bypass.batch-repeat-limit` | 绕过批次的每人一次/冷却规则 |
+| `contract.admin.reload` | `/contract admin reload` |
+| `contract.admin.settle` | 强制付款/退款/关闭 |
+| `contract.admin.view` | 查看全部合同并进入管理工作台 |
+| `contract.admin` | 上述管理与绕过权限的父节点 |
+
+### 面向「任务发布者」的授权
+
+要让一个非 OP 玩家全面管理批量任务，最小集合是
+`contract.create.batch` + `contract.schedule.create` +（需要共享模板时）`contract.template.manage`。
+
+注意批次的每一份子合同都单独计入雇主的 `limits.max-open-contracts`（默认 3），
+所以发布 32 份会直接被上限挡下。两种解法：
+
+- 把 `limits.max-open-contracts` 调高到能容纳单批份数（推荐，影响范围可控）；
+- 或授予 `contract.bypass.limit` —— 但同一节点也会解除该玩家的**接单**数量上限。
+
+`contract.bypass.batch-repeat-limit` 默认 `op`，也就是说 OP 自己测试时会绕过每日冷却，
+验证重复接取规则请用普通玩家账号。
 
 ## 管理命令
 
@@ -113,6 +152,7 @@ WAGER 使用创建时必填的仲裁者和 `/contract resolve <id> <a|b>`，保�
 
 主要状态：
 
+- `SCHEDULED`：奖励已托管，等待一次性定时公开；不会出现在公开可接取列表。
 - `OPEN`：公开 SERVICE，等待接单。
 - `PENDING_ACCEPT`：WAGER/PARTNERSHIP 邀请已发出，等待指定对方接受。
 - `IN_PROGRESS`：已接单或邀请已接受。
@@ -171,6 +211,10 @@ economy:
 
 limits:
   max-open-contracts: 3
+  max-batch-contracts: 64
+  max-repeat-cooldown-hours: 8760
+  max-templates-per-player: 32
+  max-scheduled-contracts: 64
   max-active-accepted-contracts: 3
   max-title-length: 80
   max-description-length: 500
@@ -190,12 +234,43 @@ retention:
 storage:
   flush-interval-seconds: 30
 
+scheduling:
+  max-days-ahead: 30
+  scan-interval-seconds: 30
+
 display:
   page-size: 8
   currency-prefix: "$"
 ```
 
-语言文件位于 `lang/zh_CN.yml` 和 `lang/en_US.yml`，可通过 `language` 选择。
+## 本地化
+
+语言文件位于 `lang/zh_CN.yml` 和 `lang/en_US.yml`，通过 `config.yml` 的 `language` 选择；
+缺失的键回退到 `zh_CN`。**所有面向玩家的文本都在语言文件里**，包括 GUI 标题、按钮名与 lore、
+签署确认页的资金后果、创建向导的字段名与聊天提示、收件箱/进度标签，以及服务层的全部失败原因。
+代码里不保留任何硬编码的界面文案，因此新增一门语言只需要复制一份 yml 并翻译。
+
+所有段都由共享的 `cubex-i18n` 服务解析，因此：某个键在当前语言缺失时会沿
+`当前语言 → zh_CN` 回退，而不是显示原始键名；颜色统一用 MiniMessage `<#RRGGBB>`，
+占位符统一用 `<name>`。
+
+语言文件结构：
+
+| 段 | 内容 |
+| :-- | :-- |
+| `status` / `types` / `roles` / `conditions` | 枚举显示名 |
+| `objectives` / `objective-targets` / `objective-prompts` | 系统验收目标的名称、字段名、输入提示 |
+| `ui` | GUI、向导、确认页、命令输出与服务层失败原因 |
+| `terms` | 结算预览里的短语 |
+| `messages` | 命令与聊天消息（走 MiniMessage，支持 `<prefix>`） |
+
+`lang-version: 3` 起，`/contract admin reload` 与启动迁移会做两件事：把旧的 `&#RRGGBB`
+转成 MiniMessage（包括管理员自己改过的条目，措辞不动），并把 jar 内新增的键补进服务器
+已有的语言文件（已存在的条目不覆盖）。
+
+`LanguageParityTest` 在构建时校验三件事：两个语言文件的键集合完全一致、
+同一个键在各语言里的占位符集合一致、代码里引用的每个 `ui.*` 键都真实存在。
+新增文案时请同时改两个 yml，否则构建会失败。
 
 ## 存储
 
@@ -203,6 +278,8 @@ display:
 
 ```text
 plugins/Contract/contract.yml
+plugins/Contract/templates.yml
+plugins/Contract/batch-acceptance.yml
 plugins/Contract/pending-transactions.yml
 plugins/Contract/events.log
 ```

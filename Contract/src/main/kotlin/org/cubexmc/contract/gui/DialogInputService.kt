@@ -14,7 +14,6 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.entity.Player
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.model.ContractType
-import org.cubexmc.contract.util.Text
 import java.math.BigDecimal
 
 /**
@@ -29,20 +28,20 @@ class DialogInputService(private val plugin: ContractPlugin) {
 
     /** Native confirmation: consequence text plus "sign" / "cancel" buttons. */
     fun confirm(player: Player, title: String, lines: List<String>, onConfirm: () -> Unit, onCancel: () -> Unit) {
-        val body = listOf(DialogBody.plainMessage(comp(lines.joinToString("\n") { Text.color("&#CFD8DC$it") })))
+        val body = listOf(DialogBody.plainMessage(comp(lines.joinToString("\n") { ui("confirm-consequence", mapOf("value" to it)) })))
         val yes = ActionButton.create(
-            comp(Text.color("&#69DB7C签署执行")),
-            comp(Text.color("&#CFD8DC点击立即签署并执行")),
+            comp(ui("confirm-sign")),
+            comp(ui("confirm-sign-detail")),
             BUTTON_WIDTH,
             DialogAction.customClick(DialogActionCallback { _, _ -> runAtPlayer(player, onConfirm) }, clickOptions()),
         )
         val no = ActionButton.create(
-            comp(Text.color("&#E63946取消")),
+            comp(ui("confirm-cancel")),
             null,
             BUTTON_WIDTH,
             DialogAction.customClick(DialogActionCallback { _, _ -> runAtPlayer(player, onCancel) }, clickOptions()),
         )
-        val base = DialogBase.builder(comp(Text.color("&#F4D03F$title")))
+        val base = DialogBase.builder(comp(ui("dialog-confirm-title", mapOf("value" to title))))
             .canCloseWithEscape(true)
             .afterAction(DialogBase.DialogAfterAction.CLOSE)
             .body(body)
@@ -57,32 +56,32 @@ class DialogInputService(private val plugin: ContractPlugin) {
     fun createForm(player: Player, draft: CreateDraft, onSubmit: () -> Unit, onCancel: () -> Unit) {
         val maxDescription = plugin.config.getInt("limits.max-description-length", 500)
         val inputs = ArrayList<DialogInput>()
-        inputs.add(textInput("title", "&#FFE066标题", draft.title(), 64))
-        inputs.add(textInput("desc", "&#FFE066描述(可留空)", draft.description(), maxDescription))
+        inputs.add(textInput("title", ui("field-title"), draft.title(), 64))
+        inputs.add(textInput("desc", ui("dialog-description"), draft.description(), maxDescription))
         if (draft.needsCounterparty()) {
-            inputs.add(textInput("counterparty", "&#FFE066对方玩家", draft.counterparty(), 32))
+            inputs.add(textInput("counterparty", ui("field-counterparty"), draft.counterparty(), 32))
         }
-        inputs.add(textInput("amount", if (draft.type() == ContractType.SERVICE) "&#FFE066奖金" else "&#FFE066我的押注", numberText(draft.amount()), 16))
-        inputs.add(textInput("mediator", if (draft.mediatorRequired()) "&#FFE066仲裁者" else "&#FFE066中间人(可留空)", draft.mediator(), 32))
+        inputs.add(textInput("amount", ui(if (draft.type() == ContractType.SERVICE) "field-reward" else "field-my-stake"), numberText(draft.amount()), 16))
+        inputs.add(textInput("mediator", ui(if (draft.mediatorRequired()) "field-arbiter" else "dialog-mediator"), draft.mediator(), 32))
         if (draft.needsPartnerStake()) {
-            inputs.add(textInput("stake", "&#FFE066对方押注", numberText(draft.partnerStake()), 16))
+            inputs.add(textInput("stake", ui("field-partner-stake"), numberText(draft.partnerStake()), 16))
         }
-        inputs.add(textInput("days", "&#FFE066有效期(天)", draft.days()?.toString(), 6))
+        inputs.add(textInput("days", ui("field-days"), draft.days()?.toString(), 6))
 
-        val body = listOf(DialogBody.plainMessage(comp(Text.color("&#CFD8DC填写后点击下方按钮预览并签署。资金由服务器托管。"))))
+        val body = listOf(DialogBody.plainMessage(comp(ui("dialog-form-hint"))))
         val submit = ActionButton.create(
-            comp(Text.color("&#69DB7C预览并签署")),
-            comp(Text.color("&#CFD8DC进入签署确认")),
+            comp(ui("wizard-sign")),
+            comp(ui("wizard-sign-detail")),
             FORM_BUTTON_WIDTH,
             DialogAction.customClick(DialogActionCallback { response, _ -> applyAndSubmit(player, draft, response, onSubmit) }, clickOptions()),
         )
         val cancel = ActionButton.create(
-            comp(Text.color("&#E63946放弃创建")),
-            comp(Text.color("&#CFD8DC删除当前草稿并返回合同大厅")),
+            comp(ui("wizard-abandon")),
+            comp(ui("wizard-abandon-detail")),
             FORM_BUTTON_WIDTH,
             DialogAction.customClick(DialogActionCallback { _, _ -> runAtPlayer(player, onCancel) }, clickOptions()),
         )
-        val base = DialogBase.builder(comp(Text.color("&#F4D03F创建合同 · ${plugin.lang().type(draft.type())}")))
+        val base = DialogBase.builder(comp(ui("dialog-create-title", mapOf("type" to plugin.lang().type(draft.type())))))
             .canCloseWithEscape(true)
             .afterAction(DialogBase.DialogAfterAction.CLOSE)
             .body(body)
@@ -100,8 +99,8 @@ class DialogInputService(private val plugin: ContractPlugin) {
         val stake = if (draft.needsPartnerStake()) response.getText("stake") else null
         val days = response.getText("days")
         runAtPlayer(player) {
-            draft.title(blankToNull(Text.stripControl(title ?: "")))
-            draft.description(blankToNull(Text.stripControl(description ?: "")))
+            draft.title(blankToNull(plugin.text().stripControl(title ?: "")))
+            draft.description(blankToNull(plugin.text().stripControl(description ?: "")))
             if (draft.needsCounterparty()) draft.counterparty(blankToNull(counterparty?.trim()))
             draft.mediator(blankToNull(mediator?.trim()))
             draft.amount(parseNonNegative(amount))
@@ -113,8 +112,10 @@ class DialogInputService(private val plugin: ContractPlugin) {
 
     // ---- Helpers -------------------------------------------------------------------------------
 
+    private fun ui(key: String, placeholders: Map<String, String> = emptyMap()): String = plugin.lang().ui(key, placeholders)
+
     private fun textInput(key: String, label: String, initial: String?, maxLength: Int): DialogInput {
-        var builder = DialogInput.text(key, comp(Text.color(label))).width(INPUT_WIDTH).maxLength(maxLength)
+        var builder = DialogInput.text(key, comp(label)).width(INPUT_WIDTH).maxLength(maxLength)
         if (!initial.isNullOrEmpty()) {
             builder = builder.initial(initial)
         }

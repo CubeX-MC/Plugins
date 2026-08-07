@@ -1,116 +1,92 @@
 # Reusable Agent Pipeline
 
-This pipeline is for agent-assisted plugin development. It is intentionally
-project-neutral: project facts, runtime quirks, commands, and release rules live
-in `docs/agent-project-profile.md`.
-
-## Source Models
-
-The workflow combines practices with broad industrial or academic support:
-
-- Continuous delivery: small batches, fast feedback, test automation, and
-  keeping software deployable.
-- Risk-based secure development: identify risk before implementation and scale
-  evidence to the blast radius.
-- Supply-chain integrity: reproducible builds, dependency hygiene, and release
-  artifacts that can be traced to verified source.
-- Human-centered design: model the operator/player workflow before changing
-  command, GUI, message, or permission behavior.
-- Evidence-based iteration: every agent turn should leave enough evidence for a
-  reviewer to understand what changed, what passed, and what remains uncertain.
-
-References:
-
-- DORA continuous delivery capabilities: https://dora.dev/capabilities/continuous-delivery/
-- DORA software delivery metrics: https://dora.dev/guides/dora-metrics/
-- NIST SSDF SP 800-218: https://csrc.nist.gov/pubs/sp/800/218/final
-- SLSA supply-chain framework: https://slsa.dev/
-- OWASP SAMM: https://owasp.org/www-project-samm/
+This pipeline is project-neutral. Concrete build commands, runtime constraints,
+artifact paths, and active feature decisions live in
+`docs/agent-project-profile.md` and task artifacts.
 
 ## Pipeline Stages
 
 ### 1. Intake
 
-Classify the request before reading widely:
+Classify the request:
 
-- Feature, bugfix, refactor, compatibility update, documentation, release, or
-  investigation.
-- User-visible or internal.
-- Runtime-impacting or static-only.
-- Reversible or migration-affecting.
-- Narrow module or cross-cutting.
+- feature, bugfix, refactor, compatibility, documentation, release, or
+  investigation;
+- user-visible or internal;
+- runtime-impacting or static-only;
+- reversible or migration-affecting;
+- narrow module or cross-cutting.
 
 Output: one-line task class and initial risk class.
 
 ### 2. Context Assembly
 
-Read only the minimum context needed to make a safe change:
+Read the smallest sufficient context:
 
-- `AGENTS.md`
-- `docs/agent-project-profile.md`
-- `docs/agent-verification-matrix.md`
-- Relevant architecture, API, compatibility, regression, or release docs.
-- The smallest set of source and test files that own the behavior.
+- repository and project `AGENTS.md` files;
+- `docs/agent-project-profile.md`;
+- `docs/agent-verification-matrix.md`;
+- the active task artifact;
+- the source, tests, and operator docs that own the behavior.
 
-Output: current behavior summary and likely ownership boundary.
+Output: current behavior, ownership boundary, active phase, and likely files.
 
 ### 3. Design And Risk Note
 
-Before edits, write a short internal design note:
+Before edits, record:
 
-- Intended behavior.
-- Files or modules likely to change.
-- Invariants that must not break.
-- Tests or checks that will prove the change.
-- Documentation that may need synchronization.
+- intended behavior and explicit non-goals;
+- invariants that must not break;
+- storage/economy/scheduler compatibility implications;
+- tests and manual checks that prove the change;
+- documentation that must remain synchronized.
 
-For high-risk work, prefer adding or locating a failing test before changing
-implementation.
+For high-risk work, locate or add a failing/characterization test before
+changing implementation when practical.
 
 ### 4. Implementation
 
-Implement in small reviewable slices:
-
-- Reuse existing abstractions before adding new ones.
-- Keep business rules out of thin entrypoint layers.
-- Keep IO, runtime scheduler, persistence, and UI boundaries explicit.
-- Avoid unrelated formatting or opportunistic refactors.
-- Preserve backward compatibility unless the task explicitly changes it.
+- Implement one artifact phase or smaller slice at a time.
+- Reuse existing service, store, scheduler, and GUI boundaries.
+- Keep IO, runtime scheduling, persistence, and presentation explicit.
+- Avoid unrelated formatting and opportunistic refactors.
+- Preserve backward compatibility unless the artifact explicitly changes it.
+- Do not silently expand scope when a later phase looks convenient.
 
 ### 5. Verification
 
 Use `docs/agent-verification-matrix.md`:
 
-- Run targeted tests first when possible.
-- Run broader tests after touching shared contracts.
-- Run release-grade checks for dependency, packaging, compatibility, or release
-  work.
-- Identify manual regression scenarios for runtime behavior that unit tests
-  cannot simulate.
+- targeted tests first;
+- full module tests after shared behavior changes;
+- module build and artifact gate for persistence, scheduler, dependency,
+  packaging, or release-impacting work;
+- manual runtime scenarios when mocks cannot demonstrate the actual risk.
 
-Output: command, result, and remaining gap.
+Output: exact command, result, meaningful summary, and remaining gap.
 
 ### 6. Documentation Sync
 
-Update docs in the same change when behavior changes:
+Update documentation in the same slice for changes to:
 
-- User-facing command, GUI, permission, message, or config behavior.
-- Public API behavior or stability claims.
-- Platform compatibility or dependency policy.
-- Data migration and rollback expectations.
-- Release notes or changelog entries for user-visible changes.
+- commands, GUI, permissions, messages, or configuration;
+- public API or compatibility claims;
+- storage schema, migration, recovery, or rollback behavior;
+- economy/state-machine behavior;
+- artifact phase status and handoff point.
 
 ### 7. Evidence And Handoff
 
-Finish with a compact evidence bundle:
+Finish with:
 
-- Changed files and reason.
-- Tests run and result.
-- Manual checks needed or intentionally skipped.
-- Residual risks.
-- Follow-up work only when it is directly connected to the change.
+- artifact and completed phase;
+- changed files and reason;
+- tests and runtime checks;
+- migration/rollback notes;
+- residual risk;
+- the next executable slice.
 
-Use `docs/agent-evidence-template.md` for larger changes.
+Use `docs/agent-evidence-template.md` for R3/R4 changes or cross-agent handoff.
 
 ## Risk Classes
 
@@ -118,44 +94,46 @@ Use `docs/agent-evidence-template.md` for larger changes.
 
 Docs, comments, formatting, or test-only changes with no runtime impact.
 
-Expected verification: lint or no-op validation where applicable.
+Expected evidence: document consistency/link review or the relevant no-op
+validation.
 
 ### R1 Local
 
-Single module behavior with narrow tests and no persistence, runtime scheduler,
-permissions, or public API impact.
+Pure model/util behavior with narrow ownership and no persistence, economy,
+permissions, scheduler, or public API impact.
 
-Expected verification: targeted unit tests.
+Expected evidence: targeted project-native tests.
 
 ### R2 Shared
 
-Service, manager, controller, command, GUI, config, localization, or integration
-changes used by multiple flows.
+Service, command, GUI, localization, or configuration behavior used by
+multiple flows but without a runtime-critical boundary.
 
-Expected verification: targeted tests plus `mvn test` when feasible.
+Expected evidence: targeted tests plus the full module test gate.
 
 ### R3 Runtime-Critical
 
-Persistence, migration, economy, permissions, scheduler/threading, entity/world
-access, public API, dependency shading, or release packaging.
+Persistence, migration, economy, permissions, scheduler/threading, item/world
+access, public API, dependency shading, or deployable artifact behavior.
 
-Expected verification: targeted tests, `mvn verify`, and manual regression scope.
+Expected evidence: targeted tests, full module build, artifact gate where
+applicable, and a named manual runtime scope.
 
 ### R4 Release-Critical
 
-Version bump, release artifact, platform support claim, compatibility matrix, or
+Version, release artifact, platform support claim, compatibility matrix, or
 security/supply-chain change.
 
-Expected verification: `mvn clean verify package`, release checklist, artifact
-inspection, and documented rollback notes.
+Expected evidence: clean release-grade build, artifact inspection, startup
+smoke, release checklist, and rollback notes.
 
 ## Agent Harness Expectations
 
-Agents should optimize for reviewability:
-
-- Name the risk class.
+- Name the artifact, phase, and risk class.
+- Inspect branch and scoped working-tree state before edits.
 - Explain why each file is touched.
-- Prefer deterministic commands over ad hoc manual inspection.
-- Treat failing checks as first-class output, not noise.
-- Leave durable evidence that another agent can pick up without reconstructing
-  hidden reasoning.
+- Prefer deterministic project-native commands.
+- Treat failing checks as first-class evidence.
+- Keep active artifact status synchronized with implementation.
+- Leave enough durable evidence for Claude Code or Codex to continue without
+  reconstructing decisions from chat history.

@@ -24,7 +24,6 @@ import org.cubexmc.contract.storage.ContractStorage
 import org.cubexmc.contract.storage.BatchAcceptanceStore
 import org.cubexmc.contract.storage.EventLog
 import org.cubexmc.contract.storage.PendingTransactionStore
-import org.cubexmc.contract.util.Text
 import java.io.IOException
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -42,6 +41,13 @@ class ContractService(
     private val eventLog: EventLog,
     private val batchAcceptances: BatchAcceptanceStore,
 ) {
+    /**
+     * Resolves a `ui.*` language key for a player-facing failure reason. Resolved per call rather
+     * than cached, so `/contract admin reload` picks up a language change immediately.
+     */
+    private fun ui(key: String, placeholders: Map<String, String> = emptyMap()): String =
+        plugin.lang().ui(key, placeholders)
+
     private fun logEvent(contract: Contract, time: Long, type: String, detail: String) {
         contract.addEvent(time, type, detail)
         eventLog.append(contract.id(), type, detail)
@@ -107,6 +113,21 @@ class ContractService(
         contractCount: Int,
         repeatPolicy: BatchRepeatPolicy,
         repeatCooldownHours: Int,
+    ): ServiceResult = create(owner, rewardDouble, days, title, description, mediatorName, objective, contractCount, repeatPolicy, repeatCooldownHours, null)
+
+    @Synchronized
+    fun create(
+        owner: Player,
+        rewardDouble: Double,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+        objective: ContractObjective?,
+        contractCount: Int,
+        repeatPolicy: BatchRepeatPolicy,
+        repeatCooldownHours: Int,
+        publishAt: Long?,
     ): ServiceResult = createBatch(
         owner,
         rewardDouble,
@@ -120,6 +141,7 @@ class ContractService(
         contractCount,
         repeatPolicy,
         repeatCooldownHours,
+        publishAt,
     )
 
     @Synchronized
@@ -164,16 +186,30 @@ class ContractService(
         contractCount: Int,
         repeatPolicy: BatchRepeatPolicy,
         repeatCooldownHours: Int,
+    ): ServiceResult = createWithItemReward(owner, days, title, description, mediatorName, objective, contractCount, repeatPolicy, repeatCooldownHours, null)
+
+    @Synchronized
+    fun createWithItemReward(
+        owner: Player,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+        objective: ContractObjective?,
+        contractCount: Int,
+        repeatPolicy: BatchRepeatPolicy,
+        repeatCooldownHours: Int,
+        publishAt: Long?,
     ): ServiceResult {
         val hand = owner.inventory.itemInMainHand
         if (hand.type == Material.AIR || hand.amount <= 0) {
-            return ServiceResult.fail("请先把要托管的奖励物品拿在主手")
+            return ServiceResult.fail(ui("err-item-reward-in-hand"))
         }
         if (isRuleGemItem(hand)) {
-            return ServiceResult.fail("为避免宝石状态异常,合同暂不托管 RuleGems 宝石物品")
+            return ServiceResult.fail(ui("err-rulegems-reward"))
         }
         val perContractAmount = perContractItemAmount(hand.amount, contractCount)
-            ?: return ServiceResult.fail("主手物品数量 ${hand.amount} 必须能被发布份数 $contractCount 整除")
+            ?: return ServiceResult.fail(ui("err-item-not-divisible", mapOf("amount" to hand.amount.toString(), "count" to contractCount.toString())))
         val rewardItem = hand.clone()
         rewardItem.amount = perContractAmount
         return createBatch(
@@ -189,6 +225,7 @@ class ContractService(
             contractCount,
             repeatPolicy,
             repeatCooldownHours,
+            publishAt,
         )
     }
 
@@ -205,54 +242,70 @@ class ContractService(
         contractCount: Int,
         repeatPolicy: BatchRepeatPolicy,
         repeatCooldownHours: Int,
+        publishAt: Long?,
     ): ServiceResult {
         if (!rewardDouble.isFinite()) {
-            return ServiceResult.fail("奖金必须是有效数字")
+            return ServiceResult.fail(ui("err-reward-not-number"))
         }
         if (objective != null && objective.target().isBlank()) {
-            return ServiceResult.fail("系统验收目标不能为空")
+            return ServiceResult.fail(ui("err-objective-empty"))
         }
-        val cleanTitle = Text.stripControl(title)
+        val cleanTitle = plugin.text().stripControl(title)
         if (cleanTitle.isBlank()) {
-            return ServiceResult.fail("标题不能为空")
+            return ServiceResult.fail(ui("err-title-empty"))
         }
         val maxTitleLength = plugin.config.getInt("limits.max-title-length", 80)
         if (cleanTitle.length > maxTitleLength) {
-            return ServiceResult.fail("标题不能超过 $maxTitleLength 个字符")
+            return ServiceResult.fail(ui("err-title-too-long", mapOf("max" to maxTitleLength.toString())))
         }
-        var cleanDescription = Text.stripControl(description)
+        var cleanDescription = plugin.text().stripControl(description)
         if (cleanDescription.isBlank()) {
             cleanDescription = cleanTitle
         }
         val maxDescriptionLength = plugin.config.getInt("limits.max-description-length", 500)
         if (cleanDescription.length > maxDescriptionLength) {
-            return ServiceResult.fail("描述不能超过 $maxDescriptionLength 个字符")
+            return ServiceResult.fail(ui("err-description-too-long", mapOf("max" to maxDescriptionLength.toString())))
         }
         val reward = BigDecimal.valueOf(rewardDouble).setScale(2, RoundingMode.HALF_UP)
         val minReward = BigDecimal.valueOf(plugin.config.getDouble("economy.min-reward", 100.0))
         val maxReward = BigDecimal.valueOf(plugin.config.getDouble("economy.max-reward", 100000.0))
         if (!itemReward && (reward < minReward || reward > maxReward)) {
-            return ServiceResult.fail("奖金必须在 ${economy.format(minReward)} 到 ${economy.format(maxReward)} 之间")
+            return ServiceResult.fail(ui("err-reward-range", mapOf("min" to economy.format(minReward), "max" to economy.format(maxReward))))
         }
         if (itemReward && rewardItems.isEmpty()) {
-            return ServiceResult.fail("物品奖励不能为空")
+            return ServiceResult.fail(ui("err-item-reward-empty"))
         }
         val maxBatchContracts = plugin.config.getInt("limits.max-batch-contracts", 64).coerceAtLeast(1)
         if (contractCount < 1 || contractCount > maxBatchContracts) {
-            return ServiceResult.fail("发布份数必须在 1 到 $maxBatchContracts 之间")
+            return ServiceResult.fail(ui("err-count-range", mapOf("max" to maxBatchContracts.toString())))
         }
         if (requiresBatchPermission(contractCount) && !owner.hasPermission(BATCH_CREATE_PERMISSION)) {
-            return ServiceResult.fail("你没有批量发布委托的权限")
+            return ServiceResult.fail(ui("err-no-batch-permission"))
         }
         val effectiveRepeatPolicy = if (contractCount > 1) repeatPolicy else BatchRepeatPolicy.UNLIMITED
         val maxRepeatCooldownHours = plugin.config.getInt("limits.max-repeat-cooldown-hours", 8760).coerceAtLeast(1)
         if (effectiveRepeatPolicy == BatchRepeatPolicy.COOLDOWN && repeatCooldownHours !in 1..maxRepeatCooldownHours) {
-            return ServiceResult.fail("重复接取冷却必须在 1 到 $maxRepeatCooldownHours 小时之间")
+            return ServiceResult.fail(ui("err-cooldown-range", mapOf("max" to maxRepeatCooldownHours.toString())))
         }
         val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
         val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
         if (days < minDays || days > maxDays) {
-            return ServiceResult.fail("有效期必须在 $minDays 到 $maxDays 天之间")
+            return ServiceResult.fail(ui("err-days-range", mapOf("min" to minDays.toString(), "max" to maxDays.toString())))
+        }
+        val now = System.currentTimeMillis()
+        val effectivePublishAt = publishAt?.takeIf { it > now }
+        if (publishAt != null && effectivePublishAt == null) {
+            return ServiceResult.fail(plugin.lang().ui("schedule-invalid"))
+        }
+        if (effectivePublishAt != null) {
+            if (!owner.hasPermission(SCHEDULE_CREATE_PERMISSION)) return ServiceResult.fail(plugin.lang().ui("schedule-no-permission"))
+            val maxAhead = plugin.config.getInt("scheduling.max-days-ahead", 30).coerceAtLeast(1) * SchedulingRules.DAY_MILLIS
+            if (effectivePublishAt - now > maxAhead) return ServiceResult.fail(plugin.lang().ui("schedule-too-far", mapOf("days" to (maxAhead / SchedulingRules.DAY_MILLIS).toString())))
+            val scheduledLimit = plugin.config.getInt("limits.max-scheduled-contracts", 64).coerceAtLeast(1)
+            val scheduledCount = storage.all().count { it.ownerUuid() == owner.uniqueId && it.status() == ContractStatus.SCHEDULED }
+            if (scheduledCount + contractCount > scheduledLimit && !owner.hasPermission("contract.bypass.limit")) {
+                return ServiceResult.fail(plugin.lang().ui("schedule-limit", mapOf("limit" to scheduledLimit.toString())))
+            }
         }
         val openLimit = plugin.config.getInt("limits.max-open-contracts", 3)
         val openCount = storage.all().stream()
@@ -260,7 +313,7 @@ class ContractService(
             .filter { contract -> contract.status().countsAsOwnerActive() }
             .count()
         if (exceedsOpenLimit(openCount, contractCount, openLimit) && !owner.hasPermission("contract.bypass.limit")) {
-            return ServiceResult.fail("发布后公开或待处理合同将超过上限 $openLimit")
+            return ServiceResult.fail(ui("err-open-limit", mapOf("limit" to openLimit.toString())))
         }
         val mediator = resolveOptionalMediator(mediatorName, owner.uniqueId)
         if (!mediator.success()) {
@@ -277,21 +330,25 @@ class ContractService(
         val totalReward = reward.multiply(BigDecimal.valueOf(contractCount.toLong()))
         val totalCost = reward.add(creationFee).multiply(BigDecimal.valueOf(contractCount.toLong()))
         if (!economy.has(owner, totalCost)) {
-            return ServiceResult.fail("余额不足，需要 ${economy.format(totalCost)}")
+            return ServiceResult.fail(ui("err-insufficient-funds", mapOf("value" to economy.format(totalCost))))
         }
 
         val contractIds = List(contractCount) { UUID.randomUUID().toString() }
-        val pendingPurpose = if (contractCount == 1) "contract-create" else "contract-batch-create"
+        val pendingPurpose = when {
+            effectivePublishAt != null -> "contract-schedule-create"
+            contractCount == 1 -> "contract-create"
+            else -> "contract-batch-create"
+        }
         val pendingId = try {
             pending.beginWithdraw(owner.uniqueId, totalCost, pendingPurpose, contractIds.first())
         } catch (ex: IOException) {
-            return ServiceResult.fail("无法写入待办事务日志: ${ex.message}")
+            return ServiceResult.fail(ui("err-pending-log", mapOf("error" to (ex.message ?: ""))))
         }
 
         val withdrawal = economy.withdraw(owner, totalCost)
         if (!withdrawal.success()) {
             tryClearPending(pendingId)
-            return ServiceResult.fail("扣款失败: ${withdrawal.reason()}")
+            return ServiceResult.fail(ui("err-withdraw-failed", mapOf("reason" to withdrawal.reason())))
         }
         val handBefore = if (itemReward) owner.inventory.itemInMainHand.clone() else null
         if (itemReward) {
@@ -299,15 +356,14 @@ class ContractService(
             owner.updateInventory()
         }
 
-        val now = System.currentTimeMillis()
-        val expiresAt = now + days * 24L * 60L * 60L * 1000L
+        val expiresAt = SchedulingRules.expiryAt(now, effectivePublishAt, days)
         val commissionPercent = clampCommissionPercent(
             plugin.config.getDouble("economy.completion-commission-percent", 5.0),
         )
         val batchId = if (contractCount > 1) UUID.randomUUID().toString() else null
         val contracts = contractIds.mapIndexed { index, contractId ->
             val objectiveCopy = objective?.let { ContractObjective.of(it.type(), it.target(), it.required()) }
-            val contract = Contract.createService(
+            val contract = Contract.createScheduledService(
                 contractId,
                 owner.uniqueId,
                 owner.name,
@@ -320,6 +376,7 @@ class ContractService(
                 now,
                 expiresAt,
                 objectiveCopy,
+                effectivePublishAt,
             )
             applyOptionalMediator(contract, mediator)
             if (batchId != null) {
@@ -344,15 +401,15 @@ class ContractService(
                 owner.updateInventory()
             }
             refundOrKeepPending(owner.uniqueId, totalCost, pendingId)
-            return ServiceResult.fail("保存失败，已退回扣款: ${ex.message}")
+            return ServiceResult.fail(ui("err-save-refunded", mapOf("error" to (ex.message ?: ""))))
         }
 
         val escrowDetail = if (itemReward) "${rewardItems.sumOf { it.amount }} reward items" else reward.toPlainString()
         for (contract in contracts) {
             eventLog.append(
                 contract.id(),
-                "CREATED",
-                "${owner.name} created the contract and escrowed $escrowDetail" +
+                if (effectivePublishAt == null) "CREATED" else "SCHEDULED",
+                "${owner.name} ${if (effectivePublishAt == null) "created" else "scheduled"} the contract and escrowed $escrowDetail" +
                     if (batchId == null) "" else " as batch $batchId",
             )
             if (mediator.present()) {
@@ -371,11 +428,11 @@ class ContractService(
         val mediatorUuid = mediator.uniqueId
         for (blocked in excluded) {
             if (mediatorUuid == blocked) {
-                return MediatorSpec.fail("中间人不能是合同参与方")
+                return MediatorSpec.fail(ui("err-mediator-is-party"))
             }
         }
         if (!mediator.isOnline && !mediator.hasPlayedBefore()) {
-            return MediatorSpec.fail("找不到中间人 $mediatorName(需在线或曾登录本服)")
+            return MediatorSpec.fail(ui("err-mediator-not-found", mapOf("name" to mediatorName)))
         }
         return MediatorSpec.ok(mediatorUuid, mediator.name ?: mediatorName)
     }
@@ -405,7 +462,7 @@ class ContractService(
         try {
             pending.clear(pendingId)
         } catch (ex: IOException) {
-            plugin.logger.warning("Failed to clear pending transaction $pendingId: ${ex.message}")
+            plugin.log().warn("Failed to clear pending transaction $pendingId: ${ex.message}")
         }
     }
 
@@ -424,14 +481,14 @@ class ContractService(
     private fun recoverWithdraw(entry: PendingTransactionStore.PendingEntry) {
         val playerUuid = entry.playerUuid()
         if (playerUuid == null) {
-            plugin.logger.warning("Cannot recover pending withdraw ${entry.id()} without player uuid.")
+            plugin.log().warn("Cannot recover pending withdraw ${entry.id()} without player uuid.")
             return
         }
         val contractId = entry.contractId()
         if (entry.purpose() == "contract-deliver-money" && !contractId.isNullOrBlank()) {
             val contract = storage.findById(contractId).orElse(null)
             if (contract != null && contract.participant(ParticipantRole.CONTRACTOR).map { it.moneyStake().signum() > 0 }.orElse(false)) {
-                plugin.logger.warning(
+                plugin.log().warn(
                     "Pending withdraw ${entry.id()} (${entry.purpose()}) already became contractor escrow for contract $contractId; clearing without refund.",
                 )
                 tryClearPending(entry.id())
@@ -447,7 +504,7 @@ class ContractService(
             shouldRefundOrphanWithdraw(entry.purpose(), status)
         }
         if (!refund) {
-            plugin.logger.warning(
+            plugin.log().warn(
                 "Pending withdraw ${entry.id()} (${entry.purpose()}) already became escrow for contract $contractId; clearing without refund.",
             )
             tryClearPending(entry.id())
@@ -455,10 +512,10 @@ class ContractService(
         }
         val result = economy.deposit(playerUuid, entry.amount())
         if (!result.success()) {
-            plugin.logger.warning("Failed to recover pending withdraw ${entry.id()}: ${result.reason()}")
+            plugin.log().warn("Failed to recover pending withdraw ${entry.id()}: ${result.reason()}")
             return
         }
-        plugin.logger.warning(
+        plugin.log().warn(
             "Recovered orphan pending withdraw ${entry.id()} (${entry.purpose()}) refunded ${entry.amount()} to ${entry.playerUuid()}",
         )
         tryClearPending(entry.id())
@@ -470,7 +527,7 @@ class ContractService(
             tryClearPending(pendingId)
             return
         }
-        plugin.logger.severe(
+        plugin.log().severe(
             "Refund of $amount to $playerUuid failed (${refund.reason()}); keeping pending transaction $pendingId for crash recovery.",
         )
     }
@@ -478,26 +535,26 @@ class ContractService(
     private fun recoverInterruptedSettlement(entry: PendingTransactionStore.PendingEntry) {
         val contractId = entry.contractId()
         if (contractId == null || contractId.isBlank()) {
-            plugin.logger.warning("Pending ${entry.type()} ${entry.id()} has no contract id; leaving it for manual review.")
+            plugin.log().warn("Pending ${entry.type()} ${entry.id()} has no contract id; leaving it for manual review.")
             return
         }
         val contract = storage.findById(contractId).orElse(null)
         if (contract == null) {
-            plugin.logger.warning(
+            plugin.log().warn(
                 "Pending ${entry.type()} ${entry.id()} references missing contract $contractId; clearing stale entry.",
             )
             tryClearPending(entry.id())
             return
         }
         if (contract.status().isFinal()) {
-            plugin.logger.warning("Clearing stale pending ${entry.type()} ${entry.id()} for finalized contract ${contract.shortId()}")
+            plugin.log().warn("Clearing stale pending ${entry.type()} ${entry.id()} for finalized contract ${contract.shortId()}")
             tryClearPending(entry.id())
             return
         }
 
         val now = System.currentTimeMillis()
         contract.status(ContractStatus.DISPUTED)
-        contract.disputeReason("结算中断，需要管理员核对 pending transaction ${entry.id()}")
+        contract.disputeReason(ui("dispute-settlement-interrupted", mapOf("id" to entry.id())))
         logEvent(
             contract,
             now,
@@ -508,7 +565,7 @@ class ContractService(
             storage.save()
             tryClearPending(entry.id())
         } catch (ex: IOException) {
-            plugin.logger.warning("Failed to persist interrupted settlement recovery for ${contract.shortId()}: ${ex.message}")
+            plugin.log().warn("Failed to persist interrupted settlement recovery for ${contract.shortId()}: ${ex.message}")
         }
     }
 
@@ -520,19 +577,27 @@ class ContractService(
             else -> acceptService(contractor, contract)
         }
 
+    /** Selects and accepts exactly one currently available child while holding the service lock. */
+    @Synchronized
+    fun acceptOneFromBatch(contractor: Player, batchId: String): ServiceResult {
+        val candidate = BatchQueryService.nextAvailable(storage.all(), batchId)
+            ?: return ServiceResult.fail(plugin.lang().ui("batch-empty"))
+        return acceptService(contractor, candidate)
+    }
+
     private fun acceptService(contractor: Player, contract: Contract): ServiceResult {
         val now = System.currentTimeMillis()
         if (contract.status() != ContractStatus.OPEN) {
-            return ServiceResult.fail("合同当前不可接取")
+            return ServiceResult.fail(ui("err-not-acceptable"))
         }
         if (contract.isExpired(now)) {
             return rejectExpiredAcceptance(contract)
         }
         if (contract.ownerUuid() == contractor.uniqueId) {
-            return ServiceResult.fail("不能接取自己发布的合同")
+            return ServiceResult.fail(ui("err-accept-own"))
         }
         if (isAssignedArbiter(contractor, contract)) {
-            return ServiceResult.fail("中间人不能接取自己负责裁决的合同")
+            return ServiceResult.fail(ui("err-mediator-accept"))
         }
         val repeatFailure = checkBatchRepeat(contractor, contract, now)
         if (repeatFailure != null) {
@@ -544,7 +609,7 @@ class ContractService(
             .filter { existing -> existing.status().countsAsContractorActive() }
             .count()
         if (activeAccepted >= limit && !contractor.hasPermission("contract.bypass.limit")) {
-            return ServiceResult.fail("你的接单数量已达上限 $limit")
+            return ServiceResult.fail(ui("err-accept-limit", mapOf("limit" to limit.toString())))
         }
         contract.contractorUuid(contractor.uniqueId)
         contract.contractorName(contractor.name)
@@ -581,9 +646,9 @@ class ContractService(
             cooldownHours * 60L * 60L * 1000L,
         )
         return when (decision.reason) {
-            BatchRepeatRules.BlockReason.ACTIVE_CONTRACT -> "你已经有一份同批次任务正在进行"
-            BatchRepeatRules.BlockReason.ALREADY_ACCEPTED -> "这个批次每名玩家只能接取一次"
-            BatchRepeatRules.BlockReason.COOLDOWN -> "距离再次接取同批次任务还需 ${formatRemainingTime(decision.remainingMillis)}"
+            BatchRepeatRules.BlockReason.ACTIVE_CONTRACT -> ui("err-batch-active")
+            BatchRepeatRules.BlockReason.ALREADY_ACCEPTED -> ui("err-batch-once")
+            BatchRepeatRules.BlockReason.COOLDOWN -> ui("err-batch-cooldown", mapOf("time" to formatRemainingTime(decision.remainingMillis)))
             null -> null
         }
     }
@@ -593,36 +658,36 @@ class ContractService(
         val hours = totalMinutes / 60L
         val minutes = totalMinutes % 60L
         return when {
-            hours <= 0L -> "${minutes}分钟"
-            minutes == 0L -> "${hours}小时"
-            else -> "${hours}小时${minutes}分钟"
+            hours <= 0L -> ui("duration-minutes", mapOf("minutes" to minutes.toString()))
+            minutes == 0L -> ui("duration-hours", mapOf("hours" to hours.toString()))
+            else -> ui("duration-hours-minutes", mapOf("hours" to hours.toString(), "minutes" to minutes.toString()))
         }
     }
 
     private fun acceptWager(player: Player, contract: Contract): ServiceResult {
         if (contract.status() != ContractStatus.PENDING_ACCEPT) {
-            return ServiceResult.fail("对赌合同当前不可接受")
+            return ServiceResult.fail(ui("err-wager-not-acceptable"))
         }
         if (contract.isExpired(System.currentTimeMillis())) {
             return rejectExpiredAcceptance(contract)
         }
         val partyB = contract.participant(ParticipantRole.PARTY_B).orElse(null)
         if (partyB == null || partyB.uuid() == null || partyB.uuid() != player.uniqueId) {
-            return ServiceResult.fail("只有被指定的对方可以接受这个对赌")
+            return ServiceResult.fail(ui("err-wager-wrong-player"))
         }
         val stake = partyB.moneyStake()
         if (!economy.has(player, stake)) {
-            return ServiceResult.fail("余额不足,需要 ${economy.format(stake)}")
+            return ServiceResult.fail(ui("err-insufficient-funds", mapOf("value" to economy.format(stake))))
         }
         val pendingId = try {
             pending.beginWithdraw(player.uniqueId, stake, "wager-accept", contract.id())
         } catch (ex: IOException) {
-            return ServiceResult.fail("无法写入待办事务日志: ${ex.message}")
+            return ServiceResult.fail(ui("err-pending-log", mapOf("error" to (ex.message ?: ""))))
         }
         val withdrawal = economy.withdraw(player, stake)
         if (!withdrawal.success()) {
             tryClearPending(pendingId)
-            return ServiceResult.fail("扣款失败: ${withdrawal.reason()}")
+            return ServiceResult.fail(ui("err-withdraw-failed", mapOf("reason" to withdrawal.reason())))
         }
         partyB.displayName(player.name)
         val now = System.currentTimeMillis()
@@ -643,28 +708,28 @@ class ContractService(
 
     private fun acceptPartnership(player: Player, contract: Contract): ServiceResult {
         if (contract.status() != ContractStatus.PENDING_ACCEPT) {
-            return ServiceResult.fail("合作合同当前不可接受")
+            return ServiceResult.fail(ui("err-partner-not-acceptable"))
         }
         if (contract.isExpired(System.currentTimeMillis())) {
             return rejectExpiredAcceptance(contract)
         }
         val partyB = contract.participant(ParticipantRole.PARTY_B).orElse(null)
         if (partyB == null || partyB.uuid() == null || partyB.uuid() != player.uniqueId) {
-            return ServiceResult.fail("只有被邀请的合作方可以接受")
+            return ServiceResult.fail(ui("err-partner-wrong-player"))
         }
         val stake = partyB.moneyStake()
         if (!economy.has(player, stake)) {
-            return ServiceResult.fail("余额不足,需要 ${economy.format(stake)}")
+            return ServiceResult.fail(ui("err-insufficient-funds", mapOf("value" to economy.format(stake))))
         }
         val pendingId = try {
             pending.beginWithdraw(player.uniqueId, stake, "partnership-accept", contract.id())
         } catch (ex: IOException) {
-            return ServiceResult.fail("无法写入待办事务日志: ${ex.message}")
+            return ServiceResult.fail(ui("err-pending-log", mapOf("error" to (ex.message ?: ""))))
         }
         val withdrawal = economy.withdraw(player, stake)
         if (!withdrawal.success()) {
             tryClearPending(pendingId)
-            return ServiceResult.fail("扣款失败: ${withdrawal.reason()}")
+            return ServiceResult.fail(ui("err-withdraw-failed", mapOf("reason" to withdrawal.reason())))
         }
         partyB.displayName(player.name)
         val now = System.currentTimeMillis()
@@ -705,15 +770,15 @@ class ContractService(
         description: String,
         mediatorName: String?,
     ): ServiceResult {
-        val cleanTitle = Text.stripControl(title)
+        val cleanTitle = plugin.text().stripControl(title)
         if (cleanTitle.isBlank()) {
-            return ServiceResult.fail("标题不能为空")
+            return ServiceResult.fail(ui("err-title-empty"))
         }
         val maxTitleLength = plugin.config.getInt("limits.max-title-length", 80)
         if (cleanTitle.length > maxTitleLength) {
-            return ServiceResult.fail("标题不能超过 $maxTitleLength 个字符")
+            return ServiceResult.fail(ui("err-title-too-long", mapOf("max" to maxTitleLength.toString())))
         }
-        var cleanDescription = Text.stripControl(description)
+        var cleanDescription = plugin.text().stripControl(description)
         if (cleanDescription.isBlank()) {
             cleanDescription = cleanTitle
         }
@@ -722,20 +787,20 @@ class ContractService(
         val normA = stakeA.setScale(2, RoundingMode.HALF_UP)
         val normB = stakeB.setScale(2, RoundingMode.HALF_UP)
         if (normA < minStake || normA > maxStake || normB < minStake || normB > maxStake) {
-            return ServiceResult.fail("双方押注都必须在 ${economy.format(minStake)} 到 ${economy.format(maxStake)} 之间")
+            return ServiceResult.fail(ui("err-stakes-range", mapOf("min" to economy.format(minStake), "max" to economy.format(maxStake))))
         }
         val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
         val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
         if (days < minDays || days > maxDays) {
-            return ServiceResult.fail("有效期必须在 $minDays 到 $maxDays 天之间")
+            return ServiceResult.fail(ui("err-days-range", mapOf("min" to minDays.toString(), "max" to maxDays.toString())))
         }
 
         val partner = Bukkit.getOfflinePlayer(partnerName)
         if (partner.uniqueId == creator.uniqueId) {
-            return ServiceResult.fail("不能和自己合作")
+            return ServiceResult.fail(ui("err-partner-self"))
         }
         if (!partner.isOnline && !partner.hasPlayedBefore()) {
-            return ServiceResult.fail("找不到玩家 $partnerName(需在线或曾登录本服)")
+            return ServiceResult.fail(ui("err-player-not-found", mapOf("name" to partnerName)))
         }
         val mediator = resolveOptionalMediator(mediatorName, creator.uniqueId, partner.uniqueId)
         if (!mediator.success()) {
@@ -743,19 +808,19 @@ class ContractService(
         }
 
         if (!economy.has(creator, normA)) {
-            return ServiceResult.fail("余额不足,需要 ${economy.format(normA)}")
+            return ServiceResult.fail(ui("err-insufficient-funds", mapOf("value" to economy.format(normA))))
         }
 
         val contractId = UUID.randomUUID().toString()
         val pendingId = try {
             pending.beginWithdraw(creator.uniqueId, normA, "partnership-create", contractId)
         } catch (ex: IOException) {
-            return ServiceResult.fail("无法写入待办事务日志: ${ex.message}")
+            return ServiceResult.fail(ui("err-pending-log", mapOf("error" to (ex.message ?: ""))))
         }
         val withdrawal = economy.withdraw(creator, normA)
         if (!withdrawal.success()) {
             tryClearPending(pendingId)
-            return ServiceResult.fail("扣款失败: ${withdrawal.reason()}")
+            return ServiceResult.fail(ui("err-withdraw-failed", mapOf("reason" to withdrawal.reason())))
         }
 
         val now = System.currentTimeMillis()
@@ -783,7 +848,7 @@ class ContractService(
         } catch (ex: IOException) {
             storage.remove(contract.id())
             refundOrKeepPending(creator.uniqueId, normA, pendingId)
-            return ServiceResult.fail("保存失败,已退回扣款: ${ex.message}")
+            return ServiceResult.fail(ui("err-save-refunded", mapOf("error" to (ex.message ?: ""))))
         }
         eventLog.append(
             contract.id(),
@@ -799,11 +864,11 @@ class ContractService(
 
     private fun approvePartnership(player: Player, contract: Contract): ServiceResult {
         if (contract.status() != ContractStatus.IN_PROGRESS) {
-            return ServiceResult.fail("只有进行中的合作合同可以确认")
+            return ServiceResult.fail(ui("err-partner-not-in-progress"))
         }
         val me = contract.participantByUuid(player.uniqueId).orElse(null)
         if (me == null || me.role() != ParticipantRole.PARTY_A && me.role() != ParticipantRole.PARTY_B) {
-            return ServiceResult.fail("只有合作方可以确认")
+            return ServiceResult.fail(ui("err-partner-only"))
         }
         val approved = contract.metadata.getOrDefault("approved-roles", "")
         val set = LinkedHashSet<String>()
@@ -813,7 +878,7 @@ class ContractService(
             }
         }
         if (!set.add(me.role().name)) {
-            return ServiceResult.fail("你已经确认过了,等待对方")
+            return ServiceResult.fail(ui("err-already-approved"))
         }
         contract.metadata["approved-roles"] = set.joinToString(",")
         val now = System.currentTimeMillis()
@@ -841,15 +906,15 @@ class ContractService(
         title: String,
         description: String,
     ): ServiceResult {
-        val cleanTitle = Text.stripControl(title)
+        val cleanTitle = plugin.text().stripControl(title)
         if (cleanTitle.isBlank()) {
-            return ServiceResult.fail("标题不能为空")
+            return ServiceResult.fail(ui("err-title-empty"))
         }
         val maxTitleLength = plugin.config.getInt("limits.max-title-length", 80)
         if (cleanTitle.length > maxTitleLength) {
-            return ServiceResult.fail("标题不能超过 $maxTitleLength 个字符")
+            return ServiceResult.fail(ui("err-title-too-long", mapOf("max" to maxTitleLength.toString())))
         }
-        var cleanDescription = Text.stripControl(description)
+        var cleanDescription = plugin.text().stripControl(description)
         if (cleanDescription.isBlank()) {
             cleanDescription = cleanTitle
         }
@@ -858,44 +923,44 @@ class ContractService(
         val maxStake = BigDecimal.valueOf(plugin.config.getDouble("economy.max-reward", 100000.0))
         val normalizedStake = stake.setScale(2, RoundingMode.HALF_UP)
         if (normalizedStake < minStake || normalizedStake > maxStake) {
-            return ServiceResult.fail("押注必须在 ${economy.format(minStake)} 到 ${economy.format(maxStake)} 之间")
+            return ServiceResult.fail(ui("err-stake-range", mapOf("min" to economy.format(minStake), "max" to economy.format(maxStake))))
         }
 
         val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
         val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
         if (days < minDays || days > maxDays) {
-            return ServiceResult.fail("有效期必须在 $minDays 到 $maxDays 天之间")
+            return ServiceResult.fail(ui("err-days-range", mapOf("min" to minDays.toString(), "max" to maxDays.toString())))
         }
 
         val opponent = Bukkit.getOfflinePlayer(opponentName)
         val arbiter = Bukkit.getOfflinePlayer(arbiterName)
         if (opponent.uniqueId == creator.uniqueId) {
-            return ServiceResult.fail("不能和自己对赌")
+            return ServiceResult.fail(ui("err-wager-self"))
         }
         if (arbiter.uniqueId == creator.uniqueId || arbiter.uniqueId == opponent.uniqueId) {
-            return ServiceResult.fail("仲裁者必须是第三方")
+            return ServiceResult.fail(ui("err-arbiter-third-party"))
         }
         if (!opponent.isOnline && !opponent.hasPlayedBefore()) {
-            return ServiceResult.fail("找不到玩家 $opponentName(需在线或曾登录本服)")
+            return ServiceResult.fail(ui("err-player-not-found", mapOf("name" to opponentName)))
         }
         if (!arbiter.isOnline && !arbiter.hasPlayedBefore()) {
-            return ServiceResult.fail("找不到玩家 $arbiterName(需在线或曾登录本服)")
+            return ServiceResult.fail(ui("err-player-not-found", mapOf("name" to arbiterName)))
         }
 
         if (!economy.has(creator, normalizedStake)) {
-            return ServiceResult.fail("余额不足,需要 ${economy.format(normalizedStake)}")
+            return ServiceResult.fail(ui("err-insufficient-funds", mapOf("value" to economy.format(normalizedStake))))
         }
 
         val contractId = UUID.randomUUID().toString()
         val pendingId = try {
             pending.beginWithdraw(creator.uniqueId, normalizedStake, "wager-create", contractId)
         } catch (ex: IOException) {
-            return ServiceResult.fail("无法写入待办事务日志: ${ex.message}")
+            return ServiceResult.fail(ui("err-pending-log", mapOf("error" to (ex.message ?: ""))))
         }
         val withdrawal = economy.withdraw(creator, normalizedStake)
         if (!withdrawal.success()) {
             tryClearPending(pendingId)
-            return ServiceResult.fail("扣款失败: ${withdrawal.reason()}")
+            return ServiceResult.fail(ui("err-withdraw-failed", mapOf("reason" to withdrawal.reason())))
         }
 
         val now = System.currentTimeMillis()
@@ -923,7 +988,7 @@ class ContractService(
         } catch (ex: IOException) {
             storage.remove(contract.id())
             refundOrKeepPending(creator.uniqueId, normalizedStake, pendingId)
-            return ServiceResult.fail("保存失败,已退回扣款: ${ex.message}")
+            return ServiceResult.fail(ui("err-save-refunded", mapOf("error" to (ex.message ?: ""))))
         }
         eventLog.append(contract.id(), "CREATED", "${creator.name} opened wager vs $opponentName, stake ${normalizedStake.toPlainString()}")
         tryClearPending(pendingId)
@@ -933,14 +998,14 @@ class ContractService(
     @Synchronized
     fun resolveWager(arbiter: Player, contract: Contract, winner: String): ServiceResult {
         if (contract.type() != ContractType.WAGER) {
-            return ServiceResult.fail("这不是对赌合同")
+            return ServiceResult.fail(ui("err-not-wager"))
         }
         if (contract.status() != ContractStatus.IN_PROGRESS && contract.status() != ContractStatus.SUBMITTED) {
-            return ServiceResult.fail("当前状态不可裁决")
+            return ServiceResult.fail(ui("err-not-resolvable"))
         }
         val arbiterParticipant = contract.arbiter()
         if (arbiterParticipant == null || arbiterParticipant.uuid() == null || arbiterParticipant.uuid() != arbiter.uniqueId) {
-            return ServiceResult.fail("只有指定的仲裁者可以裁决")
+            return ServiceResult.fail(ui("err-arbiter-only"))
         }
 
         val condition: PayoutCondition
@@ -952,7 +1017,7 @@ class ContractService(
             condition = PayoutCondition.DISPUTE_RESOLVED_FOR_CONTRACTOR
             winnerRole = ParticipantRole.PARTY_B
         } else {
-            return ServiceResult.fail("裁决结果必须是 a 或 b")
+            return ServiceResult.fail(ui("err-resolve-arg"))
         }
         val winnerName = contract.participant(winnerRole).map { it.displayName() }.orElse(winner)
         return settle(
@@ -967,10 +1032,10 @@ class ContractService(
     @Synchronized
     fun acceptMediation(mediator: Player, contract: Contract): ServiceResult {
         if (!isAssignedArbiter(mediator, contract)) {
-            return ServiceResult.fail("只有指定中间人可以接受此职责")
+            return ServiceResult.fail(ui("err-mediator-only-accept"))
         }
         if (contract.arbiterAccepted()) {
-            return ServiceResult.fail("中间人职责已经接受")
+            return ServiceResult.fail(ui("err-mediator-already-accepted"))
         }
         contract.arbiterAccepted(true)
         val now = System.currentTimeMillis()
@@ -981,19 +1046,19 @@ class ContractService(
     @Synchronized
     fun mediate(mediator: Player, contract: Contract, decision: String): ServiceResult {
         if (!isAssignedArbiter(mediator, contract)) {
-            return ServiceResult.fail("只有指定中间人可以裁决这个合同")
+            return ServiceResult.fail(ui("err-mediator-only"))
         }
         if (decision.equals("accept", ignoreCase = true)) {
             return acceptMediation(mediator, contract)
         }
         if (!contract.arbiterAccepted()) {
-            return ServiceResult.fail("中间人需要先接受职责: /contract mediate ${contract.shortId()} accept")
+            return ServiceResult.fail(ui("err-mediator-accept-first", mapOf("id" to contract.shortId())))
         }
         if (contract.status().isFinal()) {
-            return ServiceResult.fail("已结束的合同不能裁决")
+            return ServiceResult.fail(ui("err-final-not-mediatable"))
         }
         if (contract.status() == ContractStatus.OPEN || contract.status() == ContractStatus.PENDING_ACCEPT) {
-            return ServiceResult.fail("合同尚未生效,不能由中间人裁决")
+            return ServiceResult.fail(ui("err-not-active-mediate"))
         }
         val normalized = decision.lowercase(Locale.ROOT)
         if (contract.type() == ContractType.WAGER && (normalized == "a" || normalized == "owner")) {
@@ -1008,7 +1073,7 @@ class ContractService(
             "refund", "void", "failure" -> settle(contract, PayoutCondition.FAILURE, ContractStatus.CANCELLED, "MEDIATOR_REFUNDED", "${mediator.name} mediated refund")
             "owner", "a" -> mediateForSide(mediator, contract, PayoutCondition.DISPUTE_RESOLVED_FOR_OWNER, "MEDIATOR_OWNER_WIN", "owner/party A")
             "contractor", "b" -> mediateForSide(mediator, contract, PayoutCondition.DISPUTE_RESOLVED_FOR_CONTRACTOR, "MEDIATOR_CONTRACTOR_WIN", "contractor/party B")
-            else -> ServiceResult.fail("裁决结果必须是 accept、pay、refund、owner/a 或 contractor/b")
+            else -> ServiceResult.fail(ui("err-mediate-arg"))
         }
     }
 
@@ -1036,21 +1101,21 @@ class ContractService(
     @Synchronized
     fun submit(player: Player, contract: Contract): ServiceResult {
         if (contract.type() != ContractType.SERVICE) {
-            return ServiceResult.fail("这个合同类型不使用提交完成流程")
+            return ServiceResult.fail(ui("err-submit-unsupported"))
         }
         if (contract.status() != ContractStatus.IN_PROGRESS) {
-            return ServiceResult.fail("只有进行中的合同可以提交完成")
+            return ServiceResult.fail(ui("err-submit-not-in-progress"))
         }
         if (player.uniqueId != contract.contractorUuid()) {
-            return ServiceResult.fail("只有接单者可以提交完成")
+            return ServiceResult.fail(ui("err-submit-contractor-only"))
         }
         if (contract.systemVerifiedService()) {
-            val objective = contract.objective() ?: return ServiceResult.fail("系统验收目标缺失")
+            val objective = contract.objective() ?: return ServiceResult.fail(ui("err-objective-missing"))
             if (objective.type() != ObjectiveType.DELIVER_ITEM) {
                 if (objective.type() == ObjectiveType.DELIVER_MONEY) {
                     return submitMoneyObjective(player, contract, objective)
                 }
-                return ServiceResult.fail("这份委托由系统自动记录进度，不需要手动提交")
+                return ServiceResult.fail(ui("err-objective-auto"))
             }
             return submitDeliveryObjective(player, contract, objective)
         }
@@ -1063,7 +1128,7 @@ class ContractService(
 
     private fun submitDeliveryObjective(player: Player, contract: Contract, objective: ContractObjective): ServiceResult {
         val material = Material.matchMaterial(objective.target())
-            ?: return ServiceResult.fail("交付目标物品无效: ${objective.target()}")
+            ?: return ServiceResult.fail(ui("err-deliver-target-invalid", mapOf("target" to objective.target())))
         val remaining = objective.remaining()
         if (remaining <= 0) {
             return completeObjective(contract, player.name, "delivery already satisfied")
@@ -1074,12 +1139,12 @@ class ContractService(
         val collection = collectDeliveryItems(player, material, remaining)
         if (collection.items.isEmpty()) {
             if (collection.ruleGemBlocked > 0) {
-                return ServiceResult.fail("检测到 RuleGems 宝石物品。为避免宝石状态异常,系统交付不接收 RuleGems 物品")
+                return ServiceResult.fail(ui("err-rulegems-deliver"))
             }
-            return ServiceResult.fail("物品不足,还需要 $remaining 个 ${material.name},当前背包有 0 个可交付物品")
+            return ServiceResult.fail(ui("err-items-missing", mapOf("remaining" to remaining.toString(), "material" to material.name, "have" to "0")))
         }
         if (collection.amount < remaining) {
-            return ServiceResult.fail("物品不足,还需要 $remaining 个 ${material.name},当前背包有 ${collection.amount} 个可交付物品")
+            return ServiceResult.fail(ui("err-items-missing", mapOf("remaining" to remaining.toString(), "material" to material.name, "have" to collection.amount.toString())))
         }
         contract.addDeliveryItems(collection.items)
         objective.addProgress(remaining)
@@ -1091,7 +1156,7 @@ class ContractService(
             player.updateInventory()
             contract.deliveryItems(storedBefore)
             objective.progress(progressBefore)
-            return ServiceResult.fail("保存交付物品失败,已回滚背包: ${ex.message}")
+            return ServiceResult.fail(ui("err-deliver-save-failed", mapOf("error" to (ex.message ?: ""))))
         }
         return completeObjective(contract, player.name, "delivered ${objective.required()} ${material.name}")
     }
@@ -1102,21 +1167,21 @@ class ContractService(
             return completeObjective(contract, player.name, "money delivery already satisfied")
         }
         if (!economy.has(player, amount)) {
-            return ServiceResult.fail("余额不足,还需要提交 ${economy.format(amount)}")
+            return ServiceResult.fail(ui("err-deliver-money-short", mapOf("value" to economy.format(amount))))
         }
         val contractor = contract.participant(ParticipantRole.CONTRACTOR).orElse(null)
-            ?: return ServiceResult.fail("合同缺少接单者")
+            ?: return ServiceResult.fail(ui("err-no-contractor"))
         val stakeBefore = contractor.stake()
         val progressBefore = objective.progress()
         val pendingId = try {
             pending.beginWithdraw(player.uniqueId, amount, "contract-deliver-money", contract.id())
         } catch (ex: IOException) {
-            return ServiceResult.fail("无法写入货币交付待办事务日志: ${ex.message}")
+            return ServiceResult.fail(ui("err-money-pending-log", mapOf("error" to (ex.message ?: ""))))
         }
         val withdrawal = economy.withdraw(player, amount)
         if (!withdrawal.success()) {
             tryClearPending(pendingId)
-            return ServiceResult.fail("扣款失败: ${withdrawal.reason()}")
+            return ServiceResult.fail(ui("err-withdraw-failed", mapOf("reason" to withdrawal.reason())))
         }
         contractor.addStake(Asset.money(amount))
         objective.addProgress(objective.remaining())
@@ -1127,7 +1192,7 @@ class ContractService(
             contractor.stake(stakeBefore)
             objective.progress(progressBefore)
             refundOrKeepPending(player.uniqueId, amount, pendingId)
-            return ServiceResult.fail("保存货币交付失败,已尝试退回扣款: ${ex.message}")
+            return ServiceResult.fail(ui("err-money-save-failed", mapOf("error" to (ex.message ?: ""))))
         }
         logEvent(contract, System.currentTimeMillis(), "OBJECTIVE_PROGRESS", "${player.name} delivered ${amount.toPlainString()} money into contract escrow")
         return completeObjective(contract, player.name, "delivered ${amount.toPlainString()} money")
@@ -1136,13 +1201,13 @@ class ContractService(
     @Synchronized
     fun claimDeliveryItems(player: Player, contract: Contract): ServiceResult {
         if (contract.type() != ContractType.SERVICE) {
-            return ServiceResult.fail("这个合同类型没有可领取的暂存物品")
+            return ServiceResult.fail(ui("err-claim-unsupported"))
         }
         if (contract.hasDeliveryItems() && player.uniqueId == contract.ownerUuid()) {
             if (contract.status() != ContractStatus.COMPLETED) {
-                return ServiceResult.fail("交付物品需要在合同完成后领取")
+                return ServiceResult.fail(ui("err-claim-after-completion"))
             }
-            return claimStoredItems(player, contract, contract.deliveryItems(), "交付物品") {
+            return claimStoredItems(player, contract, contract.deliveryItems(), StoredItemKind.DELIVERY) {
                 contract.clearDeliveryItems()
             }
         }
@@ -1152,27 +1217,34 @@ class ContractService(
                 (contract.status() == ContractStatus.CANCELLED || contract.status() == ContractStatus.EXPIRED) &&
                     player.uniqueId == contract.ownerUuid()
             if (canClaimCompletedReward || canReclaimClosedReward) {
-                return claimStoredItems(player, contract, contract.rewardItems(), "奖励物品") {
+                return claimStoredItems(player, contract, contract.rewardItems(), StoredItemKind.REWARD) {
                     contract.clearRewardItems()
                 }
             }
         }
-        return ServiceResult.fail("当前没有你可以领取的暂存物品")
+        return ServiceResult.fail(ui("err-claim-nothing"))
     }
 
-    private fun claimStoredItems(player: Player, contract: Contract, items: List<ItemStack>, label: String, clear: () -> Unit): ServiceResult {
+    /** Which stored-item pool a claim is draining. Kept typed so restore-on-failure never keys off display text. */
+    private enum class StoredItemKind(val labelKey: String) {
+        DELIVERY("stored-delivery-items"),
+        REWARD("stored-reward-items"),
+    }
+
+    private fun claimStoredItems(player: Player, contract: Contract, items: List<ItemStack>, kind: StoredItemKind, clear: () -> Unit): ServiceResult {
+        val label = ui(kind.labelKey)
         if (items.isEmpty()) {
-            return ServiceResult.fail("这份合同没有可领取的$label")
+            return ServiceResult.fail(ui("claim-none-of-kind", mapOf("kind" to label)))
         }
         val inventoryBefore = cloneStorageContents(player)
         val leftovers = player.inventory.addItem(*items.map { it.clone() }.toTypedArray())
         if (leftovers.isNotEmpty()) {
             player.inventory.storageContents = inventoryBefore
             player.updateInventory()
-            return ServiceResult.fail("背包空间不足,请清理后再领取")
+            return ServiceResult.fail(ui("claim-inventory-full"))
         }
         clear()
-        logEvent(contract, System.currentTimeMillis(), "ITEMS_CLAIMED", "${player.name} claimed ${items.sumOf { it.amount }} stored $label")
+        logEvent(contract, System.currentTimeMillis(), "ITEMS_CLAIMED", "${player.name} claimed ${items.sumOf { it.amount }} stored ${kind.name.lowercase(Locale.ROOT)} items")
         return try {
             storage.save()
             player.updateInventory()
@@ -1180,12 +1252,11 @@ class ContractService(
         } catch (ex: IOException) {
             player.inventory.storageContents = inventoryBefore
             player.updateInventory()
-            if (label == "交付物品") {
-                contract.deliveryItems(items)
-            } else {
-                contract.rewardItems(items)
+            when (kind) {
+                StoredItemKind.DELIVERY -> contract.deliveryItems(items)
+                StoredItemKind.REWARD -> contract.rewardItems(items)
             }
-            ServiceResult.fail("保存领取状态失败,已回滚背包: ${ex.message}")
+            ServiceResult.fail(ui("claim-save-failed", mapOf("error" to (ex.message ?: ""))))
         }
     }
 
@@ -1235,7 +1306,7 @@ class ContractService(
 
     private fun completeObjective(contract: Contract, actorName: String, detail: String): ServiceResult {
         if (contract.status() != ContractStatus.IN_PROGRESS) {
-            return ServiceResult.fail("合同当前不可自动结算")
+            return ServiceResult.fail(ui("err-auto-settle-blocked"))
         }
         contract.submittedAt(System.currentTimeMillis())
         return pay(contract, "SYSTEM_OBJECTIVE_COMPLETED", "$actorName completed objective: $detail")
@@ -1247,16 +1318,16 @@ class ContractService(
             return approvePartnership(player, contract)
         }
         if (contract.type() != ContractType.SERVICE) {
-            return ServiceResult.fail("这个合同类型不能用 approve 确认")
+            return ServiceResult.fail(ui("err-approve-unsupported"))
         }
         // Owner may confirm payment as soon as the work is done — either after the contractor submits
         // (SUBMITTED) or proactively while still IN_PROGRESS (early acceptance). The owner only ever
         // gives away their own escrow to the contractor they chose, so this harms no third party.
         if (contract.status() != ContractStatus.SUBMITTED && contract.status() != ContractStatus.IN_PROGRESS) {
-            return ServiceResult.fail("只有进行中或待确认的合同可以确认付款")
+            return ServiceResult.fail(ui("err-approve-status"))
         }
         if (player.uniqueId != contract.ownerUuid()) {
-            return ServiceResult.fail("只有雇主可以确认这个合同")
+            return ServiceResult.fail(ui("err-approve-owner-only"))
         }
         val early = contract.status() == ContractStatus.IN_PROGRESS
         return pay(
@@ -1268,9 +1339,10 @@ class ContractService(
 
     @Synchronized
     fun cancel(player: Player, contract: Contract): ServiceResult {
+        val wasScheduled = contract.status() == ContractStatus.SCHEDULED
         val result = cancelInternal(player, contract)
         // Only count a real cancellation against the canceller; an escalation to dispute is not one.
-        if (result.success() && result.contract()?.status() == ContractStatus.CANCELLED) {
+        if (!wasScheduled && result.success() && result.contract()?.status() == ContractStatus.CANCELLED) {
             plugin.reputation().recordCancelled(player.uniqueId, player.name)
         }
         return result
@@ -1281,9 +1353,12 @@ class ContractService(
         val isOwner = playerUuid == contract.ownerUuid()
         val isContractor = playerUuid == contract.contractorUuid()
         if (!isOwner && !isContractor) {
-            return ServiceResult.fail("只有合同相关玩家可以取消")
+            return ServiceResult.fail(ui("err-cancel-participants-only"))
         }
         val now = System.currentTimeMillis()
+        if (contract.status() == ContractStatus.SCHEDULED && isOwner) {
+            return refund(contract, ContractStatus.CANCELLED, "SCHEDULE_CANCELLED", "${player.name} cancelled the scheduled contract", contract.creationFee())
+        }
         if (contract.status() == ContractStatus.OPEN && isOwner) {
             val refundFee = plugin.config.getBoolean("economy.refund-creation-fee-on-cancel", false)
             val extra = if (refundFee) contract.creationFee() else BigDecimal.ZERO
@@ -1297,11 +1372,11 @@ class ContractService(
         }
         if (contract.status() == ContractStatus.IN_PROGRESS || contract.status() == ContractStatus.SUBMITTED) {
             contract.status(ContractStatus.DISPUTED)
-            contract.disputeReason("取消请求需要管理员处理")
+            contract.disputeReason(ui("dispute-cancel-request"))
             logEvent(contract, now, "DISPUTED", "${player.name} requested cancellation during active work")
             return dirty(contract)
         }
-        return ServiceResult.fail("这个状态下不能取消合同")
+        return ServiceResult.fail(ui("err-cancel-status"))
     }
 
     @Synchronized
@@ -1310,26 +1385,26 @@ class ContractService(
         val isOwner = playerUuid == contract.ownerUuid()
         val isContractor = playerUuid == contract.contractorUuid()
         if (!isOwner && !isContractor) {
-            return ServiceResult.fail("只有合同相关玩家可以发起争议")
+            return ServiceResult.fail(ui("err-dispute-participants-only"))
         }
         if (isOwner && !plugin.config.getBoolean("disputes.allow-owner-dispute", true)) {
-            return ServiceResult.fail("当前不允许雇主发起争议")
+            return ServiceResult.fail(ui("err-dispute-owner-blocked"))
         }
         if (isContractor && !plugin.config.getBoolean("disputes.allow-contractor-dispute", true)) {
-            return ServiceResult.fail("当前不允许接单者发起争议")
+            return ServiceResult.fail(ui("err-dispute-contractor-blocked"))
         }
         if (contract.status() == ContractStatus.DISPUTED) {
-            return ServiceResult.fail("合同已经处于争议状态")
+            return ServiceResult.fail(ui("err-already-disputed"))
         }
         if (!canInitiatePlayerDispute(contract.status())) {
-            return ServiceResult.fail("已结束的合同不能发起争议")
+            return ServiceResult.fail(ui("err-dispute-final"))
         }
         val now = System.currentTimeMillis()
         // Remember who raised it and the state to return to, so the initiator can withdraw it later.
         contract.metadata["dispute-by"] = playerUuid.toString()
         contract.metadata["dispute-prev-status"] = contract.status().name
         contract.status(ContractStatus.DISPUTED)
-        contract.disputeReason(Text.stripControl(reason))
+        contract.disputeReason(plugin.text().stripControl(reason))
         logEvent(contract, now, "DISPUTED", "${player.name}: ${contract.disputeReason()}")
         plugin.reputation().recordDisputed(playerUuid, player.name)
         return dirty(contract)
@@ -1343,23 +1418,23 @@ class ContractService(
     @Synchronized
     fun withdrawDispute(player: Player, contract: Contract): ServiceResult {
         if (contract.status() != ContractStatus.DISPUTED) {
-            return ServiceResult.fail("只有处于争议中的合同可以撤销争议")
+            return ServiceResult.fail(ui("err-withdraw-not-disputed"))
         }
         val raisedBy = contract.metadata["dispute-by"]
         val previousName = contract.metadata["dispute-prev-status"]
         if (raisedBy == null || previousName == null) {
-            return ServiceResult.fail("这个争议需要管理员处理，不能自行撤销")
+            return ServiceResult.fail(ui("err-withdraw-admin-only"))
         }
         if (raisedBy != player.uniqueId.toString()) {
-            return ServiceResult.fail("只有发起争议的玩家可以撤销争议")
+            return ServiceResult.fail(ui("err-withdraw-initiator-only"))
         }
         val previous = try {
             ContractStatus.valueOf(previousName)
         } catch (ex: IllegalArgumentException) {
-            return ServiceResult.fail("无法恢复争议前的状态，请联系管理员")
+            return ServiceResult.fail(ui("err-withdraw-no-state"))
         }
         if (!isRestorableDisputeStatus(previous)) {
-            return ServiceResult.fail("争议前状态无效，请联系管理员")
+            return ServiceResult.fail(ui("err-withdraw-bad-state"))
         }
         val now = System.currentTimeMillis()
         contract.status(previous)
@@ -1374,13 +1449,13 @@ class ContractService(
     @Synchronized
     fun adminPay(contract: Contract, adminName: String): ServiceResult {
         if (contract.contractorUuid() == null) {
-            return ServiceResult.fail("没有接单者，不能付款")
+            return ServiceResult.fail(ui("err-pay-no-contractor"))
         }
         if (contract.status().isFinal()) {
-            return ServiceResult.fail("合同已经结束")
+            return ServiceResult.fail(ui("err-contract-final"))
         }
         if (contract.payoutsFor(PayoutCondition.SUCCESS).isEmpty()) {
-            return ServiceResult.fail("这个合同类型没有默认成功付款规则，请使用对应裁决或退款流程")
+            return ServiceResult.fail(ui("err-no-success-rule"))
         }
         return pay(contract, "ADMIN_PAID", "$adminName forced payment")
     }
@@ -1388,7 +1463,7 @@ class ContractService(
     @Synchronized
     fun adminRefund(contract: Contract, adminName: String): ServiceResult {
         if (contract.status().isFinal()) {
-            return ServiceResult.fail("合同已经结束")
+            return ServiceResult.fail(ui("err-contract-final"))
         }
         return refund(contract, ContractStatus.CANCELLED, "ADMIN_REFUNDED", "$adminName forced refund")
     }
@@ -1396,7 +1471,7 @@ class ContractService(
     @Synchronized
     fun adminClose(contract: Contract, adminName: String): ServiceResult {
         if (contract.status().isFinal()) {
-            return ServiceResult.fail("合同已经结束")
+            return ServiceResult.fail(ui("err-contract-final"))
         }
         val now = System.currentTimeMillis()
         contract.status(ContractStatus.CANCELLED)
@@ -1432,6 +1507,22 @@ class ContractService(
         return changed
     }
 
+    /** Idempotently reveals due contracts; existing child IDs and escrow stay unchanged. */
+    @Synchronized
+    fun activateScheduled(now: Long = System.currentTimeMillis()): Int {
+        var activated = 0
+        for (contract in storage.all()) {
+            val publishAt = contract.publishAt()
+            if (SchedulingRules.shouldActivate(contract.status(), publishAt, now)) {
+                contract.status(ContractStatus.OPEN)
+                logEvent(contract, now, "PUBLISHED", "scheduled contract published")
+                activated++
+            }
+        }
+        if (activated > 0) storage.markDirty()
+        return activated
+    }
+
     private fun purgeRetiredContracts(now: Long): Int {
         val completedDays = plugin.config.getInt("retention.completed-contract-days", 90)
         val closedDays = plugin.config.getInt("retention.closed-contract-days", 30)
@@ -1450,7 +1541,7 @@ class ContractService(
             try {
                 storage.save()
             } catch (ex: IOException) {
-                plugin.logger.warning("Failed to persist retired contract purge: ${ex.message}")
+                plugin.log().warn("Failed to persist retired contract purge: ${ex.message}")
             }
         }
         return removed
@@ -1459,9 +1550,9 @@ class ContractService(
     private fun rejectExpiredAcceptance(contract: Contract): ServiceResult {
         val result = expireAwaitingAcceptance(contract)
         if (!result.success()) {
-            return ServiceResult.fail("合同已过接单截止时间，自动处理失败: ${result.reason()}")
+            return ServiceResult.fail(ui("err-expiry-failed", mapOf("reason" to result.reason())))
         }
-        return ServiceResult.fail("合同已过接单截止时间")
+        return ServiceResult.fail(ui("err-expired"))
     }
 
     private fun expireAwaitingAcceptance(contract: Contract): ServiceResult =
@@ -1473,7 +1564,7 @@ class ContractService(
                 "EXPIRED_PENDING",
                 "opponent did not accept in time",
             )
-            else -> ServiceResult.fail("合同当前状态不按接单截止处理")
+            else -> ServiceResult.fail(ui("err-expiry-not-applicable"))
         }
 
     @Synchronized
@@ -1488,6 +1579,7 @@ class ContractService(
         storage.flushIfDirty()
         plugin.reputation().flushIfDirty()
         batchAcceptances.flushIfDirty()
+        plugin.templates().flushIfDirty()
     }
 
     private fun pay(contract: Contract, eventType: String, detail: String): ServiceResult =
@@ -1511,7 +1603,7 @@ class ContractService(
         val ownerUuid = contract.ownerUuid() ?: throw NullPointerException("ownerUuid")
         val bonus = economy.deposit(ownerUuid, extra)
         if (!bonus.success()) {
-            return ServiceResult.fail("退款附加失败: ${bonus.reason()}")
+            return ServiceResult.fail(ui("err-refund-bonus-failed", mapOf("reason" to bonus.reason())))
         }
         val baseContract = base.contract() ?: throw NullPointerException("contract")
         return ServiceResult.ok(baseContract, base.amount().add(extra))
@@ -1550,12 +1642,12 @@ class ContractService(
         detail: String,
     ): ServiceResult {
         if (rules.isEmpty()) {
-            return ServiceResult.fail("这个合同没有可用的结算规则: $purpose")
+            return ServiceResult.fail(ui("err-no-settlement-rule", mapOf("purpose" to purpose)))
         }
         val settlementId = try {
             pending.beginSettlement(contract.id(), "$purpose:$eventType")
         } catch (ex: IOException) {
-            return ServiceResult.fail("无法写入结算事务日志: ${ex.message}")
+            return ServiceResult.fail(ui("err-settlement-log", mapOf("error" to (ex.message ?: ""))))
         }
 
         val outcome = executePayouts(contract, rules, settlementId, purpose)
@@ -1577,22 +1669,22 @@ class ContractService(
             tryClearPending(settlementId)
             return ServiceResult.ok(contract, totalParticipantPayout)
         } catch (ex: IOException) {
-            return ServiceResult.fail("保存失败，结算可能已执行，已保留待恢复事务 $settlementId: ${ex.message}")
+            return ServiceResult.fail(ui("err-settlement-save", mapOf("id" to settlementId, "error" to (ex.message ?: ""))))
         }
     }
 
     private fun interruptSettlement(contract: Contract, settlementId: String, reason: String): ServiceResult {
         val now = System.currentTimeMillis()
         contract.status(ContractStatus.DISPUTED)
-        contract.disputeReason("结算中断，需要管理员核对 pending transaction $settlementId")
+        contract.disputeReason(ui("dispute-settlement-interrupted", mapOf("id" to settlementId)))
         logEvent(contract, now, "SETTLEMENT_INTERRUPTED", "$reason; pending $settlementId")
         try {
             storage.save()
             tryClearPending(settlementId)
         } catch (ex: IOException) {
-            return ServiceResult.fail("结算中断且保存恢复状态失败: ${ex.message}")
+            return ServiceResult.fail(ui("err-settlement-recovery", mapOf("error" to (ex.message ?: ""))))
         }
-        return ServiceResult.fail("结算中断，合同已转入争议等待管理员核对: $reason")
+        return ServiceResult.fail(ui("err-settlement-disputed", mapOf("reason" to reason)))
     }
 
     private fun executePayouts(
@@ -1619,7 +1711,7 @@ class ContractService(
                     val targetUuid = target?.uuid()
                     if (target == null || targetUuid == null) {
                         outcome.success = false
-                        outcome.error = "找不到收款方角色 $recipientRole"
+                        outcome.error = ui("err-recipient-role-missing", mapOf("role" to recipientRole.name))
                         return outcome
                     }
                     val deposit = depositWithPending(contract, targetUuid, share, purpose, settlementId, "rule-$index-$recipientRole")
@@ -1637,7 +1729,7 @@ class ContractService(
                     val arbiterUuid = arbiter?.uuid()
                     if (arbiter == null || arbiterUuid == null) {
                         outcome.success = false
-                        outcome.error = "合同没有 arbiter"
+                        outcome.error = ui("err-no-arbiter")
                         return outcome
                     }
                     val deposit = depositWithPending(contract, arbiterUuid, share, purpose, settlementId, "rule-$index-ARBITER")
@@ -1665,7 +1757,7 @@ class ContractService(
         val pendingId = try {
             pending.beginDeposit(playerUuid, amount, purpose, contract.id(), payoutKey, settlementId)
         } catch (ex: IOException) {
-            return EconomyService.TransactionResult.fail("无法写入 payout 待办事务日志: ${ex.message}")
+            return EconomyService.TransactionResult.fail(ui("err-payout-log", mapOf("error" to (ex.message ?: ""))))
         }
         val deposit = economy.deposit(playerUuid, amount)
         if (!deposit.success()) {
@@ -1796,7 +1888,7 @@ class ContractService(
             storage.save()
             ServiceResult.ok(contract, amount)
         } catch (ex: IOException) {
-            ServiceResult.fail("保存失败: ${ex.message}")
+            ServiceResult.fail(ui("err-save-failed", mapOf("error" to (ex.message ?: ""))))
         }
 
     companion object {
@@ -1836,6 +1928,7 @@ class ContractService(
         fun requiresBatchPermission(contractCount: Int): Boolean = contractCount > 1
 
         private const val BATCH_CREATE_PERMISSION = "contract.create.batch"
+        private const val SCHEDULE_CREATE_PERMISSION = "contract.schedule.create"
         private const val BATCH_REPEAT_BYPASS_PERMISSION = "contract.bypass.batch-repeat-limit"
         private const val DEFAULT_REPEAT_COOLDOWN_HOURS = 24
 

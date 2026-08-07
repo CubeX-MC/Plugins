@@ -1,4 +1,4 @@
-config-version: 5
+config-version: 6
 language: zh_CN
 
 economy:
@@ -21,6 +21,10 @@ limits:
   max-batch-contracts: 64
   # 批量任务“冷却后可重复”模式允许设置的最大冷却小时数
   max-repeat-cooldown-hours: 8760
+  # 每名玩家最多保存多少个私有/服务器合同模板
+  max-templates-per-player: 32
+  # 每名发布者最多保留多少个尚未到点的定时合同子任务
+  max-scheduled-contracts: 64
   max-active-accepted-contracts: 3
   max-title-length: 80
   max-description-length: 500
@@ -40,6 +44,12 @@ retention:
 
 storage:
   flush-interval-seconds: 30
+
+scheduling:
+  # 一次性定时发布最多可设置到未来多少天
+  max-days-ahead: 30
+  # 到点发布扫描间隔；重复扫描是幂等的，不会创建重复合同
+  scan-interval-seconds: 30
 
 display:
   page-size: 8

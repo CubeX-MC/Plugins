@@ -10,10 +10,11 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Logger;
+import org.cubexmc.core.CubexLogger;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.cubexmc.contract.ContractPlugin;
 import org.cubexmc.contract.model.ContractStatus;
-import org.cubexmc.contract.util.Text;
+import org.cubexmc.core.CubexText;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -44,7 +45,7 @@ class LanguageManagerTest {
         String footer = manager.message("list-footer");
 
         // Assert
-        assertEquals(Text.color("&#F4D03F[Contract]&#F1F5F9 &#69DB7C合同已发布: &#FFE066#abc123 &#F1F5F9已托管 &#69DB7C$50&#F1F5F9。")
+        assertEquals(new CubexText().color("&#F4D03F[Contract]&#F1F5F9 &#69DB7C合同已发布: &#FFE066#abc123 &#F1F5F9已托管 &#69DB7C$50&#F1F5F9。")
                         .toLowerCase(Locale.ROOT),
                 created.toLowerCase(Locale.ROOT));
         assertTrue(usage.contains("/contract info <id>"));
@@ -69,7 +70,9 @@ class LanguageManagerTest {
 
         // Assert
         assertEquals("公开中", manager.status(ContractStatus.OPEN));
-        assertEquals("missing-key", manager.message("missing-key"));
+        // Every section is addressed by its full key now, so a miss reports the whole path — which
+        // is what an operator needs in order to find the entry to add.
+        assertEquals("messages.missing-key", manager.message("missing-key"));
     }
 
     private void writeV2Lang(String content) throws Exception {
@@ -82,9 +85,10 @@ class LanguageManagerTest {
         ContractPlugin plugin = mock(ContractPlugin.class);
         YamlConfiguration config = new YamlConfiguration();
         config.set("language", "zh_CN");
+        when(plugin.log()).thenReturn(new CubexLogger(Logger.getLogger("LanguageManagerTest")));
         when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
         when(plugin.getConfig()).thenReturn(config);
-        when(plugin.getLogger()).thenReturn(Logger.getLogger("LanguageManagerTest"));
+        when(plugin.getLogger()).thenReturn((Logger.getLogger("LanguageManagerTest")));
         return plugin;
     }
 }

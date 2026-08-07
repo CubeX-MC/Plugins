@@ -8,15 +8,15 @@ import java.io.IOException
 import java.math.BigDecimal
 import java.util.ArrayList
 import java.util.UUID
-import java.util.logging.Logger
+import org.cubexmc.core.CubexLogger
 
 class PendingTransactionStore {
     private val file: File
-    private val logger: Logger
+    private val logger: CubexLogger
 
-    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "pending-transactions.yml"), plugin.logger)
+    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "pending-transactions.yml"), plugin.log())
 
-    constructor(file: File, logger: Logger) {
+    constructor(file: File, logger: CubexLogger) {
         this.file = file
         this.logger = logger
     }
@@ -113,7 +113,7 @@ class PendingTransactionStore {
                 val settlementId = section.getString("settlement-id")
                 entries.add(PendingEntry(id, type, playerUuid, amount, purpose, createdAt, contractId, payoutKey, settlementId))
             } catch (ex: RuntimeException) {
-                logger.warning("Skipping malformed pending transaction $id: ${ex.message}")
+                logger.warn("Skipping malformed pending transaction $id: ${ex.message}")
             }
         }
         return entries

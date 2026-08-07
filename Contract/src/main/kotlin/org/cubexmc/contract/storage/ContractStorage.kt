@@ -6,6 +6,8 @@ import org.bukkit.configuration.InvalidConfigurationException
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.core.Reloadable
+import org.cubexmc.core.Terminable
 import org.cubexmc.contract.model.Asset
 import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.ContractEvent
@@ -30,21 +32,25 @@ import java.util.LinkedHashMap
 import java.util.Objects
 import java.util.Optional
 import java.util.UUID
-import java.util.logging.Logger
+import org.cubexmc.core.CubexLogger
 
-class ContractStorage {
+/**
+ * Implements [Reloadable] so it can be a named stage in the plugin's reload chain, and
+ * [Terminable] so `bind(this)` flushes it on disable without a hand-written lambda.
+ */
+class ContractStorage : Reloadable, Terminable {
     private val file: File
     private val backupFile: File
     private val dataFolder: File?
-    private val logger: Logger
+    private val logger: CubexLogger
     private val contracts: MutableMap<String, Contract> = LinkedHashMap()
 
     @Volatile
     private var dirty = false
 
-    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "contract.yml"), plugin.logger)
+    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "contract.yml"), plugin.log())
 
-    constructor(file: File, logger: Logger) {
+    constructor(file: File, logger: CubexLogger) {
         this.file = file
         this.backupFile = File(file.parentFile, file.name + ".bak")
         this.dataFolder = file.parentFile
@@ -87,7 +93,7 @@ class ContractStorage {
             if (backupFile.exists()) {
                 try {
                     val recovered = parseContracts(loadStrict(backupFile))
-                    logger.warning("Recovered ${recovered.size} contracts from ${backupFile.name}.")
+                    logger.warn("Recovered ${recovered.size} contracts from ${backupFile.name}.")
                     return recovered
                 } catch (backup: Exception) {
                     logger.severe("Backup ${backupFile.name} is also unreadable: ${backup.message}")
@@ -116,7 +122,7 @@ class ContractStorage {
                 val contract = readContract(id, section)
                 result[contract.id()] = contract
             } catch (ex: RuntimeException) {
-                logger.warning("Skipping malformed contract $id: ${ex.message}")
+                logger.warn("Skipping malformed contract $id: ${ex.message}")
             }
         }
         return result
@@ -255,6 +261,7 @@ class ContractStorage {
             payouts,
             status,
             section.getLong("created-at"),
+            nullableLong(section, "publish-at"),
             nullableLong(section, "accepted-at"),
             nullableLong(section, "submitted-at"),
             nullableLong(section, "completed-at"),
@@ -332,6 +339,7 @@ class ContractStorage {
             rules,
             status,
             section.getLong("created-at"),
+            null,
             nullableLong(section, "accepted-at"),
             nullableLong(section, "submitted-at"),
             nullableLong(section, "completed-at"),
@@ -386,6 +394,7 @@ class ContractStorage {
 
         section["status"] = contract.status().name
         section["created-at"] = contract.createdAt()
+        section["publish-at"] = contract.publishAt()
         section["accepted-at"] = contract.acceptedAt()
         section["submitted-at"] = contract.submittedAt()
         section["completed-at"] = contract.completedAt()
@@ -458,7 +467,7 @@ class ContractStorage {
                     }
                 }
             } catch (ex: RuntimeException) {
-                logger.warning("Skipping malformed stored $path item: ${ex.message}")
+                logger.warn("Skipping malformed stored $path item: ${ex.message}")
             }
         }
         return result
@@ -497,4 +506,15 @@ class ContractStorage {
 
     private fun nullableLong(section: ConfigurationSection, path: String): Long? =
         if (section.contains(path)) section.getLong(path) else null
+
+    /** Reload stage: re-read the backing file. */
+    override fun reload() {
+        load()
+    }
+
+    /** Terminable: flush pending writes when the plugin shuts down. */
+    override fun close() {
+        flushIfDirty()
+    }
+
 }

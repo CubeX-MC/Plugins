@@ -10,6 +10,9 @@ import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.gui.framework.Menu
 import org.cubexmc.contract.gui.framework.MenuRegistry
 import org.cubexmc.contract.model.Contract
+import org.cubexmc.contract.model.BatchSummary
+import org.cubexmc.contract.model.ContractTemplate
+import org.cubexmc.contract.model.TemplateVisibility
 import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
@@ -17,9 +20,14 @@ import org.cubexmc.contract.model.ContractType
 import org.cubexmc.contract.model.ObjectiveType
 import org.cubexmc.contract.model.ParticipantRole
 import org.cubexmc.contract.service.ServiceResult
-import org.cubexmc.contract.util.Text
+import org.cubexmc.contract.service.BatchQueryService
+import org.cubexmc.core.Terminable
 import java.math.BigDecimal
 import java.util.UUID
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -30,7 +38,7 @@ import kotlin.math.min
  * Navigation runs through the [framework.Menu]/[framework.MenuRegistry] button framework rather than
  * a central slot switch; text/number entry runs through [ChatInputService].
  */
-class ContractGui(private val plugin: ContractPlugin) : Listener {
+class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
     private val drafts: MutableMap<UUID, CreateDraft> = HashMap()
 
     /** Pure presentation helpers (contract item icons, wizard preview). */
@@ -56,11 +64,18 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         openHall(player, HallView.OPEN, 1)
     }
 
-    fun closeSessions() {
+    /**
+     * Drops every open menu, in-flight draft and pending chat prompt. Called on disable via
+     * [Terminable], and as a reload stage so nobody keeps clicking a menu built from stale config.
+     */
+    override fun close() {
         registry.closeAll()
         drafts.clear()
         input.cancelAll()
     }
+
+    /** Named alias for [close]; reads better at the reload call sites. */
+    fun closeSessions() = close()
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
@@ -70,45 +85,105 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
     // ---- Hall (public board / my contracts / inbox) --------------------------------------------
 
     fun openHall(player: Player, view: HallView, page: Int) {
-        val contracts = hallContracts(player, view)
-        val pages = pageCount(contracts.size)
+        val entries = hallEntries(player, view)
+        val pages = pageCount(entries.size)
         val current = clampPage(page, pages)
         val menu = Menu(hallTitle(view), 6)
         fillBorder(menu.inventory)
 
-        menu.button(1, viewButton(HallView.OPEN, view, Material.EMERALD, "开放")) { openHall(player, HallView.OPEN, 1) }
-        menu.button(2, viewButton(HallView.ACTIVE, view, Material.CLOCK, "进行中")) { openHall(player, HallView.ACTIVE, 1) }
-        menu.button(3, viewButton(HallView.SUBMITTED, view, Material.DIAMOND, "待确认")) { openHall(player, HallView.SUBMITTED, 1) }
-        menu.button(4, viewButton(HallView.DISPUTED, view, Material.REDSTONE, "申诉中")) { openHall(player, HallView.DISPUTED, 1) }
-        menu.button(5, viewButton(HallView.DONE, view, Material.NETHER_STAR, "已完成")) { openHall(player, HallView.DONE, 1) }
-        menu.button(6, viewButton(HallView.CLOSED, view, Material.BARRIER, "已关闭")) { openHall(player, HallView.CLOSED, 1) }
+        menu.button(1, viewButton(HallView.OPEN, view, Material.EMERALD, ui("hall-view-open"))) { openHall(player, HallView.OPEN, 1) }
+        menu.button(2, viewButton(HallView.ACTIVE, view, Material.CLOCK, ui("hall-view-active"))) { openHall(player, HallView.ACTIVE, 1) }
+        menu.button(3, viewButton(HallView.SUBMITTED, view, Material.DIAMOND, ui("hall-view-submitted"))) { openHall(player, HallView.SUBMITTED, 1) }
+        menu.button(4, viewButton(HallView.DISPUTED, view, Material.REDSTONE, ui("hall-view-disputed"))) { openHall(player, HallView.DISPUTED, 1) }
+        menu.button(5, viewButton(HallView.DONE, view, Material.NETHER_STAR, ui("hall-view-done"))) { openHall(player, HallView.DONE, 1) }
+        menu.button(6, viewButton(HallView.CLOSED, view, Material.BARRIER, ui("hall-view-closed"))) { openHall(player, HallView.CLOSED, 1) }
 
         val back = { openHall(player, view, current) }
         val start = (current - 1) * BOARD_SLOTS.size
-        val end = min(start + BOARD_SLOTS.size, contracts.size)
+        val end = min(start + BOARD_SLOTS.size, entries.size)
         for (index in start until end) {
             val slot = BOARD_SLOTS[index - start]
-            val contract = contracts[index]
-            val label = inboxLabel(player, contract)
-            val contractId = contract.id()
-            menu.button(slot, render.contractItem(contract, label, progressLabel(player, contract))) {
-                plugin.storage().findByPrefix(contractId).ifPresent { found -> openDetails(player, found, false, back) }
+            when (val entry = entries[index]) {
+                is HallEntry.Single -> {
+                    val contract = entry.contract
+                    val contractId = contract.id()
+                    menu.button(slot, render.contractItem(contract, inboxLabel(player, contract), progressLabel(player, contract))) {
+                        plugin.storage().findByPrefix(contractId).ifPresent { found -> openDetails(player, found, false, back) }
+                    }
+                }
+                is HallEntry.Batch -> {
+                    val summary = entry.summary
+                    menu.button(slot, render.batchItem(summary, plugin.lang().ui(if (summary.available > 0) "batch-pool-action" else "batch-progress-action"))) {
+                        openBatchDetails(player, summary.batchId, 1, back)
+                    }
+                }
             }
         }
-        if (contracts.isEmpty()) {
-            menu.decoration(22, button(Material.LIME_DYE, "&#69DB7C${emptyHint(view)}", "&#CFD8DC换个筛选或稍后再来看看"))
+        if (entries.isEmpty()) {
+            menu.decoration(22, button(Material.LIME_DYE, emptyHint(view), ui("hall-empty-hint")))
         }
 
-        menu.button(45, button(Material.ARROW, "&#FFE066上一页", "&#CFD8DC第 $current/$pages 页")) { if (current > 1) openHall(player, view, current - 1) }
-        menu.button(49, button(Material.WRITABLE_BOOK, "&#69DB7C创建合同", "&#CFD8DC发布委托、对赌或合作")) { openWizardType(player) }
+        menu.button(45, button(Material.ARROW, ui("nav-prev"), pageLore(current, pages))) { if (current > 1) openHall(player, view, current - 1) }
+        if (player.hasPermission(TEMPLATE_USE_PERMISSION)) {
+            menu.button(48, button(Material.CHEST, ui("template-pool"), ui("template-pool-detail"))) { openTemplateLibrary(player, 1) }
+        }
+        menu.button(49, button(Material.WRITABLE_BOOK, ui("hall-create"), ui("hall-create-detail"))) { openWizardType(player) }
         val inboxCount = inboxContracts(player).size
-        menu.button(50, button(Material.BELL, "&#F4D03F刷新", "&#CFD8DC当前分栏: &#FFFFFF${contracts.size}", "&#CFD8DC待你处理: &#FFFFFF$inboxCount", "&#CFD8DC红色箭头代表当前轮到你操作")) { openHall(player, view, current) }
+        menu.button(
+            50,
+            button(
+                Material.BELL,
+                ui("hall-refresh"),
+                ui("hall-refresh-count", mapOf("count" to entries.size.toString())),
+                ui("hall-refresh-inbox", mapOf("count" to inboxCount.toString())),
+                ui("hall-refresh-hint"),
+            ),
+        ) { openHall(player, view, current) }
         if (player.hasPermission("contract.admin.view")) {
-            menu.button(51, button(Material.CRAFTING_TABLE, "&#E63946管理工作台", "&#CFD8DC处理争议、中断结算与全部合同")) { openAdmin(player, AdminFilter.DISPUTED, 1) }
+            menu.button(51, button(Material.CRAFTING_TABLE, ui("hall-admin"), ui("hall-admin-detail"))) { openAdmin(player, AdminFilter.DISPUTED, 1) }
         }
-        menu.button(52, button(Material.KNOWLEDGE_BOOK, "&#FFE066帮助", "&#CFD8DC查看命令与资金规则说明")) { sendHelp(player) }
-        menu.button(53, button(Material.ARROW, "&#FFE066下一页", "&#CFD8DC第 $current/$pages 页")) { openHall(player, view, current + 1) }
+        menu.button(52, button(Material.KNOWLEDGE_BOOK, ui("hall-help"), ui("hall-help-detail"))) { sendHelp(player) }
+        menu.button(53, button(Material.ARROW, ui("nav-next"), pageLore(current, pages))) { openHall(player, view, current + 1) }
 
+        registry.open(player, menu)
+    }
+
+    private fun openBatchDetails(player: Player, batchId: String, page: Int, back: () -> Unit) {
+        val summary = BatchQueryService.summaries(plugin.contracts().allContracts())[batchId]
+        if (summary == null) {
+            player.sendMessage(ui("batch-missing"))
+            back()
+            return
+        }
+        val pages = pageCount(summary.children.size)
+        val current = clampPage(page, pages)
+        val menu = Menu(ui("batch-title"), 6)
+        fillBorder(menu.inventory)
+        menu.decoration(4, render.batchItem(summary, "#${batchId.take(8)}"))
+        if (summary.available > 0 && summary.representative.ownerUuid() != player.uniqueId) {
+            menu.button(7, button(Material.EMERALD_BLOCK, ui("batch-accept"), ui("batch-accept-detail"), ui("batch-decrement"), ui("sign-required"))) {
+                val action = PendingAction.simple(
+                    PendingAction.Kind.ACCEPT_BATCH,
+                    summary.representative,
+                    batchId,
+                    ui("batch-confirm"),
+                    listOf(ui("batch-confirm-select"), ui("batch-confirm-one")),
+                )
+                openConfirm(player, action) { openBatchDetails(player, batchId, current, back) }
+            }
+        }
+        val start = (current - 1) * BOARD_SLOTS.size
+        val end = min(start + BOARD_SLOTS.size, summary.children.size)
+        for (index in start until end) {
+            val child = summary.children[index]
+            val childId = child.id()
+            menu.button(BOARD_SLOTS[index - start], render.contractItem(child, null, progressLabel(player, child))) {
+                plugin.storage().findByPrefix(childId).ifPresent { openDetails(player, it, false) { openBatchDetails(player, batchId, current, back) } }
+            }
+        }
+        menu.button(45, button(Material.ARROW, ui("nav-prev"), pageLore(current, pages))) { if (current > 1) openBatchDetails(player, batchId, current - 1, back) }
+        menu.button(49, button(Material.ARROW, ui("nav-back"), ui("nav-back-hall"))) { back() }
+        menu.button(53, button(Material.ARROW, ui("nav-next"), pageLore(current, pages))) { if (current < pages) openBatchDetails(player, batchId, current + 1, back) }
         registry.open(player, menu)
     }
 
@@ -120,12 +195,12 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         val contracts = adminContracts(filter)
         val pages = pageCount(contracts.size)
         val current = clampPage(page, pages)
-        val menu = Menu(ADMIN_TITLE, 6)
+        val menu = Menu(ui("admin-title"), 6)
         fillBorder(menu.inventory)
 
-        menu.button(1, adminFilterButton(AdminFilter.DISPUTED, filter, Material.REDSTONE, "争议/中断结算")) { openAdmin(player, AdminFilter.DISPUTED, 1) }
-        menu.button(2, adminFilterButton(AdminFilter.ACTIVE, filter, Material.CLOCK, "进行中")) { openAdmin(player, AdminFilter.ACTIVE, 1) }
-        menu.button(3, adminFilterButton(AdminFilter.ALL, filter, Material.COMPASS, "全部")) { openAdmin(player, AdminFilter.ALL, 1) }
+        menu.button(1, adminFilterButton(AdminFilter.DISPUTED, filter, Material.REDSTONE, ui("admin-filter-disputed"))) { openAdmin(player, AdminFilter.DISPUTED, 1) }
+        menu.button(2, adminFilterButton(AdminFilter.ACTIVE, filter, Material.CLOCK, ui("admin-filter-active"))) { openAdmin(player, AdminFilter.ACTIVE, 1) }
+        menu.button(3, adminFilterButton(AdminFilter.ALL, filter, Material.COMPASS, ui("admin-filter-all"))) { openAdmin(player, AdminFilter.ALL, 1) }
 
         val back = { openAdmin(player, filter, current) }
         val start = (current - 1) * BOARD_SLOTS.size
@@ -139,9 +214,9 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             }
         }
 
-        menu.button(45, button(Material.ARROW, "&#FFE066上一页", "&#CFD8DC第 $current/$pages 页")) { if (current > 1) openAdmin(player, filter, current - 1) }
-        menu.button(49, button(Material.EMERALD, "&#69DB7C返回合同大厅", "&#CFD8DC合同数: &#FFFFFF${contracts.size}")) { open(player) }
-        menu.button(53, button(Material.ARROW, "&#FFE066下一页", "&#CFD8DC第 $current/$pages 页")) { openAdmin(player, filter, current + 1) }
+        menu.button(45, button(Material.ARROW, ui("nav-prev"), pageLore(current, pages))) { if (current > 1) openAdmin(player, filter, current - 1) }
+        menu.button(49, button(Material.EMERALD, ui("nav-back-hall-button"), ui("admin-contract-count", mapOf("count" to contracts.size.toString())))) { open(player) }
+        menu.button(53, button(Material.ARROW, ui("nav-next"), pageLore(current, pages))) { openAdmin(player, filter, current + 1) }
 
         registry.open(player, menu)
     }
@@ -149,7 +224,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
     // ---- Details -------------------------------------------------------------------------------
 
     private fun openDetails(player: Player, contract: Contract, adminMode: Boolean, back: () -> Unit) {
-        val menu = Menu(DETAIL_TITLE_PREFIX + Text.color("&#FFE066#${contract.shortId()}"), 3)
+        val menu = Menu(ui("detail-title", mapOf("id" to contract.shortId())), 3)
         fillBorder(menu.inventory)
         menu.decoration(13, render.detailItem(contract))
 
@@ -158,7 +233,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         } else {
             renderParticipantActions(menu, player, contract, back)
         }
-        menu.button(22, button(Material.ARROW, "&#FFE066返回", "&#CFD8DC回到上一页")) { back() }
+        menu.button(22, button(Material.ARROW, ui("nav-back"), ui("nav-back-detail"))) { back() }
 
         registry.open(player, menu)
     }
@@ -169,79 +244,113 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
         val mediator = isArbiter(contract, player.uniqueId)
         if (contract.type() != ContractType.WAGER && mediator && !contract.arbiterAccepted()) {
-            action(10, button(Material.LECTERN, "&#69DB7C接受中间人职责", "&#CFD8DC接受后可在争议或失效时裁决"))
+            action(10, button(Material.LECTERN, ui("action-mediate-accept"), ui("action-mediate-accept-detail")))
         } else if (contract.type() != ContractType.WAGER && mediator && canMediate(contract)) {
             if (contract.type() == ContractType.SERVICE) {
-                action(10, button(Material.EMERALD, "&#69DB7C裁定付款", "&#CFD8DC认定合同有效完成并付款"))
-                action(11, button(Material.REDSTONE, "&#E63946裁定退款", "&#CFD8DC认定合同失效并退款"))
+                action(10, button(Material.EMERALD, ui("action-mediate-pay"), ui("action-mediate-pay-detail")))
+                action(11, button(Material.REDSTONE, ui("action-mediate-refund"), ui("action-mediate-refund-detail")))
             } else if (contract.type() == ContractType.PARTNERSHIP) {
-                action(10, button(Material.LIME_WOOL, "&#69DB7C裁定 A 胜", "&#CFD8DC甲方获得争议裁决"))
-                action(11, button(Material.RED_WOOL, "&#E63946裁定 B 胜", "&#CFD8DC乙方获得争议裁决"))
-                action(12, button(Material.GOLD_INGOT, "&#FFE066退回双方押注", "&#CFD8DC按失败/失效规则退款"))
+                action(10, button(Material.LIME_WOOL, ui("action-mediate-a"), ui("action-mediate-a-detail")))
+                action(11, button(Material.RED_WOOL, ui("action-mediate-b"), ui("action-mediate-b-detail")))
+                action(12, button(Material.GOLD_INGOT, ui("action-mediate-return"), ui("action-mediate-return-detail")))
             }
         } else if (contract.status() == ContractStatus.PENDING_ACCEPT && canAcceptInvitation(player, contract)) {
-            action(10, button(Material.EMERALD_BLOCK, "&#69DB7C接受邀请", "&#CFD8DC将扣除你的押注并进入进行中", "&#FFE066需要签署确认"))
+            action(10, button(Material.EMERALD_BLOCK, ui("action-accept-invite"), ui("action-accept-invite-detail"), ui("sign-required")))
         } else if (contract.type() == ContractType.SERVICE && contract.status() == ContractStatus.OPEN && contract.ownerUuid() != player.uniqueId && !mediator) {
-            action(10, button(Material.EMERALD_BLOCK, "&#69DB7C接下合同", "&#CFD8DC托管奖励: &#69DB7C${rewardSummary(contract)}", "&#FFE066需要签署确认"))
+            action(10, button(Material.EMERALD_BLOCK, ui("action-accept"), ui("action-accept-escrow", mapOf("value" to rewardSummary(contract))), ui("sign-required")))
         }
         if (contract.type() == ContractType.SERVICE && contract.status() == ContractStatus.IN_PROGRESS && player.uniqueId == contract.contractorUuid()) {
             val objective = contract.objective()
             if (objective == null) {
-                action(10, button(Material.DIAMOND, "&#CDE0F5提交完成", "&#CFD8DC等待雇主确认后付款"))
+                action(10, button(Material.DIAMOND, ui("action-submit"), ui("action-submit-detail")))
             } else if (objective.type() == ObjectiveType.DELIVER_ITEM) {
-                action(10, button(Material.CHEST, "&#69DB7C交付物品", "&#CFD8DC需要: &#FFFFFF${objective.target()} ${objective.remaining()} 个", "&#CFD8DC交付后暂存在合同中", "&#CFD8DC目标完成后系统自动付款"))
+                action(
+                    10,
+                    button(
+                        Material.CHEST,
+                        ui("action-deliver-item"),
+                        ui("action-deliver-item-need", mapOf("target" to objective.target(), "amount" to objective.remaining().toString())),
+                        ui("action-deliver-item-store"),
+                        ui("action-objective-auto"),
+                    ),
+                )
             } else if (objective.type() == ObjectiveType.DELIVER_MONEY) {
-                action(10, button(Material.GOLD_INGOT, "&#69DB7C提交货币", "&#CFD8DC需要提交: &#FFFFFF${plugin.economy().format(BigDecimal.valueOf(objective.remaining().toLong()))}", "&#CFD8DC提交后系统自动结算"))
+                action(
+                    10,
+                    button(
+                        Material.GOLD_INGOT,
+                        ui("action-deliver-money"),
+                        ui("action-deliver-money-need", mapOf("value" to plugin.economy().format(BigDecimal.valueOf(objective.remaining().toLong())))),
+                        ui("action-deliver-money-auto"),
+                    ),
+                )
             } else {
-                menu.decoration(10, button(Material.COMPASS, "&#69DB7C系统记录中", "&#CFD8DC目标: &#FFFFFF${objective.target()} ${objective.progressText()}", "&#CFD8DC完成后系统自动付款"))
+                menu.decoration(
+                    10,
+                    button(
+                        Material.COMPASS,
+                        ui("action-objective-tracking"),
+                        ui("action-objective-target", mapOf("target" to objective.target(), "progress" to objective.progressText())),
+                        ui("action-objective-auto"),
+                    ),
+                )
             }
         }
         if (contract.type() == ContractType.SERVICE && contract.status() == ContractStatus.COMPLETED && player.uniqueId == contract.ownerUuid() && contract.hasDeliveryItems()) {
-            action(10, button(Material.CHEST, "&#69DB7C领取交付物品", "&#CFD8DC合同暂存: &#FFFFFF${contract.deliveryItemCount()} 个物品", "&#CFD8DC需要背包空间"))
+            action(10, button(Material.CHEST, ui("action-claim-delivery"), ui("action-claim-stored", mapOf("count" to contract.deliveryItemCount().toString())), ui("action-claim-space")))
         }
         if (contract.type() == ContractType.SERVICE && contract.status() == ContractStatus.COMPLETED && player.uniqueId == contract.contractorUuid() && contract.hasRewardItems()) {
-            action(10, button(Material.CHEST, "&#69DB7C领取奖励物品", "&#CFD8DC合同暂存: &#FFFFFF${contract.rewardItemCount()} 个物品", "&#CFD8DC需要背包空间"))
+            action(10, button(Material.CHEST, ui("action-claim-reward"), ui("action-claim-stored", mapOf("count" to contract.rewardItemCount().toString())), ui("action-claim-space")))
         }
         if (contract.type() == ContractType.SERVICE &&
             (contract.status() == ContractStatus.CANCELLED || contract.status() == ContractStatus.EXPIRED) &&
             player.uniqueId == contract.ownerUuid() &&
             contract.hasRewardItems()
         ) {
-            action(10, button(Material.CHEST, "&#69DB7C领回奖励物品", "&#CFD8DC合同暂存: &#FFFFFF${contract.rewardItemCount()} 个物品", "&#CFD8DC需要背包空间"))
+            action(10, button(Material.CHEST, ui("action-reclaim-reward"), ui("action-claim-stored", mapOf("count" to contract.rewardItemCount().toString())), ui("action-claim-space")))
         }
         if (contract.type() == ContractType.SERVICE && !contract.systemVerifiedService() && contract.status() == ContractStatus.SUBMITTED && player.uniqueId == contract.ownerUuid()) {
-            action(10, button(Material.EMERALD, "&#69DB7C确认付款", "&#CFD8DC付款: &#69DB7C${plugin.economy().format(contract.payoutAmount())}", "&#FFE066需要签署确认"))
+            action(10, button(Material.EMERALD, ui("action-approve"), ui("action-approve-amount", mapOf("value" to plugin.economy().format(contract.payoutAmount()))), ui("sign-required")))
         }
         if (contract.type() == ContractType.SERVICE && !contract.systemVerifiedService() && contract.status() == ContractStatus.IN_PROGRESS && player.uniqueId == contract.ownerUuid()) {
-            action(10, button(Material.EMERALD, "&#69DB7C提前确认付款", "&#E63946⚠ 乙方尚未提交完成", "&#CFD8DC付款: &#69DB7C${plugin.economy().format(contract.payoutAmount())}", "&#FFE066需要签署确认"))
+            action(
+                10,
+                button(
+                    Material.EMERALD,
+                    ui("action-approve-early"),
+                    ui("action-approve-early-warn"),
+                    ui("action-approve-amount", mapOf("value" to plugin.economy().format(contract.payoutAmount()))),
+                    ui("sign-required"),
+                ),
+            )
         }
         if (contract.type() == ContractType.PARTNERSHIP && contract.status() == ContractStatus.IN_PROGRESS && isParty(contract, player.uniqueId)) {
-            action(10, button(Material.EMERALD, "&#69DB7C确认合作完成", "&#CFD8DC双方确认后按合作规则结算", "&#FFE066需要签署确认"))
+            action(10, button(Material.EMERALD, ui("action-partner-approve"), ui("action-partner-approve-detail"), ui("sign-required")))
         }
         if (contract.type() == ContractType.WAGER && (contract.status() == ContractStatus.IN_PROGRESS || contract.status() == ContractStatus.SUBMITTED) && isArbiter(contract, player.uniqueId)) {
-            action(10, button(Material.LIME_WOOL, "&#69DB7C裁定 A 胜", "&#CFD8DC将按对赌规则付款给甲方"))
-            action(11, button(Material.RED_WOOL, "&#E63946裁定 B 胜", "&#CFD8DC将按对赌规则付款给乙方"))
+            action(10, button(Material.LIME_WOOL, ui("action-resolve-a"), ui("action-resolve-a-detail")))
+            action(11, button(Material.RED_WOOL, ui("action-resolve-b"), ui("action-resolve-b-detail")))
         }
         if (!contract.status().isFinal() && canCancel(player, contract)) {
-            action(15, button(Material.BARRIER, "&#E63946取消合同", "&#CFD8DC按规则退款或转入争议", "&#FFE066需要签署确认"))
+            action(15, button(Material.BARRIER, ui("action-cancel"), ui("action-cancel-detail"), ui("sign-required")))
         }
         if (canDispute(contract)) {
-            action(16, button(Material.REDSTONE_BLOCK, "&#E63946发起争议", "&#CFD8DC点击后在聊天输入原因", "&#CFD8DC60 秒内输入,或输 cancel 取消"))
+            action(16, button(Material.REDSTONE_BLOCK, ui("action-dispute"), ui("action-dispute-detail"), ui("action-dispute-timeout")))
         }
         if (contract.status() == ContractStatus.DISPUTED && isDisputeInitiator(contract, player.uniqueId)) {
-            action(16, button(Material.WRITABLE_BOOK, "&#69DB7C撤销争议", "&#CFD8DC恢复到争议前的状态并继续", "&#CFD8DC仅你(发起者)可撤销"))
+            action(16, button(Material.WRITABLE_BOOK, ui("action-withdraw"), ui("action-withdraw-detail"), ui("action-withdraw-owner")))
         }
     }
 
     private fun renderAdminActions(menu: Menu, player: Player, contract: Contract, back: () -> Unit) {
         if (contract.status().isFinal()) {
-            menu.decoration(11, button(Material.GRAY_DYE, "&#CFD8DC合同已结束", "&#CFD8DC无可执行的管理操作"))
+            menu.decoration(11, button(Material.GRAY_DYE, ui("admin-final"), ui("admin-final-detail")))
             return
         }
         val contractId = contract.id()
-        menu.button(10, button(Material.EMERALD, "&#69DB7C强制付款", "&#CFD8DC按成功结算规则付款", "&#FFE066需要签署确认"), adminHandler(player, contractId, 10, back))
-        menu.button(12, button(Material.REDSTONE, "&#E63946强制退款", "&#CFD8DC按失败规则退回托管", "&#FFE066需要签署确认"), adminHandler(player, contractId, 12, back))
-        menu.button(14, button(Material.BARRIER, "&#E63946关闭合同", "&#CFD8DC不移动任何资金,需人工核对", "&#FFE066需要签署确认"), adminHandler(player, contractId, 14, back))
+        menu.button(10, button(Material.EMERALD, ui("admin-pay"), ui("admin-pay-detail"), ui("sign-required")), adminHandler(player, contractId, 10, back))
+        menu.button(12, button(Material.REDSTONE, ui("admin-refund"), ui("admin-refund-detail"), ui("sign-required")), adminHandler(player, contractId, 12, back))
+        menu.button(14, button(Material.BARRIER, ui("admin-close"), ui("admin-close-detail"), ui("sign-required")), adminHandler(player, contractId, 14, back))
     }
 
     private fun participantHandler(player: Player, contractId: String, slot: Int, back: () -> Unit): (org.bukkit.event.inventory.InventoryClickEvent) -> Unit = {
@@ -281,10 +390,11 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             if (!player.hasPermission("contract.admin.settle")) {
                 player.sendMessage(plugin.lang().message("no-permission"))
             } else if (!contract.status().isFinal()) {
+                val id = mapOf("id" to contract.shortId())
                 val action = when (slot) {
-                    10 -> PendingAction.simple(PendingAction.Kind.ADMIN_PAY, contract, null, "管理员强制付款 #${contract.shortId()}", listOf("按合同的成功结算规则向收款方付款。", "系统佣金照常回收。"))
-                    12 -> PendingAction.simple(PendingAction.Kind.ADMIN_REFUND, contract, null, "管理员强制退款 #${contract.shortId()}", listOf("按失败规则将托管退回发起方。"))
-                    14 -> PendingAction.simple(PendingAction.Kind.ADMIN_CLOSE, contract, null, "管理员关闭合同 #${contract.shortId()}", listOf("仅关闭合同,不移动任何资金。", "资金需另行用 pay/refund 或人工核对处理。"))
+                    10 -> PendingAction.simple(PendingAction.Kind.ADMIN_PAY, contract, null, ui("confirm-admin-pay-title", id), listOf(ui("confirm-admin-pay-1"), ui("confirm-admin-pay-2")))
+                    12 -> PendingAction.simple(PendingAction.Kind.ADMIN_REFUND, contract, null, ui("confirm-admin-refund-title", id), listOf(ui("confirm-admin-refund-1")))
+                    14 -> PendingAction.simple(PendingAction.Kind.ADMIN_CLOSE, contract, null, ui("confirm-admin-close-title", id), listOf(ui("confirm-admin-close-1"), ui("confirm-admin-close-2")))
                     else -> null
                 }
                 if (action != null) openConfirm(player, action) { reopenDetails(player, contractId, true, back) }
@@ -297,48 +407,62 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun detailAction(player: Player, contract: Contract, slot: Int, mediator: Boolean): PendingAction? {
         val status = contract.status()
+        val id = mapOf("id" to contract.shortId())
+        val payout = mapOf("value" to plugin.economy().format(contract.payoutAmount()))
+        val commission = mapOf("value" to plugin.economy().format(contract.commissionAmount()))
         if (slot == 10) {
             if (contract.type() != ContractType.WAGER && mediator && canMediate(contract)) {
                 if (contract.type() == ContractType.SERVICE) {
-                    return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "pay", "中间人裁定付款 #${contract.shortId()}", listOf("认定委托有效完成。", "接单者获得 ${plugin.economy().format(contract.payoutAmount())}。"))
+                    return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "pay", ui("confirm-mediate-pay-title", id), listOf(ui("confirm-mediate-pay-1"), ui("confirm-mediate-pay-2", payout)))
                 }
-                return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "a", "中间人裁定甲方胜 #${contract.shortId()}", listOf("甲方获得争议裁决,取得双方押注。"))
+                return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "a", ui("confirm-mediate-a-title", id), listOf(ui("confirm-mediate-a-1")))
             }
             if (status == ContractStatus.PENDING_ACCEPT && canAcceptInvitation(player, contract)) {
-                return PendingAction.simple(PendingAction.Kind.ACCEPT, contract, null, "接受邀请 #${contract.shortId()}", render.acceptConsequences(contract))
+                return PendingAction.simple(PendingAction.Kind.ACCEPT, contract, null, ui("confirm-accept-invite-title", id), render.acceptConsequences(contract))
             }
             if (contract.type() == ContractType.SERVICE && status == ContractStatus.OPEN && contract.ownerUuid() != player.uniqueId && !mediator) {
-                return PendingAction.simple(PendingAction.Kind.ACCEPT, contract, null, "接下委托 #${contract.shortId()}", listOf("接单本身不扣款。", "完成后可获得 ${rewardSummary(contract)}。"))
+                return PendingAction.simple(PendingAction.Kind.ACCEPT, contract, null, ui("confirm-accept-title", id), listOf(ui("confirm-accept-1"), ui("confirm-accept-2", mapOf("value" to rewardSummary(contract)))))
             }
             if (contract.type() == ContractType.SERVICE && !contract.systemVerifiedService() && status == ContractStatus.SUBMITTED && player.uniqueId == contract.ownerUuid()) {
-                return PendingAction.simple(PendingAction.Kind.APPROVE, contract, null, "确认付款 #${contract.shortId()}", listOf("向接单者支付 ${plugin.economy().format(contract.payoutAmount())}。", "系统回收佣金 ${plugin.economy().format(contract.commissionAmount())}。"))
+                return PendingAction.simple(PendingAction.Kind.APPROVE, contract, null, ui("confirm-approve-title", id), listOf(ui("confirm-approve-1", payout), ui("confirm-approve-2", commission)))
             }
             if (contract.type() == ContractType.SERVICE && !contract.systemVerifiedService() && status == ContractStatus.IN_PROGRESS && player.uniqueId == contract.ownerUuid()) {
-                return PendingAction.simple(PendingAction.Kind.APPROVE, contract, null, "提前确认付款 #${contract.shortId()}", listOf("⚠ 乙方尚未提交完成,你将提前付款。", "向接单者支付 ${plugin.economy().format(contract.payoutAmount())}。", "系统回收佣金 ${plugin.economy().format(contract.commissionAmount())}。"))
+                return PendingAction.simple(
+                    PendingAction.Kind.APPROVE,
+                    contract,
+                    null,
+                    ui("confirm-approve-early-title", id),
+                    listOf(ui("confirm-approve-early-1"), ui("confirm-approve-1", payout), ui("confirm-approve-2", commission)),
+                )
             }
             if (contract.type() == ContractType.PARTNERSHIP && status == ContractStatus.IN_PROGRESS && isParty(contract, player.uniqueId)) {
-                return PendingAction.simple(PendingAction.Kind.APPROVE, contract, null, "确认合作完成 #${contract.shortId()}", listOf("记录你的确认。", "双方都确认后各自取回押注(扣除佣金)。"))
+                return PendingAction.simple(PendingAction.Kind.APPROVE, contract, null, ui("confirm-partner-title", id), listOf(ui("confirm-partner-1"), ui("confirm-partner-2")))
             }
             if (contract.type() == ContractType.WAGER && isArbiter(contract, player.uniqueId) && (status == ContractStatus.IN_PROGRESS || status == ContractStatus.SUBMITTED)) {
-                return PendingAction.simple(PendingAction.Kind.RESOLVE, contract, "a", "裁定甲方胜 #${contract.shortId()}", listOf("甲方获得双方押注,扣除系统佣金。"))
+                return PendingAction.simple(PendingAction.Kind.RESOLVE, contract, "a", ui("confirm-resolve-a-title", id), listOf(ui("confirm-resolve-a-1")))
             }
         }
         if (slot == 11 && isArbiter(contract, player.uniqueId)) {
             if (contract.type() == ContractType.WAGER) {
-                return PendingAction.simple(PendingAction.Kind.RESOLVE, contract, "b", "裁定乙方胜 #${contract.shortId()}", listOf("乙方获得双方押注,扣除系统佣金。"))
+                return PendingAction.simple(PendingAction.Kind.RESOLVE, contract, "b", ui("confirm-resolve-b-title", id), listOf(ui("confirm-resolve-b-1")))
             }
             if (contract.type() == ContractType.SERVICE && canMediate(contract)) {
-                return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "refund", "中间人裁定退款 #${contract.shortId()}", listOf("认定委托失效,雇主取回托管。"))
+                return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "refund", ui("confirm-mediate-refund-title", id), listOf(ui("confirm-mediate-refund-1")))
             }
             if (contract.type() == ContractType.PARTNERSHIP && canMediate(contract)) {
-                return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "b", "中间人裁定乙方胜 #${contract.shortId()}", listOf("乙方获得争议裁决,取得双方押注。"))
+                return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "b", ui("confirm-mediate-b-title", id), listOf(ui("confirm-mediate-b-1")))
             }
         }
         if (slot == 12 && contract.type() == ContractType.PARTNERSHIP && isArbiter(contract, player.uniqueId) && canMediate(contract)) {
-            return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "refund", "中间人退回双方押注 #${contract.shortId()}", listOf("按失败规则各自退回押注。"))
+            return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "refund", ui("confirm-mediate-return-title", id), listOf(ui("confirm-mediate-return-1")))
         }
         if (slot == 15 && !contract.status().isFinal() && canCancel(player, contract)) {
-            return PendingAction.simple(PendingAction.Kind.CANCEL, contract, null, "取消合同 #${contract.shortId()}", listOf("按当前状态退款或转入争议。", "创建费在普通取消时通常不退还。"))
+            val consequences = if (contract.status() == ContractStatus.SCHEDULED) {
+                listOf(ui("schedule-cancel-one"), ui("schedule-cancel-two"))
+            } else {
+                listOf(ui("confirm-cancel-1"), ui("confirm-cancel-2"))
+            }
+            return PendingAction.simple(PendingAction.Kind.CANCEL, contract, null, ui("confirm-cancel-title", id), consequences)
         }
         return null
     }
@@ -355,22 +479,116 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun runDirect(player: Player, result: ServiceResult, fallback: Contract, adminMode: Boolean, back: () -> Unit) {
         if (result.success()) {
-            player.sendMessage(Text.color("&#69DB7C操作成功。"))
+            player.sendMessage(ui("result-ok"))
             openDetails(player, result.contract() ?: fallback, adminMode, back)
         } else {
             player.sendMessage(plugin.lang().message("operation-failed", mapOf("reason" to result.reason())))
         }
     }
 
+    // ---- Template library ---------------------------------------------------------------------
+
+    private fun openTemplateLibrary(player: Player, page: Int) {
+        if (!player.hasPermission(TEMPLATE_USE_PERMISSION)) {
+            player.sendMessage(plugin.lang().message("no-permission"))
+            return
+        }
+        val templates = plugin.templateService().visibleTo(player.uniqueId, player.hasPermission(TEMPLATE_MANAGE_PERMISSION))
+        val pages = pageCount(templates.size)
+        val current = clampPage(page, pages)
+        val menu = Menu(ui("template-title"), 6)
+        fillBorder(menu.inventory)
+        val start = (current - 1) * BOARD_SLOTS.size
+        val end = min(start + BOARD_SLOTS.size, templates.size)
+        for (index in start until end) {
+            val template = templates[index]
+            menu.button(BOARD_SLOTS[index - start], templateItem(template)) { openTemplateDetails(player, template.id, current) }
+        }
+        if (templates.isEmpty()) menu.decoration(22, button(Material.CHEST, ui("template-empty"), ui("template-empty-detail")))
+        menu.button(45, button(Material.ARROW, ui("nav-prev"), pageLore(current, pages))) { if (current > 1) openTemplateLibrary(player, current - 1) }
+        menu.button(49, button(Material.EMERALD, ui("nav-back-hall-button"), ui("template-count", mapOf("count" to templates.size.toString())))) { open(player) }
+        menu.button(53, button(Material.ARROW, ui("nav-next"), pageLore(current, pages))) { if (current < pages) openTemplateLibrary(player, current + 1) }
+        registry.open(player, menu)
+    }
+
+    private fun openTemplateDetails(player: Player, templateId: String, page: Int) {
+        val template = plugin.templates().find(templateId)
+        if (template == null) {
+            player.sendMessage(ui("template-missing"))
+            openTemplateLibrary(player, page)
+            return
+        }
+        val menu = Menu(ui("template-title"), 3)
+        fillBorder(menu.inventory)
+        menu.decoration(13, templateItem(template))
+        menu.button(10, button(Material.WRITABLE_BOOK, ui("template-load"), ui("template-load-edit"), ui("template-load-safe"))) {
+            drafts[player.uniqueId] = CreateDraft.fromSpec(template.spec)
+            openWizardForm(player)
+        }
+        if (player.hasPermission(TEMPLATE_MANAGE_PERMISSION)) {
+            val next = ui(if (template.visibility == TemplateVisibility.PRIVATE) "template-server" else "template-private")
+            menu.button(14, button(Material.ENDER_EYE, next, ui("template-scope-detail"))) {
+                val result = plugin.templateService().toggleVisibility(player.uniqueId, template.id, true)
+                player.sendMessage(if (result.success) ui("template-scope-updated") else ui(result.reason))
+                openTemplateDetails(player, template.id, page)
+            }
+        }
+        if (template.ownerUuid == player.uniqueId || player.hasPermission(TEMPLATE_MANAGE_PERMISSION)) {
+            menu.button(16, button(Material.BARRIER, ui("template-delete"), ui("template-delete-detail"), ui("template-delete-confirm"))) {
+                openTemplateDeleteConfirm(player, template, page)
+            }
+        }
+        menu.button(22, button(Material.ARROW, ui("template-back"))) { openTemplateLibrary(player, page) }
+        registry.open(player, menu)
+    }
+
+    private fun openTemplateDeleteConfirm(player: Player, template: ContractTemplate, page: Int) {
+        val menu = Menu(ui("confirm-title"), 3)
+        fillBorder(menu.inventory)
+        menu.decoration(13, button(Material.BARRIER, ui("template-delete-title"), ui("template-name-line", mapOf("name" to template.name)), ui("template-delete-safe")))
+        menu.button(11, button(Material.ARROW, ui("nav-back"), ui("template-keep"))) { openTemplateDetails(player, template.id, page) }
+        menu.button(15, button(Material.REDSTONE_BLOCK, ui("template-delete-permanent"), ui("template-delete-irreversible"))) {
+            val result = plugin.templateService().delete(player.uniqueId, template.id, player.hasPermission(TEMPLATE_MANAGE_PERMISSION))
+            player.sendMessage(if (result.success) ui("template-deleted") else ui(result.reason))
+            openTemplateLibrary(player, page)
+        }
+        registry.open(player, menu)
+    }
+
+    private fun templateItem(template: ContractTemplate): ItemStack = button(
+        when (template.spec.type) {
+            ContractType.SERVICE -> Material.PAPER
+            ContractType.WAGER -> Material.TARGET
+            ContractType.PARTNERSHIP -> Material.AMETHYST_CLUSTER
+            else -> Material.BOOK
+        },
+        ui("item-title", mapOf("value" to template.name)),
+        ui("template-item-type", mapOf("value" to plugin.lang().type(template.spec.type))),
+        ui("template-item-title", mapOf("value" to (template.spec.title ?: ui("field-empty")))),
+        ui("template-item-scope", mapOf("value" to ui(if (template.visibility == TemplateVisibility.SERVER) "template-range-server" else "template-range-private"))),
+        ui("template-item-owner", mapOf("value" to template.ownerName)),
+        ui("template-item-click"),
+    )
+
+    private fun saveDraftAsTemplate(player: Player, draft: CreateDraft) {
+        input.promptLine(player, ui("template-name-prompt"), false, FIELD_PROMPT_TIMEOUT_MS) { outcome ->
+            if (outcome is ChatOutcome.Submitted) {
+                val result = plugin.templateService().save(player.uniqueId, player.name, outcome.text, draft.toSpec())
+                player.sendMessage(if (result.success) ui("template-saved") else ui(result.reason, mapOf("limit" to plugin.config.getInt("limits.max-templates-per-player", 32).toString())))
+            }
+            openWizardForm(player)
+        }
+    }
+
     // ---- Create wizard -------------------------------------------------------------------------
 
     fun openWizardType(player: Player) {
-        val menu = Menu(WIZARD_TYPE_TITLE, 3)
+        val menu = Menu(ui("wizard-type-title"), 3)
         fillBorder(menu.inventory)
-        menu.button(11, button(Material.PAPER, "&#69DB7C委托 SERVICE", "&#CFD8DC你出钱托管,公开等待接单者完成", "&#CFD8DC完成后向接单者付款")) { startDraft(player, ContractType.SERVICE) }
-        menu.button(13, button(Material.TARGET, "&#69DB7C对赌 WAGER", "&#CFD8DC双方等额押注,指定仲裁者裁决胜负")) { startDraft(player, ContractType.WAGER) }
-        menu.button(15, button(Material.AMETHYST_CLUSTER, "&#69DB7C合作 PARTNERSHIP", "&#CFD8DC双方各自押注,双方确认后结算", "&#CFD8DC可选指定中间人")) { startDraft(player, ContractType.PARTNERSHIP) }
-        menu.button(22, button(Material.ARROW, "&#FFE066返回合同大厅", "&#CFD8DC回到合同大厅")) { cancelDraft(player) }
+        menu.button(11, button(Material.PAPER, ui("wizard-type-service"), ui("wizard-type-service-1"), ui("wizard-type-service-2"))) { startDraft(player, ContractType.SERVICE) }
+        menu.button(13, button(Material.TARGET, ui("wizard-type-wager"), ui("wizard-type-wager-1"))) { startDraft(player, ContractType.WAGER) }
+        menu.button(15, button(Material.AMETHYST_CLUSTER, ui("wizard-type-partnership"), ui("wizard-type-partnership-1"), ui("wizard-type-partnership-2"))) { startDraft(player, ContractType.PARTNERSHIP) }
+        menu.button(22, button(Material.ARROW, ui("nav-back-hall-button"), ui("nav-back-hall"))) { cancelDraft(player) }
         registry.open(player, menu)
     }
 
@@ -381,7 +599,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun cancelDraft(player: Player) {
         drafts.remove(player.uniqueId)
-        player.sendMessage(Text.color("&#FFE066已放弃创建合同。"))
+        player.sendMessage(ui("draft-abandoned"))
         open(player)
     }
 
@@ -396,14 +614,14 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             dialog.createForm(player, draft, { submitCreateForm(player) }, { cancelDraft(player) })
             return
         }
-        val menu = Menu(WIZARD_FORM_TITLE, 6)
+        val menu = Menu(ui("wizard-form-title"), 6)
         fillBorder(menu.inventory)
 
-        menu.decoration(11, button(Material.NAME_TAG, "&#FFE066类型: &#FFFFFF${plugin.lang().type(draft.type())}", "&#CFD8DC如需更换类型请返回上一步"))
-        menu.button(13, fieldButton(Material.WRITABLE_BOOK, "标题", draft.title())) { promptTextField(player, "&#FFE066请输入合同标题(输 cancel 取消)") { draft.title(it) } }
+        menu.decoration(11, button(Material.NAME_TAG, ui("wizard-type-label", mapOf("value" to plugin.lang().type(draft.type()))), ui("wizard-type-label-detail")))
+        menu.button(13, fieldButton(Material.WRITABLE_BOOK, ui("field-title"), draft.title())) { promptTextField(player, ui("prompt-title")) { draft.title(it) } }
         menu.button(15, descriptionButton(draft.description())) { beginDescriptionPrompt(player) }
         if (draft.needsCounterparty()) {
-            menu.button(20, fieldButton(Material.PLAYER_HEAD, "对方玩家", draft.counterparty())) { promptTextField(player, "&#FFE066请输入对方玩家名(输 cancel 取消)") { draft.counterparty(it) } }
+            menu.button(20, fieldButton(Material.PLAYER_HEAD, ui("field-counterparty"), draft.counterparty())) { promptTextField(player, ui("prompt-counterparty")) { draft.counterparty(it) } }
         }
         if (draft.type() == ContractType.SERVICE) {
             menu.button(20, rewardModeButton(draft)) {
@@ -412,29 +630,31 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             }
         }
         if (draft.type() == ContractType.SERVICE && draft.itemReward()) {
-            menu.decoration(22, button(Material.CHEST, "&#69DB7C奖励物品", "&#CFD8DC签署时托管主手整组物品", "&#FFE066请把奖励拿在主手"))
+            menu.decoration(22, button(Material.CHEST, ui("reward-item-title"), ui("reward-item-1"), ui("reward-item-2")))
         } else {
-            menu.button(22, fieldButton(Material.GOLD_INGOT, if (draft.type() == ContractType.SERVICE) "奖金" else "我的押注", draft.amount()?.let { render.trimNumber(it) })) {
-                promptNumberField(player, if (draft.type() == ContractType.SERVICE) "&#FFE066请输入奖金金额(输 cancel 取消)" else "&#FFE066请输入我的押注金额(输 cancel 取消)") { draft.amount(it) }
+            val service = draft.type() == ContractType.SERVICE
+            menu.button(22, fieldButton(Material.GOLD_INGOT, ui(if (service) "field-reward" else "field-my-stake"), draft.amount()?.let { render.trimNumber(it) })) {
+                promptNumberField(player, ui(if (service) "prompt-reward" else "prompt-my-stake")) { draft.amount(it) }
             }
         }
-        menu.button(24, fieldButton(Material.LECTERN, if (draft.mediatorRequired()) "仲裁者" else "中间人(可选)", draft.mediator())) {
-            promptTextField(player, if (draft.mediatorRequired()) "&#FFE066请输入仲裁者玩家名(输 cancel 取消)" else "&#FFE066请输入中间人玩家名(输 cancel 取消)") { draft.mediator(it) }
+        val mediatorRequired = draft.mediatorRequired()
+        menu.button(24, fieldButton(Material.LECTERN, ui(if (mediatorRequired) "field-arbiter" else "field-mediator"), draft.mediator())) {
+            promptTextField(player, ui(if (mediatorRequired) "prompt-arbiter" else "prompt-mediator")) { draft.mediator(it) }
         }
         if (draft.needsPartnerStake()) {
-            menu.button(29, fieldButton(Material.GOLD_NUGGET, "对方押注", draft.partnerStake()?.let { render.trimNumber(it) })) { promptNumberField(player, "&#FFE066请输入对方押注金额(输 cancel 取消)") { draft.partnerStake(it) } }
+            menu.button(29, fieldButton(Material.GOLD_NUGGET, ui("field-partner-stake"), draft.partnerStake()?.let { render.trimNumber(it) })) { promptNumberField(player, ui("prompt-partner-stake")) { draft.partnerStake(it) } }
         }
         if (draft.type() == ContractType.SERVICE) {
             menu.button(29, verificationButton(draft)) { toggleVerification(player, draft) }
             if (player.hasPermission(BATCH_CREATE_PERMISSION)) {
-                menu.button(30, fieldButton(Material.PAPER, "发布份数", draft.contractCount().toString())) {
-                    promptNumberField(player, "&#FFE066请输入发布份数(输 cancel 取消)") { draft.contractCount(Math.round(it).toInt()) }
+                menu.button(30, fieldButton(Material.PAPER, ui("field-count"), draft.contractCount().toString())) {
+                    promptNumberField(player, ui("prompt-count")) { draft.contractCount(Math.round(it).toInt()) }
                 }
                 if (draft.contractCount() > 1) {
                     menu.button(32, batchRepeatPolicyButton(draft)) { cycleBatchRepeatPolicy(player, draft) }
                     if (draft.repeatPolicy() == BatchRepeatPolicy.COOLDOWN) {
-                        menu.button(39, fieldButton(Material.CLOCK, "重复冷却(小时)", draft.repeatCooldownHours().toString())) {
-                            promptNumberField(player, "&#FFE066请输入重复接取冷却小时数(输 cancel 取消)") {
+                        menu.button(39, fieldButton(Material.CLOCK, ui("field-cooldown"), draft.repeatCooldownHours().toString())) {
+                            promptNumberField(player, ui("prompt-cooldown")) {
                                 draft.repeatCooldownHours(Math.round(it).toInt())
                             }
                         }
@@ -450,40 +670,50 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
                     draft.objectiveTarget("MONEY")
                     menu.decoration(40, defaultMoneyTargetButton())
                 } else {
-                    menu.button(40, fieldButton(objectiveTargetMaterial(objectiveType), objectiveTargetLabel(objectiveType), draft.objectiveTarget())) {
-                        promptTextField(player, objectiveTargetPrompt(objectiveType)) { draft.objectiveTarget(it) }
+                    menu.button(40, fieldButton(objectiveTargetMaterial(objectiveType), plugin.lang().objectiveTarget(objectiveType), draft.objectiveTarget())) {
+                        promptTextField(player, plugin.lang().objectivePrompt(objectiveType)) { draft.objectiveTarget(it) }
                     }
                     if (canUseHandAsObjectiveTarget(objectiveType)) {
                         menu.button(41, handTargetButton()) { setObjectiveTargetFromHand(player, draft) }
                     }
                 }
-                menu.button(42, fieldButton(Material.TARGET, "目标数量", draft.objectiveRequired()?.toString())) {
-                    promptNumberField(player, "&#FFE066请输入目标数量(输 cancel 取消)") { draft.objectiveRequired(Math.round(it).toInt()) }
+                menu.button(42, fieldButton(Material.TARGET, ui("field-objective-amount"), draft.objectiveRequired()?.toString())) {
+                    promptNumberField(player, ui("prompt-objective-amount")) { draft.objectiveRequired(Math.round(it).toInt()) }
                 }
             }
         }
-        menu.button(31, fieldButton(Material.CLOCK, "有效期(天)", draft.days()?.toString())) { promptNumberField(player, "&#FFE066请输入有效期天数(输 cancel 取消)") { draft.days(Math.round(it).toInt()) } }
+        menu.button(31, fieldButton(Material.CLOCK, ui("field-days"), draft.days()?.toString())) { promptNumberField(player, ui("prompt-days")) { draft.days(Math.round(it).toInt()) } }
 
-        menu.decoration(33, button(Material.MAP, "&#F4D03F条款预览", *render.draftPreview(draft).toTypedArray()))
-        menu.button(46, button(Material.BARRIER, "&#E63946放弃创建", "&#CFD8DC删除当前草稿并返回合同大厅")) { cancelDraft(player) }
-        menu.button(48, button(Material.ARROW, "&#FFE066上一步", "&#CFD8DC重新选择合同类型")) { openWizardType(player) }
+        menu.decoration(33, button(Material.MAP, ui("preview-title"), *render.draftPreview(draft).toTypedArray()))
+        if (draft.type() == ContractType.SERVICE && player.hasPermission(SCHEDULE_CREATE_PERMISSION)) {
+            menu.button(43, scheduleButton(draft)) { promptSchedule(player, draft) }
+        }
+        menu.button(46, button(Material.BARRIER, ui("wizard-abandon"), ui("wizard-abandon-detail"))) { cancelDraft(player) }
+        if (player.hasPermission(TEMPLATE_USE_PERMISSION)) {
+            menu.button(47, button(Material.CHEST, ui("template-save"), ui("template-save-detail"))) { saveDraftAsTemplate(player, draft) }
+        }
+        menu.button(48, button(Material.ARROW, ui("wizard-prev"), ui("wizard-prev-detail"))) { openWizardType(player) }
 
         val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
         if (validation == null) {
-            menu.button(50, button(Material.EMERALD_BLOCK, "&#69DB7C预览并签署创建", "&#CFD8DC进入签署确认页", "&#FFE066需要签署确认")) {
+            menu.button(50, button(Material.EMERALD_BLOCK, ui("wizard-sign"), ui("wizard-sign-detail"), ui("sign-required"))) {
                 val recheck = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
                 if (recheck != null) {
-                    player.sendMessage(Text.color("&#E63946$recheck"))
+                    player.sendMessage(problemText(recheck))
                 } else {
-                    openConfirm(player, PendingAction.create(draft, render.draftPreview(draft))) { openWizardForm(player) }
+                    openConfirm(player, createAction(draft)) { openWizardForm(player) }
                 }
             }
         } else {
-            menu.decoration(50, button(Material.GRAY_DYE, "&#CFD8DC尚不能创建", "&#E63946$validation"))
+            menu.decoration(50, button(Material.GRAY_DYE, ui("wizard-blocked"), problemText(validation)))
         }
 
         registry.open(player, menu)
     }
+
+    /** Wraps the draft preview in a localized confirmation page. */
+    private fun createAction(draft: CreateDraft): PendingAction =
+        PendingAction.create(ui("confirm-create-title"), ui("confirm-create-lead", mapOf("type" to plugin.lang().type(draft.type()))), render.draftPreview(draft))
 
     // ---- Confirm + execute ---------------------------------------------------------------------
 
@@ -495,10 +725,10 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         }
         val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
         if (validation != null) {
-            player.sendMessage(Text.color("&#E63946$validation"))
+            player.sendMessage(problemText(validation))
             openWizardForm(player)
         } else {
-            openConfirm(player, PendingAction.create(draft, render.draftPreview(draft))) { openWizardForm(player) }
+            openConfirm(player, createAction(draft)) { openWizardForm(player) }
         }
     }
 
@@ -508,36 +738,49 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             dialog.confirm(player, action.title(), action.consequences(), { executeAction(player, action, onReturn) }, onReturn)
             return
         }
-        val menu = Menu(CONFIRM_TITLE, 3)
+        val menu = Menu(ui("confirm-title"), 3)
         fillBorder(menu.inventory)
         val lore = ArrayList<String>()
-        lore.add(Text.color("&#FFE066动作: &#FFFFFF${action.title()}"))
+        lore.add(ui("confirm-action-line", mapOf("value" to action.title())))
         lore.add("")
         for (line in action.consequences()) {
-            lore.add(Text.color("&#CFD8DC$line"))
+            lore.add(ui("confirm-consequence", mapOf("value" to line)))
         }
         lore.add("")
-        lore.add(Text.color("&#E63946点击右侧签署后将立即生效。"))
-        menu.decoration(13, button(Material.PAPER, "&#F4D03F签署确认", *lore.toTypedArray()))
-        menu.button(11, button(Material.BARRIER, "&#E63946取消", "&#CFD8DC返回,不执行任何操作")) { onReturn() }
-        menu.button(15, button(Material.WRITABLE_BOOK, "&#69DB7C签署执行", "&#CFD8DC点击立即签署并执行此操作", "&#E63946操作不可撤销")) { executeAction(player, action, onReturn) }
+        lore.add(ui("confirm-note"))
+        menu.decoration(13, button(Material.PAPER, ui("confirm-title"), *lore.toTypedArray()))
+        menu.button(11, button(Material.BARRIER, ui("confirm-cancel"), ui("confirm-cancel-detail"))) { onReturn() }
+        menu.button(15, button(Material.WRITABLE_BOOK, ui("confirm-sign"), ui("confirm-sign-detail"), ui("confirm-sign-warn"))) { executeAction(player, action, onReturn) }
         registry.open(player, menu)
     }
 
     private fun executeAction(player: Player, action: PendingAction, onReturn: () -> Unit) {
         if (action.kind() == PendingAction.Kind.CREATE) {
-            val contractCount = drafts[player.uniqueId]?.contractCount() ?: 1
+            val activeDraft = drafts[player.uniqueId]
+            val contractCount = activeDraft?.contractCount() ?: 1
+            val scheduled = activeDraft?.publishAt() != null
             val result = executeCreate(player)
             if (result.success()) {
-                player.sendMessage(Text.color("&#69DB7C签署成功,已发布 $contractCount 份委托。"))
+                val key = if (scheduled) "schedule-created" else "result-created"
+                player.sendMessage(ui(key, mapOf("count" to contractCount.toString())))
                 drafts.remove(player.uniqueId)
                 val done = result.contract()
-                val mineBack = { openHall(player, HallView.OPEN, 1) }
+                val mineBack = { openHall(player, if (scheduled) HallView.ACTIVE else HallView.OPEN, 1) }
                 if (done != null) openDetails(player, done, false, mineBack) else mineBack()
             } else {
                 player.sendMessage(plugin.lang().message("operation-failed", mapOf("reason" to result.reason())))
                 onReturn()
             }
+            return
+        }
+        if (action.kind() == PendingAction.Kind.ACCEPT_BATCH) {
+            val result = plugin.contracts().acceptOneFromBatch(player, action.arg())
+            if (result.success()) {
+                player.sendMessage(ui("result-signed"))
+            } else {
+                player.sendMessage(plugin.lang().message("operation-failed", mapOf("reason" to result.reason())))
+            }
+            onReturn()
             return
         }
         val contract = plugin.storage().findByPrefix(action.contractId()).orElse(null)
@@ -548,6 +791,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         }
         val result = when (action.kind()) {
             PendingAction.Kind.ACCEPT -> plugin.contracts().accept(player, contract)
+            PendingAction.Kind.ACCEPT_BATCH -> ServiceResult.fail("internal")
             PendingAction.Kind.APPROVE -> plugin.contracts().approve(player, contract)
             PendingAction.Kind.RESOLVE -> plugin.contracts().resolveWager(player, contract, action.arg())
             PendingAction.Kind.MEDIATE -> plugin.contracts().mediate(player, contract, action.arg())
@@ -558,7 +802,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             PendingAction.Kind.CREATE -> ServiceResult.fail("internal")
         }
         if (result.success()) {
-            player.sendMessage(Text.color("&#69DB7C签署成功,操作已完成。"))
+            player.sendMessage(ui("result-signed"))
         } else {
             player.sendMessage(plugin.lang().message("operation-failed", mapOf("reason" to result.reason())))
         }
@@ -566,14 +810,14 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
     }
 
     private fun executeCreate(player: Player): ServiceResult {
-        val draft = drafts[player.uniqueId] ?: return ServiceResult.fail("创建草稿已失效,请重新开始")
+        val draft = drafts[player.uniqueId] ?: return ServiceResult.fail(ui("draft-expired"))
         val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
         if (validation != null) {
-            return ServiceResult.fail(validation)
+            return ServiceResult.fail(ui(validation.key, validation.placeholders))
         }
         val description = draft.description() ?: ""
-        val days = draft.days() ?: return ServiceResult.fail("请先填写期限")
-        val title = draft.title() ?: return ServiceResult.fail("请先填写标题")
+        val days = draft.days() ?: return ServiceResult.fail(ui("draft-need-days"))
+        val title = draft.title() ?: return ServiceResult.fail(ui("draft-need-title"))
         return when (draft.type()) {
             ContractType.SERVICE -> {
                 if (draft.itemReward()) {
@@ -587,9 +831,10 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
                         draft.contractCount(),
                         draft.repeatPolicy(),
                         draft.repeatCooldownHours(),
+                        draft.publishAt(),
                     )
                 } else {
-                    val amount = draft.amount() ?: return ServiceResult.fail("请先填写金额")
+                    val amount = draft.amount() ?: return ServiceResult.fail(ui("draft-need-amount"))
                     plugin.contracts().create(
                         player,
                         amount,
@@ -601,29 +846,30 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
                         draft.contractCount(),
                         draft.repeatPolicy(),
                         draft.repeatCooldownHours(),
+                        draft.publishAt(),
                     )
                 }
             }
             ContractType.WAGER -> {
-                val amount = draft.amount() ?: return ServiceResult.fail("请先填写金额")
-                val counterparty = draft.counterparty() ?: return ServiceResult.fail("请先填写对方玩家")
-                val mediator = draft.mediator() ?: return ServiceResult.fail("请先填写仲裁者")
+                val amount = draft.amount() ?: return ServiceResult.fail(ui("draft-need-amount"))
+                val counterparty = draft.counterparty() ?: return ServiceResult.fail(ui("draft-need-counterparty"))
+                val mediator = draft.mediator() ?: return ServiceResult.fail(ui("draft-need-arbiter"))
                 plugin.contracts().createWager(player, counterparty, BigDecimal.valueOf(amount), days, mediator, title, description)
             }
             ContractType.PARTNERSHIP -> {
-                val amount = draft.amount() ?: return ServiceResult.fail("请先填写金额")
-                val counterparty = draft.counterparty() ?: return ServiceResult.fail("请先填写对方玩家")
-                val partnerStake = draft.partnerStake() ?: return ServiceResult.fail("请先填写对方押注")
+                val amount = draft.amount() ?: return ServiceResult.fail(ui("draft-need-amount"))
+                val counterparty = draft.counterparty() ?: return ServiceResult.fail(ui("draft-need-counterparty"))
+                val partnerStake = draft.partnerStake() ?: return ServiceResult.fail(ui("draft-need-partner-stake"))
                 plugin.contracts().createPartnership(player, counterparty, BigDecimal.valueOf(amount), BigDecimal.valueOf(partnerStake), days, title, description, emptyToNull(draft.mediator()))
             }
-            else -> ServiceResult.fail("不支持的合同类型")
+            else -> ServiceResult.fail(ui("draft-unsupported-type"))
         }
     }
 
     // ---- Chat-driven inputs --------------------------------------------------------------------
 
     private fun promptTextField(player: Player, message: String, apply: (String?) -> Unit) {
-        input.promptLine(player, Text.color(message), allowClear = false, FIELD_PROMPT_TIMEOUT_MS) { outcome ->
+        input.promptLine(player, message, allowClear = false, FIELD_PROMPT_TIMEOUT_MS) { outcome ->
             if (outcome is ChatOutcome.Submitted) {
                 val text = outcome.text.trim()
                 apply(if (text.isEmpty()) null else text)
@@ -633,11 +879,11 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
     }
 
     private fun promptNumberField(player: Player, message: String, apply: (Double) -> Unit) {
-        input.promptLine(player, Text.color(message), allowClear = false, FIELD_PROMPT_TIMEOUT_MS) { outcome ->
+        input.promptLine(player, message, allowClear = false, FIELD_PROMPT_TIMEOUT_MS) { outcome ->
             if (outcome is ChatOutcome.Submitted) {
                 val parsed = parseNonNegative(outcome.text.trim())
                 if (parsed == null) {
-                    player.sendMessage(Text.color("&#E63946数字格式不正确,请输入 0 或更大的数字。"))
+                    player.sendMessage(ui("prompt-number-invalid"))
                 } else {
                     apply(parsed)
                 }
@@ -656,7 +902,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         input.promptLine(player, plugin.lang().message("description-input-start"), allowClear = true, DESCRIPTION_PROMPT_TIMEOUT_MS) { outcome ->
             when (outcome) {
                 is ChatOutcome.Submitted -> {
-                    val clean = Text.stripControl(outcome.text)
+                    val clean = plugin.text().stripControl(outcome.text)
                     if (clean.length > maxLength) {
                         player.sendMessage(plugin.lang().message("description-input-too-long", mapOf("max" to maxLength.toString())))
                     } else {
@@ -715,13 +961,13 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
     private fun setObjectiveTargetFromHand(player: Player, draft: CreateDraft) {
         val type = draft.objectiveType()
         if (!canUseHandAsObjectiveTarget(type)) {
-            player.sendMessage(Text.color("&#E63946这个目标类型不能使用主手物品设置。"))
+            player.sendMessage(ui("objective-hand-unsupported"))
             openWizardForm(player)
             return
         }
         val hand = player.inventory.itemInMainHand
         if (hand.type == Material.AIR) {
-            player.sendMessage(Text.color("&#E63946请先把要作为目标的物品拿在主手。"))
+            player.sendMessage(ui("objective-hand-empty"))
             openWizardForm(player)
             return
         }
@@ -731,7 +977,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         } else if (draft.objectiveRequired() == null || (draft.objectiveRequired() ?: 0) <= 0) {
             draft.objectiveRequired(1)
         }
-        player.sendMessage(Text.color("&#69DB7C已使用主手物品设置目标: &#FFFFFF${hand.type.name}"))
+        player.sendMessage(ui("objective-hand-set", mapOf("target" to hand.type.name)))
         openWizardForm(player)
     }
 
@@ -760,7 +1006,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         val contractId = contract.id()
         input.promptLine(
             player,
-            Text.color("&#FFE066请在 60 秒内输入争议原因,或输入 &#E63946cancel &#FFE066取消。"),
+            ui("dispute-prompt"),
             allowClear = false,
             DISPUTE_PROMPT_TIMEOUT_MS,
         ) { outcome ->
@@ -774,8 +1020,8 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
                         player.sendMessage(plugin.lang().message("operation-failed", mapOf("reason" to result.reason())))
                     }
                 }, { player.sendMessage(plugin.lang().message("not-found")) })
-                ChatOutcome.Cancelled -> player.sendMessage(Text.color("&#FFE066已取消争议输入。"))
-                ChatOutcome.TimedOut -> player.sendMessage(Text.color("&#E63946争议输入超时,已取消。"))
+                ChatOutcome.Cancelled -> player.sendMessage(ui("dispute-cancelled"))
+                ChatOutcome.TimedOut -> player.sendMessage(ui("dispute-timeout"))
                 ChatOutcome.Cleared -> {}
             }
         }
@@ -790,11 +1036,59 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     // ---- Data queries --------------------------------------------------------------------------
 
+    private fun hallEntries(player: Player, view: HallView): List<HallEntry> {
+        val all = plugin.contracts().allContracts()
+        val summaries = BatchQueryService.summaries(all)
+        val seenBatches = HashSet<String>()
+        return hallContracts(player, view).mapNotNull { contract ->
+            val batchId = contract.metadata["batch-id"]
+            if (batchId.isNullOrBlank()) {
+                HallEntry.Single(contract)
+            } else if (seenBatches.add(batchId)) {
+                summaries[batchId]?.let(HallEntry::Batch)
+            } else {
+                null
+            }
+        }
+    }
+
+    private fun promptSchedule(player: Player, draft: CreateDraft) {
+        input.promptLine(
+            player,
+            ui("schedule-prompt", mapOf("zone" to ZoneId.systemDefault().toString())),
+            false,
+            FIELD_PROMPT_TIMEOUT_MS,
+        ) { outcome ->
+            if (outcome is ChatOutcome.Submitted) {
+                val value = outcome.text.trim()
+                if (value.equals("now", true) || value == ui("schedule-now-keyword")) {
+                    draft.publishAt(null)
+                    player.sendMessage(ui("schedule-now-set"))
+                } else {
+                    try {
+                        val instant = LocalDateTime.parse(value, SCHEDULE_FORMAT).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        if (instant <= System.currentTimeMillis()) {
+                            player.sendMessage(ui("schedule-past"))
+                        } else {
+                            draft.publishAt(instant)
+                            player.sendMessage(ui("schedule-future-set"))
+                        }
+                    } catch (_: DateTimeParseException) {
+                        player.sendMessage(ui("schedule-format-error"))
+                    }
+                }
+            }
+            openWizardForm(player)
+        }
+    }
+
     private fun hallContracts(player: Player, view: HallView): List<Contract> = when (view) {
         HallView.OPEN -> plugin.contracts().allContracts().stream()
             .filter { contract -> contract.status() == ContractStatus.OPEN || contract.status() == ContractStatus.PENDING_ACCEPT && contract.relatedTo(player.uniqueId) }
             .toList()
-        HallView.ACTIVE -> relatedContracts(player, ContractStatus.IN_PROGRESS)
+        HallView.ACTIVE -> plugin.contracts().allContracts().filter {
+            it.relatedTo(player.uniqueId) && (it.status() == ContractStatus.SCHEDULED || it.status() == ContractStatus.IN_PROGRESS)
+        }
         HallView.SUBMITTED -> relatedContracts(player, ContractStatus.SUBMITTED)
         HallView.DISPUTED -> relatedContracts(player, ContractStatus.DISPUTED)
         HallView.DONE -> relatedContracts(player, ContractStatus.COMPLETED)
@@ -822,33 +1116,33 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
         val id = player.uniqueId
         val status = contract.status()
         if (isArbiter(contract, id)) {
-            if (!contract.arbiterAccepted()) return "待你接受中间人/仲裁职责"
-            if (contract.type() == ContractType.WAGER && (status == ContractStatus.IN_PROGRESS || status == ContractStatus.SUBMITTED)) return "待你裁决对赌"
-            if (contract.type() != ContractType.WAGER && status == ContractStatus.DISPUTED) return "待你裁决争议"
+            if (!contract.arbiterAccepted()) return ui("inbox-mediator-pending")
+            if (contract.type() == ContractType.WAGER && (status == ContractStatus.IN_PROGRESS || status == ContractStatus.SUBMITTED)) return ui("inbox-wager-resolve")
+            if (contract.type() != ContractType.WAGER && status == ContractStatus.DISPUTED) return ui("inbox-dispute-resolve")
         }
-        if (status == ContractStatus.PENDING_ACCEPT && id == contract.contractorUuid()) return "待你接受邀请"
+        if (status == ContractStatus.PENDING_ACCEPT && id == contract.contractorUuid()) return ui("inbox-accept-invite")
         if (contract.type() == ContractType.SERVICE) {
-            if (status == ContractStatus.COMPLETED && id == contract.ownerUuid() && contract.hasDeliveryItems()) return "待你领取交付物品"
-            if (status == ContractStatus.COMPLETED && id == contract.contractorUuid() && contract.hasRewardItems()) return "待你领取奖励物品"
-            if ((status == ContractStatus.CANCELLED || status == ContractStatus.EXPIRED) && id == contract.ownerUuid() && contract.hasRewardItems()) return "待你领回奖励物品"
+            if (status == ContractStatus.COMPLETED && id == contract.ownerUuid() && contract.hasDeliveryItems()) return ui("inbox-claim-delivery")
+            if (status == ContractStatus.COMPLETED && id == contract.contractorUuid() && contract.hasRewardItems()) return ui("inbox-claim-reward")
+            if ((status == ContractStatus.CANCELLED || status == ContractStatus.EXPIRED) && id == contract.ownerUuid() && contract.hasRewardItems()) return ui("inbox-reclaim-reward")
             if (status == ContractStatus.IN_PROGRESS && id == contract.contractorUuid()) {
                 val objective = contract.objective()
-                if (objective == null) return "待你提交完成"
+                if (objective == null) return ui("inbox-submit")
                 return when (objective.type()) {
-                    ObjectiveType.DELIVER_ITEM -> "待你交付物品"
-                    ObjectiveType.DELIVER_MONEY -> "待你提交货币"
-                    else -> "系统目标 ${objective.progressText()}"
+                    ObjectiveType.DELIVER_ITEM -> ui("inbox-deliver-item")
+                    ObjectiveType.DELIVER_MONEY -> ui("inbox-deliver-money")
+                    else -> ui("inbox-objective", mapOf("progress" to objective.progressText()))
                 }
             }
-            if (!contract.systemVerifiedService() && status == ContractStatus.SUBMITTED && id == contract.ownerUuid()) return "待你确认付款"
+            if (!contract.systemVerifiedService() && status == ContractStatus.SUBMITTED && id == contract.ownerUuid()) return ui("inbox-approve")
         }
         if (contract.type() == ContractType.PARTNERSHIP && status == ContractStatus.IN_PROGRESS && isParty(contract, id)) {
             val approved = contract.metadata.getOrDefault("approved-roles", "")
             val me = contract.participantByUuid(id)
-            if (me.isPresent && !approved.contains(me.get().role().name)) return "待你确认合作完成"
+            if (me.isPresent && !approved.contains(me.get().role().name)) return ui("inbox-partner-approve")
         }
         if (status == ContractStatus.DISPUTED && contract.relatedTo(id)) {
-            return if (isDisputeInitiator(contract, id)) "你发起的争议 · 可撤销" else "争议处理中"
+            return if (isDisputeInitiator(contract, id)) ui("inbox-dispute-own") else ui("inbox-dispute-other")
         }
         return null
     }
@@ -861,21 +1155,22 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             return action
         }
         if (isArbiter(contract, id) && contract.type() != ContractType.WAGER && contract.arbiterAccepted()) {
-            return "中间人已接受,等待争议或双方处理"
+            return ui("progress-mediator-accepted")
         }
         val objective = contract.objective()
         if (objective != null && status == ContractStatus.IN_PROGRESS) {
-            return "系统目标 ${objective.progressText()}"
+            return ui("inbox-objective", mapOf("progress" to objective.progressText()))
         }
         return when (status) {
-            ContractStatus.OPEN -> "等待玩家接单"
-            ContractStatus.PENDING_ACCEPT -> "等待指定对方接受邀请"
-            ContractStatus.IN_PROGRESS -> "执行中,等待接单方完成"
-            ContractStatus.SUBMITTED -> "已提交,等待雇主确认"
-            ContractStatus.DISPUTED -> "申诉中,等待管理员或中间人处理"
-            ContractStatus.COMPLETED -> "已完成并结算"
-            ContractStatus.CANCELLED -> "已关闭或撤销"
-            ContractStatus.EXPIRED -> "接单超时,已关闭"
+            ContractStatus.SCHEDULED -> ui("schedule-state")
+            ContractStatus.OPEN -> ui("progress-open")
+            ContractStatus.PENDING_ACCEPT -> ui("progress-pending-accept")
+            ContractStatus.IN_PROGRESS -> ui("progress-in-progress")
+            ContractStatus.SUBMITTED -> ui("progress-submitted")
+            ContractStatus.DISPUTED -> ui("progress-disputed")
+            ContractStatus.COMPLETED -> ui("progress-completed")
+            ContractStatus.CANCELLED -> ui("progress-cancelled")
+            ContractStatus.EXPIRED -> ui("progress-expired")
         }
     }
 
@@ -893,7 +1188,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
     }
 
     private fun adminLabel(contract: Contract): String =
-        if (contract.status() == ContractStatus.DISPUTED) "争议待处理" else plugin.lang().status(contract.status())
+        if (contract.status() == ContractStatus.DISPUTED) ui("admin-label-disputed") else plugin.lang().status(contract.status())
 
     private fun rewardSummary(contract: Contract): String {
         val parts = ArrayList<String>()
@@ -901,7 +1196,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             parts.add(plugin.economy().format(contract.reward()))
         }
         if (contract.hasRewardItems()) {
-            parts.add("${contract.rewardItemCount()} 个物品")
+            parts.add(ui("item-count", mapOf("count" to contract.rewardItemCount().toString())))
         }
         return if (parts.isEmpty()) plugin.economy().format(BigDecimal.ZERO) else parts.joinToString(" + ")
     }
@@ -910,85 +1205,55 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun fieldButton(material: Material, label: String, value: String?): ItemStack {
         val filled = !value.isNullOrBlank()
-        val name = (if (filled) "&#69DB7C" else "&#FFE066") + label
-        return button(material, name, "&#CFD8DC当前: &#FFFFFF${if (filled) value else "未填写"}", "&#FFE066点击在聊天输入")
+        val current = if (filled) value!! else ui("field-empty")
+        val name = ui(if (filled) "field-name-filled" else "field-name-empty", mapOf("label" to label))
+        return button(material, name, ui("field-current", mapOf("value" to current)), ui("field-click"))
     }
 
     private fun defaultMoneyTargetButton(): ItemStack =
-        button(
-            Material.GOLD_INGOT,
-            "&#69DB7C货币: &#FFFFFF默认经济",
-            "&#CFD8DC使用服务器 Vault/CMI Economy 默认货币。",
-            "&#CFD8DC这里只需要填写目标数量。",
-        )
+        button(Material.GOLD_INGOT, ui("money-target"), ui("money-target-1"), ui("money-target-2"))
 
     private fun handTargetButton(): ItemStack =
-        button(
-            Material.ITEM_FRAME,
-            "&#69DB7C使用主手物品",
-            "&#CFD8DC把目标物品拿在主手后点击。",
-            "&#CFD8DC提交物品任务会同时读取这一组数量。",
-        )
+        button(Material.ITEM_FRAME, ui("hand-target"), ui("hand-target-1"), ui("hand-target-2"))
 
     private fun rewardModeButton(draft: CreateDraft): ItemStack =
         if (draft.itemReward()) {
-            button(
-                Material.CHEST,
-                "&#69DB7C奖励: &#FFFFFF主手物品",
-                "&#CFD8DC签署时托管主手整组物品。",
-                "&#FFE066点击切换为金钱奖励",
-            )
+            button(Material.CHEST, ui("reward-mode-item"), ui("reward-mode-item-1"), ui("reward-mode-item-2"))
+        } else {
+            button(Material.GOLD_INGOT, ui("reward-mode-money"), ui("reward-mode-money-1"), ui("reward-mode-money-2"))
+        }
+
+    private fun scheduleButton(draft: CreateDraft): ItemStack {
+        val publishAt = draft.publishAt()
+        return if (publishAt == null) {
+            button(Material.CLOCK, ui("schedule-button-now"), ui("schedule-button-set"), ui("schedule-button-escrow"))
         } else {
             button(
-                Material.GOLD_INGOT,
-                "&#69DB7C奖励: &#FFFFFF金钱",
-                "&#CFD8DC签署时从余额扣除奖金。",
-                "&#FFE066点击切换为主手物品奖励",
+                Material.CLOCK,
+                ui("schedule-button-time", mapOf("time" to SCHEDULE_FORMAT.format(java.time.Instant.ofEpochMilli(publishAt).atZone(ZoneId.systemDefault())))),
+                ui("schedule-button-once"),
+                ui("schedule-button-change"),
             )
         }
+    }
 
     private fun verificationButton(draft: CreateDraft): ItemStack =
         if (draft.systemVerified()) {
-            button(
-                Material.COMPARATOR,
-                "&#69DB7C系统验收",
-                "&#CFD8DC目标达成后系统自动付款。",
-                "&#FFE066点击切换为人工验收",
-            )
+            button(Material.COMPARATOR, ui("verify-system"), ui("verify-system-1"), ui("verify-system-2"))
         } else {
-            button(
-                Material.PLAYER_HEAD,
-                "&#FFE066人工验收",
-                "&#CFD8DC接单者提交后由发布者确认付款。",
-                "&#FFE066点击切换为系统验收",
-            )
+            button(Material.PLAYER_HEAD, ui("verify-manual"), ui("verify-manual-1"), ui("verify-manual-2"))
         }
 
     private fun batchRepeatPolicyButton(draft: CreateDraft): ItemStack =
         when (draft.repeatPolicy()) {
-            BatchRepeatPolicy.UNLIMITED -> button(
-                Material.REPEATER,
-                "&#FFE066重复接取: &#FFFFFF不限制",
-                "&#CFD8DC同一玩家可以连续领取该批次任务",
-                "&#FFE066点击切换规则",
-            )
-            BatchRepeatPolicy.ONCE -> button(
-                Material.IRON_DOOR,
-                "&#69DB7C重复接取: &#FFFFFF每人仅一次",
-                "&#CFD8DC每名玩家最多领取该批次一份任务",
-                "&#FFE066点击切换规则",
-            )
-            BatchRepeatPolicy.COOLDOWN -> button(
-                Material.CLOCK,
-                "&#69DB7C重复接取: &#FFFFFF冷却后可重复",
-                "&#CFD8DC同批次同时只能进行一份任务",
-                "&#FFE066点击切换规则",
-            )
+            BatchRepeatPolicy.UNLIMITED -> button(Material.REPEATER, ui("repeat-unlimited"), ui("repeat-unlimited-1"), ui("repeat-cycle"))
+            BatchRepeatPolicy.ONCE -> button(Material.IRON_DOOR, ui("repeat-once"), ui("repeat-once-1"), ui("repeat-cycle"))
+            BatchRepeatPolicy.COOLDOWN -> button(Material.CLOCK, ui("repeat-cooldown"), ui("repeat-cooldown-1"), ui("repeat-cycle"))
         }
 
     private fun objectiveTypeButton(draft: CreateDraft): ItemStack {
         val type = draft.objectiveType() ?: ObjectiveType.KILL_ENTITY
-        return button(objectiveTargetMaterial(type), "&#69DB7C目标类型: &#FFFFFF${objectiveTypeLabel(type)}", "&#FFE066点击切换目标类型")
+        return button(objectiveTargetMaterial(type), ui("objective-type-button", mapOf("value" to plugin.lang().objective(type))), ui("objective-type-cycle"))
     }
 
     private fun objectiveTargetMaterial(type: ObjectiveType?): Material =
@@ -1013,71 +1278,6 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
             null -> Material.COMPASS
         }
 
-    private fun objectiveTypeLabel(type: ObjectiveType): String =
-        when (type) {
-            ObjectiveType.CRAFT_ITEM -> "合成物品"
-            ObjectiveType.BLOCK_BREAK -> "挖掘方块"
-            ObjectiveType.FISH -> "钓鱼"
-            ObjectiveType.BLOCK_PLACE -> "放置方块"
-            ObjectiveType.KILL_ENTITY -> "击杀生物"
-            ObjectiveType.KILL_PLAYER -> "击杀玩家"
-            ObjectiveType.CONSUME_ITEM -> "消耗物品"
-            ObjectiveType.DELIVER_ITEM -> "提交物品"
-            ObjectiveType.ENCHANT_ITEM -> "附魔物品"
-            ObjectiveType.SHEAR -> "使用剪刀"
-            ObjectiveType.BREED -> "繁殖动物"
-            ObjectiveType.TAME -> "驯服动物"
-            ObjectiveType.CHAT -> "发送聊天"
-            ObjectiveType.BLOCK_INTERACT -> "交互方块"
-            ObjectiveType.RUN_COMMAND -> "执行指令"
-            ObjectiveType.USE_ITEM -> "使用物品"
-            ObjectiveType.DELIVER_MONEY -> "提交货币"
-        }
-
-    private fun objectiveTargetLabel(type: ObjectiveType?): String =
-        when (type) {
-            ObjectiveType.CRAFT_ITEM -> "物品类型"
-            ObjectiveType.BLOCK_BREAK -> "方块类型"
-            ObjectiveType.FISH -> "渔获类型"
-            ObjectiveType.BLOCK_PLACE -> "方块类型"
-            ObjectiveType.KILL_ENTITY -> "生物类型"
-            ObjectiveType.KILL_PLAYER -> "目标玩家"
-            ObjectiveType.CONSUME_ITEM -> "物品类型"
-            ObjectiveType.DELIVER_ITEM -> "物品类型"
-            ObjectiveType.ENCHANT_ITEM -> "物品类型"
-            ObjectiveType.SHEAR -> "实体类型"
-            ObjectiveType.BREED -> "动物类型"
-            ObjectiveType.TAME -> "动物类型"
-            ObjectiveType.CHAT -> "聊天内容"
-            ObjectiveType.BLOCK_INTERACT -> "方块类型"
-            ObjectiveType.RUN_COMMAND -> "指令"
-            ObjectiveType.USE_ITEM -> "物品类型"
-            ObjectiveType.DELIVER_MONEY -> "货币"
-            null -> "目标"
-        }
-
-    private fun objectiveTargetPrompt(type: ObjectiveType?): String =
-        when (type) {
-            ObjectiveType.CRAFT_ITEM -> "&#FFE066请输入合成产物,如 BREAD"
-            ObjectiveType.BLOCK_BREAK -> "&#FFE066请输入方块类型,如 STONE"
-            ObjectiveType.FISH -> "&#FFE066请输入渔获物品,如 COD,或 ANY 表示任意渔获"
-            ObjectiveType.BLOCK_PLACE -> "&#FFE066请输入放置方块类型,如 TORCH"
-            ObjectiveType.KILL_ENTITY -> "&#FFE066请输入生物类型,如 ZOMBIE"
-            ObjectiveType.KILL_PLAYER -> "&#FFE066请输入目标玩家名,或 ANY 表示任意玩家"
-            ObjectiveType.CONSUME_ITEM -> "&#FFE066请输入消耗物品,如 BREAD"
-            ObjectiveType.DELIVER_ITEM -> "&#FFE066请输入物品类型,如 DIAMOND"
-            ObjectiveType.ENCHANT_ITEM -> "&#FFE066请输入附魔物品,如 DIAMOND_SWORD"
-            ObjectiveType.SHEAR -> "&#FFE066请输入实体类型,如 SHEEP,或 ANY 表示任意"
-            ObjectiveType.BREED -> "&#FFE066请输入动物类型,如 COW,或 ANY 表示任意"
-            ObjectiveType.TAME -> "&#FFE066请输入动物类型,如 WOLF,或 ANY 表示任意"
-            ObjectiveType.CHAT -> "&#FFE066请输入聊天内容(区分大小写),或 ANY 表示发送任意消息"
-            ObjectiveType.BLOCK_INTERACT -> "&#FFE066请输入方块类型,如 STONE_BUTTON,或 ANY 表示任意方块"
-            ObjectiveType.RUN_COMMAND -> "&#FFE066请输入指令,不要带斜杠,如 spawn"
-            ObjectiveType.USE_ITEM -> "&#FFE066请输入物品类型,如 ENDER_PEARL"
-            ObjectiveType.DELIVER_MONEY -> "&#FFE066默认货币无需输入"
-            null -> "&#FFE066请输入目标"
-        }
-
     private fun canUseHandAsObjectiveTarget(type: ObjectiveType?): Boolean =
         when (type) {
             ObjectiveType.CRAFT_ITEM,
@@ -1095,15 +1295,25 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun descriptionButton(value: String?): ItemStack {
         val filled = !value.isNullOrBlank()
-        val name = (if (filled) "&#69DB7C" else "&#FFE066") + "描述"
-        return button(Material.BOOK, name, "&#CFD8DC当前: &#FFFFFF${ContractTerms.preview(value)}", "&#FFE066点击后在聊天输入", "&#CFD8DC输入 cancel 取消, clear 清空")
+        val name = ui(if (filled) "field-name-filled" else "field-name-empty", mapOf("label" to ui("field-description")))
+        return button(
+            Material.BOOK,
+            name,
+            ui("field-current", mapOf("value" to ContractTerms.preview(value, ui("field-empty")))),
+            ui("field-chat-click"),
+            ui("field-description-hint"),
+        )
     }
 
     private fun adminFilterButton(filter: AdminFilter, selected: AdminFilter, material: Material, label: String): ItemStack =
-        button(material, (if (filter == selected) "&#69DB7C" else "&#CFD8DC") + label, "&#CFD8DC点击切换分栏")
+        button(material, tabLabel(filter == selected, label), ui("admin-filter-switch"))
 
     private fun viewButton(target: HallView, selected: HallView, material: Material, label: String): ItemStack =
-        button(material, (if (target == selected) "&#69DB7C" else "&#CFD8DC") + label, "&#CFD8DC点击切换视图")
+        button(material, tabLabel(target == selected, label), ui("hall-view-switch"))
+
+    /** Tab labels differ only by highlight colour, which lives in the locale file like every other style. */
+    private fun tabLabel(selected: Boolean, label: String): String =
+        ui(if (selected) "tab-selected" else "tab-unselected", mapOf("label" to label))
 
     // ---- Predicates / config -------------------------------------------------------------------
 
@@ -1117,7 +1327,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
     private fun canCancel(player: Player, contract: Contract): Boolean = contract.participantByUuid(player.uniqueId).isPresent
 
     private fun canMediate(contract: Contract): Boolean =
-        contract.arbiterAccepted() && !contract.status().isFinal() && contract.status() != ContractStatus.OPEN && contract.status() != ContractStatus.PENDING_ACCEPT
+        contract.arbiterAccepted() && !contract.status().isFinal() && contract.status() != ContractStatus.SCHEDULED && contract.status() != ContractStatus.OPEN && contract.status() != ContractStatus.PENDING_ACCEPT
 
     private fun isParty(contract: Contract, uuid: UUID): Boolean =
         contract.participantByUuid(uuid).map { participant -> participant.role() == ParticipantRole.PARTY_A || participant.role() == ParticipantRole.PARTY_B }.orElse(false)
@@ -1130,22 +1340,31 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     private fun clampPage(page: Int, pages: Int): Int = min(max(1, page), pages)
 
+    /** Shorthand for a `ui.*` language lookup; resolved per call so `/contract admin reload` applies. */
+    private fun ui(key: String, placeholders: Map<String, String> = emptyMap()): String = plugin.lang().ui(key, placeholders)
+
+    private fun pageLore(current: Int, pages: Int): String =
+        ui("nav-page", mapOf("page" to current.toString(), "pages" to pages.toString()))
+
+    private fun problemText(problem: DraftProblem): String =
+        ui("problem-line", mapOf("value" to ui(problem.key, problem.placeholders)))
+
     private fun hallTitle(view: HallView): String = when (view) {
-        HallView.OPEN -> BOARD_TITLE
-        HallView.ACTIVE -> ACTIVE_TITLE
-        HallView.SUBMITTED -> SUBMITTED_TITLE
-        HallView.DISPUTED -> DISPUTED_TITLE
-        HallView.DONE -> DONE_TITLE
-        HallView.CLOSED -> CLOSED_TITLE
+        HallView.OPEN -> ui("hall-title-open")
+        HallView.ACTIVE -> ui("hall-title-active")
+        HallView.SUBMITTED -> ui("hall-title-submitted")
+        HallView.DISPUTED -> ui("hall-title-disputed")
+        HallView.DONE -> ui("hall-title-done")
+        HallView.CLOSED -> ui("hall-title-closed")
     }
 
     private fun emptyHint(view: HallView): String = when (view) {
-        HallView.OPEN -> "暂无可接取合同"
-        HallView.ACTIVE -> "暂无进行中的合同"
-        HallView.SUBMITTED -> "暂无待确认合同"
-        HallView.DISPUTED -> "暂无申诉中的合同"
-        HallView.DONE -> "暂无已完成合同"
-        HallView.CLOSED -> "暂无已关闭合同"
+        HallView.OPEN -> ui("hall-empty-open")
+        HallView.ACTIVE -> ui("hall-empty-active")
+        HallView.SUBMITTED -> ui("hall-empty-submitted")
+        HallView.DISPUTED -> ui("hall-empty-disputed")
+        HallView.DONE -> ui("hall-empty-done")
+        HallView.CLOSED -> ui("hall-empty-closed")
     }
 
     private fun minAmount(): Double = plugin.config.getDouble("economy.min-reward", 100.0)
@@ -1165,23 +1384,21 @@ class ContractGui(private val plugin: ContractPlugin) : Listener {
 
     enum class AdminFilter { DISPUTED, ACTIVE, ALL }
 
+    private sealed interface HallEntry {
+        data class Single(val contract: Contract) : HallEntry
+        data class Batch(val summary: BatchSummary) : HallEntry
+    }
+
     companion object {
-        private val BOARD_TITLE = Text.color("&#F4D03F合同 · 开放")
-        private val ACTIVE_TITLE = Text.color("&#F4D03F合同 · 进行中")
-        private val SUBMITTED_TITLE = Text.color("&#F4D03F合同 · 待确认")
-        private val DISPUTED_TITLE = Text.color("&#F4D03F合同 · 申诉中")
-        private val DONE_TITLE = Text.color("&#F4D03F合同 · 已完成")
-        private val CLOSED_TITLE = Text.color("&#F4D03F合同 · 已关闭")
-        private val DETAIL_TITLE_PREFIX = Text.color("&#F4D03F合同详情 ")
-        private val WIZARD_TYPE_TITLE = Text.color("&#F4D03F创建合同 · 选择类型")
-        private val WIZARD_FORM_TITLE = Text.color("&#F4D03F创建合同 · 填写")
-        private val CONFIRM_TITLE = Text.color("&#F4D03F签署确认")
-        private val ADMIN_TITLE = Text.color("&#E63946管理工作台")
         private val BOARD_SLOTS = intArrayOf(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43)
         private const val DISPUTE_PROMPT_TIMEOUT_MS = 60_000L
         private const val DESCRIPTION_PROMPT_TIMEOUT_MS = 120_000L
         private const val FIELD_PROMPT_TIMEOUT_MS = 60_000L
         private const val BATCH_CREATE_PERMISSION = "contract.create.batch"
+        private const val TEMPLATE_USE_PERMISSION = "contract.template.use"
+        private const val TEMPLATE_MANAGE_PERMISSION = "contract.template.manage"
+        private const val SCHEDULE_CREATE_PERMISSION = "contract.schedule.create"
+        private val SCHEDULE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
         private fun parseNonNegative(text: String): Double? =
             try {
