@@ -7,6 +7,21 @@ import org.bukkit.inventory.ItemStack
 /** Shared low-level item builders used by the contract menus and the renderer. */
 
 /**
+ * Icons shared by several menus.
+ *
+ * Every menu click is cancelled, but an icon on display is only ever one unhandled exception away
+ * from ending up in a player's inventory, so menus never show a block players cannot legitimately
+ * obtain — no barrier, no command block. Keep new icons survival-obtainable for the same reason.
+ */
+internal object GuiIcons {
+    /** Cancel, abandon, delete — an action that destroys something. */
+    val DESTRUCTIVE: Material = Material.RED_DYE
+
+    /** A closed or cancelled contract: reached its end, nothing left to do. */
+    val INACTIVE: Material = Material.GRAY_DYE
+}
+
+/**
  * Names and lore arrive already rendered by the i18n service, so these builders only assemble the
  * stack — there is no colour translation step left to forget.
  */

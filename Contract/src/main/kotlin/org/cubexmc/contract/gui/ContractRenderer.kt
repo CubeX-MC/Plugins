@@ -273,7 +273,7 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         when (status) {
             ContractStatus.SCHEDULED -> Material.CLOCK
             ContractStatus.COMPLETED -> Material.EMERALD
-            ContractStatus.CANCELLED -> Material.BARRIER
+            ContractStatus.CANCELLED -> GuiIcons.INACTIVE
             ContractStatus.EXPIRED -> Material.CLOCK
             ContractStatus.DISPUTED -> Material.REDSTONE
             ContractStatus.PENDING_ACCEPT -> Material.YELLOW_BANNER

@@ -1,0 +1,103 @@
+# 合同模板库。
+#
+# 首次启动时铺这一份示例；文件已存在就不会被覆盖，所以你的改动不会丢。
+# 玩家在向导里保存的模板也写进这个文件（插件按内存全量重写），因此手改前先停服。
+#
+# owner-uuid 是模板的归属人：
+#   - 玩家保存的模板 = 该玩家的 UUID，只有他自己（和管理员）看得到、删得掉。
+#   - 下面这些 owner-uuid 全零 = 服务器预设，不属于任何玩家。配合 visibility: SERVER
+#     对所有人可见，不占任何人的 max-templates-per-player 名额，也只有拿到
+#     contract.template.manage 的管理员能删。
+#
+# visibility: PRIVATE 只有 owner 可见 / SERVER 全服可见。管理员可以在模板详情页里切换。
+#
+# 想改成"某位管理员的私人模板"，把 owner-uuid 换成他的 UUID 即可。
+# 注意 objective-type / type / repeat-policy 必须写成下面用到的这些大写枚举名，
+# 拼错整条模板会被跳过，控制台留一行 Skipping malformed contract template。
+
+templates:
+  preset_hire:
+    owner-uuid: "00000000-0000-0000-0000-000000000000"
+    owner-name: "Server"
+    name: "雇佣委托"
+    visibility: SERVER
+    created-at: 0
+    updated-at: 0
+    spec:
+      type: SERVICE
+      title: "雇佣：帮我干活"
+      description: "写清楚要做什么、在哪做、做到什么程度算完成。"
+      days: 7
+      amount: 1000.0
+      item-reward: false
+      objective-type: null
+      objective-target: null
+      objective-required: null
+      contract-count: 1
+      repeat-policy: ONCE
+      repeat-cooldown-hours: 24
+
+  preset_bounty:
+    owner-uuid: "00000000-0000-0000-0000-000000000000"
+    owner-name: "Server"
+    name: "玩家悬赏"
+    visibility: SERVER
+    created-at: 0
+    updated-at: 0
+    spec:
+      type: BOUNTY
+      title: "悬赏：取其首级"
+      description: "在 objective-target 里填被悬赏玩家的 ID。击杀后自动结算。"
+      days: 14
+      amount: 5000.0
+      item-reward: false
+      objective-type: KILL_PLAYER
+      objective-target: null
+      objective-required: 1
+      contract-count: 1
+      repeat-policy: ONCE
+      repeat-cooldown-hours: 24
+
+  preset_loan:
+    owner-uuid: "00000000-0000-0000-0000-000000000000"
+    owner-name: "Server"
+    name: "借贷"
+    visibility: SERVER
+    created-at: 0
+    updated-at: 0
+    spec:
+      type: LOAN
+      title: "借款：到期归还"
+      description: "amount 填应还总额（本金加利息），days 填还款期限。"
+      days: 30
+      amount: 10000.0
+      item-reward: false
+      objective-type: null
+      objective-target: null
+      objective-required: null
+      contract-count: 1
+      repeat-policy: ONCE
+      repeat-cooldown-hours: 24
+
+  # 批量合同：一次挂出 10 份同样的采集任务，谁都能接，接满为止。
+  # 想让同一个人反复接，把 repeat-policy 改成 COOLDOWN 并调 repeat-cooldown-hours。
+  preset_gather_batch:
+    owner-uuid: "00000000-0000-0000-0000-000000000000"
+    owner-name: "Server"
+    name: "批量采集委托"
+    visibility: SERVER
+    created-at: 0
+    updated-at: 0
+    spec:
+      type: SERVICE
+      title: "收购：交付材料"
+      description: "在 objective-target 里填物品 ID，objective-required 填数量。"
+      days: 7
+      amount: 500.0
+      item-reward: false
+      objective-type: DELIVER_ITEM
+      objective-target: null
+      objective-required: 64
+      contract-count: 10
+      repeat-policy: ONCE
+      repeat-cooldown-hours: 24
