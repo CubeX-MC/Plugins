@@ -1,167 +1,168 @@
-lang-version: 5
+lang-version: 6
 
-prefix: "&#69DB7C[Regions] "
+prefix: "<#69DB7C>[Regions] "
 help: |
-  &#69DB7C/regions gui &#CFD8DC- 打开 Regions 管理界面
-  &#69DB7C/regions list &#CFD8DC- 查看区域
-  &#69DB7C/regions create <id> <名称> --land <领地> [area] &#CFD8DC- 在自己的 Lands 区域创建场地
-  &#69DB7C/regions bind <id> cuboid|lands ... &#CFD8DC- 绑定区域来源
-  &#69DB7C/regions mode set <id> dual_pvp|union_war|run_race|boat_race|horse_race|hide_and_seek ... &#CFD8DC- 设置玩法
-  &#69DB7C/regions game <id> ready/start/status/end &#CFD8DC- 确认、裁判开始、查看或结束游戏
-  &#69DB7C/regions flag set <id> <flag> <值> &#CFD8DC- 设置规则
-  &#69DB7C/regions effect add <id> <effect> [参数] &#CFD8DC- 添加区域效果
-  &#69DB7C/regions trial <id> [start|stop] &#CFD8DC- 仅对自己隔离试运行草稿 Effect 与 Flag
-  &#69DB7C/regions preview <id> &#CFD8DC- 查看依赖、冲突和最终有效规则
-  &#69DB7C/regions validate [id] &#CFD8DC- 校验配置
-  &#69DB7C/regions inspect <玩家> &#CFD8DC- 查看玩家区域状态
-  &#69DB7C/regions cleanup <玩家> &#CFD8DC- 清理玩家区域状态
-  &#69DB7C/regions freeze|unfreeze <id> [原因] &#CFD8DC- 超级管理员冻结或复核解冻场地
-  &#69DB7C/regions audit [id] [条数] &#CFD8DC- 超级管理员查看审计记录
-  &#69DB7C/regions reload &#CFD8DC- 重载配置
+  <#69DB7C>/regions gui <#CFD8DC>- 打开 Regions 管理界面
+  <#69DB7C>/regions list <#CFD8DC>- 查看区域
+  <#69DB7C>/regions create \<id> \<名称> --land \<领地> [area] <#CFD8DC>- 在自己的 Lands 区域创建场地
+  <#69DB7C>/regions bind \<id> cuboid|lands ... <#CFD8DC>- 绑定区域来源
+  <#69DB7C>/regions mode set \<id> dual_pvp|union_war|run_race|boat_race|horse_race|hide_and_seek ... <#CFD8DC>- 设置玩法
+  <#69DB7C>/regions game \<id> ready/start/status/end <#CFD8DC>- 确认、裁判开始、查看或结束游戏
+  <#69DB7C>/regions flag set \<id> \<flag> \<值> <#CFD8DC>- 设置规则
+  <#69DB7C>/regions effect add \<id> \<effect> [参数] <#CFD8DC>- 添加区域效果
+  <#69DB7C>/regions trial \<id> [start|stop] <#CFD8DC>- 仅对自己隔离试运行草稿 Effect 与 Flag
+  <#69DB7C>/regions preview \<id> <#CFD8DC>- 查看依赖、冲突和最终有效规则
+  <#69DB7C>/regions validate [id] <#CFD8DC>- 校验配置
+  <#69DB7C>/regions inspect \<玩家> <#CFD8DC>- 查看玩家区域状态
+  <#69DB7C>/regions cleanup \<玩家> <#CFD8DC>- 清理玩家区域状态
+  <#69DB7C>/regions freeze|unfreeze \<id> [原因] <#CFD8DC>- 超级管理员冻结或复核解冻场地
+  <#69DB7C>/regions audit [id] [条数] <#CFD8DC>- 超级管理员查看审计记录
+  <#69DB7C>/regions reload <#CFD8DC>- 重载配置
 help-publishing: |
-  &#69DB7C/regions publish|withdraw <id> &#CFD8DC- 发布草稿或撤回当前版本
-  &#69DB7C/regions history <id> &#CFD8DC- 查看不可变版本历史
-  &#69DB7C/regions rollback <id> <revision> &#CFD8DC- 将历史版本发布为新 revision
-  &#69DB7C/regions archive <id> &#CFD8DC- 归档场地
-help-player: "&#CFD8DC进入被设置过的领地或场地即可体验 Regions；对战、比赛、小游戏场地会在需要确认时提示你使用 &#69DB7C/regions game <场地> ready&#CFD8DC。"
-reloaded: "&#69DB7CRegions 已重载。"
-no-permission: "&#E63946你没有权限。"
-authority-not-ruler: "&#E63946只有 RuleGems 统治者可以管理场地。"
-authority-not-source-owner: "&#E63946你不是该场地所绑定区域的当前主人。"
-authority-source-unknown: "&#E63946该场地的区域来源不存在。"
-authority-source-unavailable: "&#E63946该场地的区域来源当前不可用。"
-authority-superadmin-required: "&#E63946此操作仅限 Regions 超级管理员。"
-authority-region-frozen: "&#E63946该场地已冻结，仅 Regions 超级管理员可以处理。"
-authority-ownership-changed: "&#E63946区域主人已发生变化；场地必须冻结并由超级管理员复核。"
-player-only: "&#E63946该命令只能由玩家执行。"
-invalid-usage: "&#FFE066用法: {usage}"
-not-found: "&#E63946找不到区域: {id}"
-player-not-found: "&#E63946找不到在线玩家: {player}"
-list-empty: "&#CFD8DC还没有配置任何区域。"
-list-header: "&#69DB7C已配置区域 ({count}):"
-list-line: "&#CFD8DC- &#FFE066{id} &#CFD8DC{enabled} &#FFFFFF{name} &#90A4AE[state={lifecycle}, source={source}, mode={mode}]"
-enabled: "&#69DB7C启用"
-disabled: "&#90A4AE禁用"
-validate-ok: "&#69DB7C区域配置校验通过。"
-validate-header: "&#FFE066区域校验结果 ({count}):"
-validate-line: "&#CFD8DC- &#FFE066{id} &#E63946{severity} &#FFFFFF{message}"
-inspect-header: "&#69DB7C{player} 的 Regions 状态:"
-inspect-empty: "&#CFD8DC当前没有活动区域 session。"
-inspect-line: "&#CFD8DC- &#FFE066{region} &#90A4AE进入于 {entered}"
-cleanup-done: "&#69DB7C已清理 {player} 的区域状态 ({count} 个 session)。"
-doctor-header: "&#69DB7CRegions doctor:"
-doctor-line: "&#CFD8DC- {message}"
+  <#69DB7C>/regions publish|withdraw \<id> <#CFD8DC>- 发布草稿或撤回当前版本
+  <#69DB7C>/regions history \<id> <#CFD8DC>- 查看不可变版本历史
+  <#69DB7C>/regions rollback \<id> \<revision> <#CFD8DC>- 将历史版本发布为新 revision
+  <#69DB7C>/regions archive \<id> <#CFD8DC>- 归档场地
+help-player: "<#CFD8DC>进入被设置过的领地或场地即可体验 Regions；对战、比赛、小游戏场地会在需要确认时提示你使用 <#69DB7C>/regions game \\<场地> ready<#CFD8DC>。"
+reloaded: "<#69DB7C>Regions 已重载。"
+reload-failed: "<#E63946>Regions 重载失败，运行中的状态保持不变。失败阶段: <stages>"
+no-permission: "<#E63946>你没有权限。"
+authority-not-ruler: "<#E63946>只有 RuleGems 统治者可以管理场地。"
+authority-not-source-owner: "<#E63946>你不是该场地所绑定区域的当前主人。"
+authority-source-unknown: "<#E63946>该场地的区域来源不存在。"
+authority-source-unavailable: "<#E63946>该场地的区域来源当前不可用。"
+authority-superadmin-required: "<#E63946>此操作仅限 Regions 超级管理员。"
+authority-region-frozen: "<#E63946>该场地已冻结，仅 Regions 超级管理员可以处理。"
+authority-ownership-changed: "<#E63946>区域主人已发生变化；场地必须冻结并由超级管理员复核。"
+player-only: "<#E63946>该命令只能由玩家执行。"
+invalid-usage: "<#FFE066>用法: <usage>"
+not-found: "<#E63946>找不到区域: <id>"
+player-not-found: "<#E63946>找不到在线玩家: <player>"
+list-empty: "<#CFD8DC>还没有配置任何区域。"
+list-header: "<#69DB7C>已配置区域 (<count>):"
+list-line: "<#CFD8DC>- <#FFE066><id> <#CFD8DC><enabled> <#FFFFFF><name> <#90A4AE>[state=<lifecycle>, source=<source>, mode=<mode>]"
+enabled: "<#69DB7C>启用"
+disabled: "<#90A4AE>禁用"
+validate-ok: "<#69DB7C>区域配置校验通过。"
+validate-header: "<#FFE066>区域校验结果 (<count>):"
+validate-line: "<#CFD8DC>- <#FFE066><id> <#E63946><severity> <#FFFFFF><message>"
+inspect-header: "<#69DB7C><player> 的 Regions 状态:"
+inspect-empty: "<#CFD8DC>当前没有活动区域 session。"
+inspect-line: "<#CFD8DC>- <#FFE066><region> <#90A4AE>进入于 <entered>"
+cleanup-done: "<#69DB7C>已清理 <player> 的区域状态 (<count> 个 session)。"
+doctor-header: "<#69DB7C>Regions doctor:"
+doctor-line: "<#CFD8DC>- <message>"
 
 command:
-  flag-denied: "&c这个区域不允许使用 /{command}。"
-  region-created: "&a已创建区域草稿 {id}，并绑定到 {source}。校验后使用 /regions publish {id} 发布。"
-  region-removed: "&a已删除区域 {id}。"
-  region-enabled: "&a区域 {id} 已启用。"
-  region-disabled: "&a区域 {id} 已禁用。"
-  region-failed: "&c操作失败: {reason}"
-  unknown-source: "&c未知 source: {input}"
-  bound: "&a区域 {id} 已绑定到 {source}。"
-  mode-set: "&a已把区域 {id} 的玩法设为 {mode}。"
-  flag-set: "&a已把区域 {id} 的 {flag} 设为 {value}。"
-  flag-cleared: "&a已移除区域 {id} 的 {flag}。"
-  effect-added: "&a已为区域 {id} 添加 {effect}。"
-  effect-removed: "&a已移除区域 {id} 的第 {index} 个 effect。"
-  effect-empty: "&7区域 {id} 当前没有 effect。"
-  published: "&a区域 {id} 的草稿已发布。"
-  publish-failed: "&c发布失败: {reason}"
-  withdrawn: "&e区域 {id} 已撤回为草稿。"
-  withdraw-failed: "&c撤回失败: {reason}"
-  archived: "&e区域 {id} 已归档。"
-  rolled-back: "&a已把 revision {revision} 重新发布为区域 {id} 的新版本。"
-  rollback-failed: "&c回滚失败: {reason}"
-  frozen: "&e区域 {id} 已冻结。"
-  unfrozen: "&a区域 {id} 已解冻。"
-  freeze-failed: "&c操作失败: {reason}"
-  history-header: "&6{id} 的已发布版本 ({count})"
-  history-empty: "&7暂无已发布历史。"
-  history-line: "&7- &e#{revision} &f{name} &8mode={mode}, state={state}"
-  audit-header: "&6Regions 审计记录 ({count})"
-  audit-empty: "&7暂无记录。"
-  audit-line: "&7{time} &f{region} &e{action} &7by {actor}{reason}"
-  preview-header: "&6{id} 发布预览 · revision {revision}"
-  preview-no-draft: "&c区域 {id} 没有可预览的草稿。"
-  preview-summary: "&7变化: {changes}，问题: {issues}，确定重叠: {overlaps}"
-  preview-dependency-ok: "&a依赖 {id}: {detail}"
-  preview-dependency-missing: "&c依赖 {id}: {detail}"
-  preview-resolution-summary: "&b最终 Mode: {mode}；主 Trigger Region: {trigger}"
-  preview-flag-line: "&7Flag {flag}={value} &8← {source}"
-  preview-effect-line: "&7Effect {effect} [{combination}] &8← {source}"
-  trial-started: "&a隔离试运行已开始；只有你会受到草稿 Effect 与 Flag 影响。"
-  trial-stopped: "&e隔离试运行已结束。"
-  trial-failed: "&c试运行失败: {reason}"
-  game-ended: "&a已结束 {id} 的战斗。"
-  game-not-running: "&e{id} 当前没有进行中的游戏。"
-  game-status: "&e{id}: {state}"
+  flag-denied: "<red>这个区域不允许使用 /<command>。"
+  region-created: "<green>已创建区域草稿 <id>，并绑定到 <source>。校验后使用 /regions publish <id> 发布。"
+  region-removed: "<green>已删除区域 <id>。"
+  region-enabled: "<green>区域 <id> 已启用。"
+  region-disabled: "<green>区域 <id> 已禁用。"
+  region-failed: "<red>操作失败: <reason>"
+  unknown-source: "<red>未知 source: <input>"
+  bound: "<green>区域 <id> 已绑定到 <source>。"
+  mode-set: "<green>已把区域 <id> 的玩法设为 <mode>。"
+  flag-set: "<green>已把区域 <id> 的 <flag> 设为 <value>。"
+  flag-cleared: "<green>已移除区域 <id> 的 <flag>。"
+  effect-added: "<green>已为区域 <id> 添加 <effect>。"
+  effect-removed: "<green>已移除区域 <id> 的第 <index> 个 effect。"
+  effect-empty: "<gray>区域 <id> 当前没有 effect。"
+  published: "<green>区域 <id> 的草稿已发布。"
+  publish-failed: "<red>发布失败: <reason>"
+  withdrawn: "<yellow>区域 <id> 已撤回为草稿。"
+  withdraw-failed: "<red>撤回失败: <reason>"
+  archived: "<yellow>区域 <id> 已归档。"
+  rolled-back: "<green>已把 revision <revision> 重新发布为区域 <id> 的新版本。"
+  rollback-failed: "<red>回滚失败: <reason>"
+  frozen: "<yellow>区域 <id> 已冻结。"
+  unfrozen: "<green>区域 <id> 已解冻。"
+  freeze-failed: "<red>操作失败: <reason>"
+  history-header: "<gold><id> 的已发布版本 (<count>)"
+  history-empty: "<gray>暂无已发布历史。"
+  history-line: "<gray>- <yellow>#<revision> <white><name> <dark_gray>mode=<mode>, state=<state>"
+  audit-header: "<gold>Regions 审计记录 (<count>)"
+  audit-empty: "<gray>暂无记录。"
+  audit-line: "<gray><time> <white><region> <yellow><action> <gray>by <actor><reason>"
+  preview-header: "<gold><id> 发布预览 · revision <revision>"
+  preview-no-draft: "<red>区域 <id> 没有可预览的草稿。"
+  preview-summary: "<gray>变化: <changes>，问题: <issues>，确定重叠: <overlaps>"
+  preview-dependency-ok: "<green>依赖 <id>: <detail>"
+  preview-dependency-missing: "<red>依赖 <id>: <detail>"
+  preview-resolution-summary: "<aqua>最终 Mode: <mode>；主 Trigger Region: <trigger>"
+  preview-flag-line: "<gray>Flag <flag>=<value> <dark_gray>← <source>"
+  preview-effect-line: "<gray>Effect <effect> [<combination>] <dark_gray>← <source>"
+  trial-started: "<green>隔离试运行已开始；只有你会受到草稿 Effect 与 Flag 影响。"
+  trial-stopped: "<yellow>隔离试运行已结束。"
+  trial-failed: "<red>试运行失败: <reason>"
+  game-ended: "<green>已结束 <id> 的战斗。"
+  game-not-running: "<yellow><id> 当前没有进行中的游戏。"
+  game-status: "<yellow><id>: <state>"
 
 game:
   combat:
-    restoring: "&e{name} 正在恢复上一局，请稍后重新进入。"
-    in-progress: "&e{name} 的战斗已经开始，你不会加入当前局。"
-    full: "&c{name} 当前人数已满。"
-    not-combat: "&c这个区域不是对战模式。"
-    not-inside: "&c你不在这个场地内。"
-    already-started: "&e战斗已经开始。"
-    ready: "&a{player} 已确认开始 ({current}/{total})"
-    ready-prompt: "&e{name} 已满足开战人数。输入 &a/regions game {id} ready &e确认开始。"
-    removed: "&e你已被移出本局战斗，复活后会恢复入场前状态。"
-    started: "&c战斗开始！"
-    ended: "&e战斗结束。"
-    waiting-players: "&e还需要更多玩家进入场地 ({current}/{required})。"
-    waiting-unions: "&e工会战需要至少 {required} 个不同工会在场，目前识别到 {current} 个。"
-    not-ready: "&e尚未满足开战条件。"
-    union-winner: "&6工会战结束，胜利工会: &e{union}"
+    restoring: "<yellow><name> 正在恢复上一局，请稍后重新进入。"
+    in-progress: "<yellow><name> 的战斗已经开始，你不会加入当前局。"
+    full: "<red><name> 当前人数已满。"
+    not-combat: "<red>这个区域不是对战模式。"
+    not-inside: "<red>你不在这个场地内。"
+    already-started: "<yellow>战斗已经开始。"
+    ready: "<green><player> 已确认开始 (<current>/<total>)"
+    ready-prompt: "<yellow><name> 已满足开战人数。输入 <green>/regions game <id> ready <yellow>确认开始。"
+    removed: "<yellow>你已被移出本局战斗，复活后会恢复入场前状态。"
+    started: "<red>战斗开始！"
+    ended: "<yellow>战斗结束。"
+    waiting-players: "<yellow>还需要更多玩家进入场地 (<current>/<required>)。"
+    waiting-unions: "<yellow>工会战需要至少 <required> 个不同工会在场，目前识别到 <current> 个。"
+    not-ready: "<yellow>尚未满足开战条件。"
+    union-winner: "<gold>工会战结束，胜利工会: <yellow><union>"
   race:
-    restoring: "&e{name} 正在结束上一局，请稍后重新进入。"
-    in-progress: "&e{name} 的比赛已经开始，你会在下一局加入。"
-    full: "&c{name} 当前参赛人数已满。"
-    joined: "&a你已进入 {name}。输入 &e/regions game {id} ready &a准备比赛。"
-    left: "&e{player} 离开比赛。"
-    not-inside: "&c你不在这个比赛场地内。"
-    already-started: "&e比赛已经开始。"
-    start-required: "&e请先到起点附近再准备。"
-    ready: "&a{player} 已准备 ({current}/{total})"
-    waiting-players: "&e还需要更多玩家才能开始比赛 ({current}/{required})。"
-    waiting-at-start: "&e还有玩家不在起点附近，比赛暂不能开始。"
-    waiting-vehicle: "&e还有玩家不满足起点检查方式: {vehicle}。"
-    started: "&a{name} 比赛开始！"
-    timeout: "&e比赛达到时间上限，已自动结束。"
-    ended: "&e比赛结束。"
-    checkpoint: "&a通过检查点 {index}/{total}。"
-    your-result: "&6完成比赛！名次: &e#{rank} &7用时: {time}s"
-    finished: "&6{player} 完成比赛，当前名次 #{rank}。"
+    restoring: "<yellow><name> 正在结束上一局，请稍后重新进入。"
+    in-progress: "<yellow><name> 的比赛已经开始，你会在下一局加入。"
+    full: "<red><name> 当前参赛人数已满。"
+    joined: "<green>你已进入 <name>。输入 <yellow>/regions game <id> ready <green>准备比赛。"
+    left: "<yellow><player> 离开比赛。"
+    not-inside: "<red>你不在这个比赛场地内。"
+    already-started: "<yellow>比赛已经开始。"
+    start-required: "<yellow>请先到起点附近再准备。"
+    ready: "<green><player> 已准备 (<current>/<total>)"
+    waiting-players: "<yellow>还需要更多玩家才能开始比赛 (<current>/<required>)。"
+    waiting-at-start: "<yellow>还有玩家不在起点附近，比赛暂不能开始。"
+    waiting-vehicle: "<yellow>还有玩家不满足起点检查方式: <vehicle>。"
+    started: "<green><name> 比赛开始！"
+    timeout: "<yellow>比赛达到时间上限，已自动结束。"
+    ended: "<yellow>比赛结束。"
+    checkpoint: "<green>通过检查点 <index>/<total>。"
+    your-result: "<gold>完成比赛！名次: <yellow>#<rank> <gray>用时: <time>s"
+    finished: "<gold><player> 完成比赛，当前名次 #<rank>。"
     require:
-      on-foot: "&e此阶段要求步行，不能骑乘载具。"
-      any: "&e此阶段要求乘坐任意载具。"
-      boat: "&e此阶段要求坐在船上。"
-      horse: "&e此阶段要求骑在马上。"
-      other: "&e此阶段要求载具/状态: {vehicle}。"
+      on-foot: "<yellow>此阶段要求步行，不能骑乘载具。"
+      any: "<yellow>此阶段要求乘坐任意载具。"
+      boat: "<yellow>此阶段要求坐在船上。"
+      horse: "<yellow>此阶段要求骑在马上。"
+      other: "<yellow>此阶段要求载具/状态: <vehicle>。"
   round:
-    restoring: "&e{name} 正在恢复上一局，请稍后重新进入。"
-    in-progress: "&e{name} 正在进行中，你会在下一局加入。"
-    full: "&c{name} 当前人数已满。"
-    joined: "&a你已进入 {name}。输入 &e/regions game {id} ready &a准备小游戏。"
-    wait-hiding: "&e请等待隐藏时间结束。"
-    removed: "&e你已离开当前小游戏，复活后会恢复入场前状态。"
-    not-inside: "&c你不在这个小游戏场地内。"
-    already-started: "&e小游戏已经开始。"
-    ready: "&a{player} 已准备 ({current}/{total})"
-    waiting-players: "&e还需要更多玩家才能开始小游戏 ({current}/{required})。"
-    started: "&a{name} 开始！寻找者将在 {seconds} 秒后释放。"
-    hiders-win-timeout: "&6时间到，隐藏者获胜！"
-    role-seeker: "&c你的身份: 寻找者。等待倒计时结束后，攻击隐藏者即可找到对方。"
-    role-hider: "&a你的身份: 隐藏者。倒计时结束前赶快藏好，被寻找者攻击会出局。"
-    seek-start: "&c寻找者已释放！"
-    found-become-seeker: "&e你被 {seeker} 找到了，现在加入寻找者。"
-    found-eliminated: "&e你被 {seeker} 找到了，已离开本局。"
-    found: "&6{player} 被 {seeker} 找到了。"
-    seekers-win: "&c所有隐藏者都被找到了，寻找者获胜！"
-    hiders-win-abandoned: "&6寻找者离开了游戏，隐藏者获胜！"
-    ended: "&e小游戏结束，你的临时状态已恢复。"
+    restoring: "<yellow><name> 正在恢复上一局，请稍后重新进入。"
+    in-progress: "<yellow><name> 正在进行中，你会在下一局加入。"
+    full: "<red><name> 当前人数已满。"
+    joined: "<green>你已进入 <name>。输入 <yellow>/regions game <id> ready <green>准备小游戏。"
+    wait-hiding: "<yellow>请等待隐藏时间结束。"
+    removed: "<yellow>你已离开当前小游戏，复活后会恢复入场前状态。"
+    not-inside: "<red>你不在这个小游戏场地内。"
+    already-started: "<yellow>小游戏已经开始。"
+    ready: "<green><player> 已准备 (<current>/<total>)"
+    waiting-players: "<yellow>还需要更多玩家才能开始小游戏 (<current>/<required>)。"
+    started: "<green><name> 开始！寻找者将在 <seconds> 秒后释放。"
+    hiders-win-timeout: "<gold>时间到，隐藏者获胜！"
+    role-seeker: "<red>你的身份: 寻找者。等待倒计时结束后，攻击隐藏者即可找到对方。"
+    role-hider: "<green>你的身份: 隐藏者。倒计时结束前赶快藏好，被寻找者攻击会出局。"
+    seek-start: "<red>寻找者已释放！"
+    found-become-seeker: "<yellow>你被 <seeker> 找到了，现在加入寻找者。"
+    found-eliminated: "<yellow>你被 <seeker> 找到了，已离开本局。"
+    found: "<gold><player> 被 <seeker> 找到了。"
+    seekers-win: "<red>所有隐藏者都被找到了，寻找者获胜！"
+    hiders-win-abandoned: "<gold>寻找者离开了游戏，隐藏者获胜！"
+    ended: "<yellow>小游戏结束，你的临时状态已恢复。"
   vehicle:
     pig: "猪"
     strider: "炽足兽"
@@ -172,308 +173,308 @@ game:
 
 gui:
   common:
-    back: "&c返回"
-    close: "&c关闭"
+    back: "<red>返回"
+    close: "<red>关闭"
     none: "无"
     unset: "未设置"
     unlimited: "不限"
     auto: "自动"
-    absent: "<无>"
-    previous-page: "&e上一页"
-    next-page: "&e下一页"
+    absent: "\\<无>"
+    previous-page: "<yellow>上一页"
+    next-page: "<yellow>下一页"
   prompt:
-    hint: "&7这条消息不会发到公共聊天。输入 cancel 取消。"
+    hint: "<gray>这条消息不会发到公共聊天。输入 cancel 取消。"
     cancel-word: "取消"
-    cancelled: "&7已取消。"
-    create-id: "&a请输入新区域 ID。只能使用字母、数字、下划线和短横线。输入 cancel 取消。"
-    create-name: "&a请输入区域显示名称。输入 - 使用 ID 作为名称。"
-    delete: "&c确认删除区域 {id}？请输入区域 ID 确认，或输入 cancel 取消。"
-    rename: "&a请输入新的区域显示名称。输入 cancel 取消。"
-    cuboid: "&a请输入 Cuboid: world,minX,minY,minZ,maxX,maxY,maxZ。输入 cancel 取消。"
-    mode-value: "&a请输入模式参数 key=value，或 clear <key> 删除。输入 cancel 取消。"
-    flag: "&a请输入 <flag> <值> [key=value...]，例如 commands blocklist values=/spawn,/home。"
-    effect: "&a请输入 <effect> [key=value...]；可用 combination=highest_priority|exclusive|stack|merge_by_type。"
-    trigger: "&a请输入 <trigger> <action> [key=value...]；execution=primary 可限制为主 Region 执行。"
+    cancelled: "<gray>已取消。"
+    create-id: "<green>请输入新区域 ID。只能使用字母、数字、下划线和短横线。输入 cancel 取消。"
+    create-name: "<green>请输入区域显示名称。输入 - 使用 ID 作为名称。"
+    delete: "<red>确认删除区域 <id>？请输入区域 ID 确认，或输入 cancel 取消。"
+    rename: "<green>请输入新的区域显示名称。输入 cancel 取消。"
+    cuboid: "<green>请输入 Cuboid: world,minX,minY,minZ,maxX,maxY,maxZ。输入 cancel 取消。"
+    mode-value: "<green>请输入模式参数 key=value，或 clear \\<key> 删除。输入 cancel 取消。"
+    flag: "<green>请输入 \\<flag> \\<值> [key=value...]，例如 commands blocklist values=/spawn,/home。"
+    effect: "<green>请输入 \\<effect> [key=value...]；可用 combination=highest_priority|exclusive|stack|merge_by_type。"
+    trigger: "<green>请输入 \\<trigger> \\<action> [key=value...]；execution=primary 可限制为主 Region 执行。"
   save:
-    ok: "&a已保存区域 {id} 的草稿。"
-    failed: "&c操作失败: {reason}"
+    ok: "<green>已保存区域 <id> 的草稿。"
+    failed: "<red>操作失败: <reason>"
   item:
     region:
-      name: "&e{name}"
+      name: "<yellow><name>"
       lore:
-        - "&7ID: {id}"
-        - "&7Source: {source}"
-        - "&7Lifecycle: {lifecycle} · r{revision}"
-        - "&7Mode: {mode}"
-        - "&7Flags: {flags}"
-        - "&7Effects: {effects}"
+        - "<gray>ID: <id>"
+        - "<gray>Source: <source>"
+        - "<gray>Lifecycle: <lifecycle> · r<revision>"
+        - "<gray>Mode: <mode>"
+        - "<gray>Flags: <flags>"
+        - "<gray>Effects: <effects>"
   main:
-    title: "&2Regions"
+    title: "<dark_green>Regions"
     create:
-      name: "&b创建区域"
+      name: "<aqua>创建区域"
       lore:
-        - "&7输入区域 ID 和名称后，"
-        - "&7从你拥有的 Lands area 中安全选择。"
+        - "<gray>输入区域 ID 和名称后，"
+        - "<gray>从你拥有的 Lands area 中安全选择。"
     reload:
-      name: "&a重载配置"
+      name: "<green>重载配置"
       lore:
-        - "&7点击从文件重新载入 regions 配置。"
+        - "<gray>点击从文件重新载入 regions 配置。"
     count:
-      name: "&e区域总数: {count}"
+      name: "<yellow>区域总数: <count>"
       lore:
-        - "&7这里只显示你当前拥有的场地。"
+        - "<gray>这里只显示你当前拥有的场地。"
     doctor:
-      name: "&b系统检查"
+      name: "<aqua>系统检查"
       lore:
-        - "&7点击检查当前区域配置。"
-    reloaded: "&aRegions 配置已重载。"
+        - "<gray>点击检查当前区域配置。"
+    reloaded: "<green>Regions 配置已重载。"
   doctor:
-    clean: "&a没有发现配置问题。"
-    found: "&e发现 {count} 个配置问题，详情见下方。"
-    line: "&7{id}: {severity} {message}"
+    clean: "<green>没有发现配置问题。"
+    found: "<yellow>发现 <count> 个配置问题，详情见下方。"
+    line: "<gray><id>: <severity> <message>"
   detail:
-    title: "&2Region: {id}"
+    title: "<dark_green>Region: <id>"
     source:
-      name: "&b区域来源"
+      name: "<aqua>区域来源"
       lore:
-        - "&7{source}"
-        - "&8点击绑定 Lands area 或调整名称与优先级。"
+        - "<gray><source>"
+        - "<dark_gray>点击绑定 Lands area 或调整名称与优先级。"
     mode:
-      name: "&b玩法模式"
+      name: "<aqua>玩法模式"
       lore:
-        - "&7{mode}"
-        - "&8点击设置对战、比赛或小游戏玩法。"
+        - "<gray><mode>"
+        - "<dark_gray>点击设置对战、比赛或小游戏玩法。"
     flags:
-      name: "&bFlags"
+      name: "<aqua>Flags"
       lore:
-        - "&7{count} 个 flag"
-        - "&8点击切换常用规则。"
+        - "<gray><count> 个 flag"
+        - "<dark_gray>点击切换常用规则。"
     effects:
-      name: "&bEffects"
+      name: "<aqua>Effects"
       lore:
-        - "&7{count} 个 effect"
-        - "&8点击添加或移除常用效果。"
+        - "<gray><count> 个 effect"
+        - "<dark_gray>点击添加或移除常用效果。"
     triggers:
-      name: "&bTriggers & Actions"
+      name: "<aqua>Triggers & Actions"
       lore:
-        - "&7{count} 个 action block"
-        - "&8点击配置进入/离开/开赛/完赛行为。"
-    enable: "&a点击启用"
-    disable: "&e点击禁用"
+        - "<gray><count> 个 action block"
+        - "<dark_gray>点击配置进入/离开/开赛/完赛行为。"
+    enable: "<green>点击启用"
+    disable: "<yellow>点击禁用"
     validate:
-      name: "&b校验配置"
+      name: "<aqua>校验配置"
     cleanup:
-      name: "&b清理我的状态"
+      name: "<aqua>清理我的状态"
       lore:
-        - "&7用于测试时立刻移除当前玩家的区域效果。"
+        - "<gray>用于测试时立刻移除当前玩家的区域效果。"
     delete:
-      name: "&c删除区域"
+      name: "<red>删除区域"
       lore:
-        - "&7点击后需要输入区域 ID 确认。"
-        - "&c会从 regions.yml 移除此区域配置。"
+        - "<gray>点击后需要输入区域 ID 确认。"
+        - "<red>会从 regions.yml 移除此区域配置。"
     publish:
-      name: "&a发布草稿"
+      name: "<green>发布草稿"
       lore:
-        - "&7校验通过后切换当前发布版本。"
-        - "&7当前草稿 revision: {revision}"
+        - "<gray>校验通过后切换当前发布版本。"
+        - "<gray>当前草稿 revision: <revision>"
     withdraw:
-      name: "&e撤回已发布版本"
+      name: "<yellow>撤回已发布版本"
       lore:
-        - "&7停止场地运行并转回草稿。"
+        - "<gray>停止场地运行并转回草稿。"
     history:
-      name: "&b版本历史"
+      name: "<aqua>版本历史"
       lore:
-        - "&7{count} 个已保存版本。"
-        - "&7点击在聊天中查看 revision 编号。"
+        - "<gray><count> 个已保存版本。"
+        - "<gray>点击在聊天中查看 revision 编号。"
     trial-start:
-      name: "&b开始我的隔离试运行"
+      name: "<aqua>开始我的隔离试运行"
       lore:
-        - "&7仅把草稿的 Effect 与 Flag 应用于你自己。"
-        - "&7不会启动 Mode、执行 Trigger 或影响其他玩家。"
+        - "<gray>仅把草稿的 Effect 与 Flag 应用于你自己。"
+        - "<gray>不会启动 Mode、执行 Trigger 或影响其他玩家。"
     trial-stop:
-      name: "&c结束我的隔离试运行"
+      name: "<red>结束我的隔离试运行"
       lore:
-        - "&7立即恢复你自己的状态。"
-    withdrawn: "&e区域 {id} 已撤回为草稿。"
-    withdraw-failed: "&c撤回失败: {reason}"
+        - "<gray>立即恢复你自己的状态。"
+    withdrawn: "<yellow>区域 <id> 已撤回为草稿。"
+    withdraw-failed: "<red>撤回失败: <reason>"
   trial:
-    started: "&a隔离试运行已开始；只有你会受到草稿 Effect 与 Flag 影响。"
-    stopped: "&e隔离试运行已结束。"
-    failed: "&c试运行失败: {reason}"
+    started: "<green>隔离试运行已开始；只有你会受到草稿 Effect 与 Flag 影响。"
+    stopped: "<yellow>隔离试运行已结束。"
+    failed: "<red>试运行失败: <reason>"
   delete:
-    cancelled: "&7删除已取消。"
-    ok: "&a已删除区域 {id}。"
-    failed: "&c删除失败: {reason}"
+    cancelled: "<gray>删除已取消。"
+    ok: "<green>已删除区域 <id>。"
+    failed: "<red>删除失败: <reason>"
   create:
-    bad-id: "&c区域 ID 格式不正确。"
-    exists: "&c区域 {id} 已存在。"
-    lands-unavailable: "&cLands 当前不可用，无法读取你拥有的 area。"
+    bad-id: "<red>区域 ID 格式不正确。"
+    exists: "<red>区域 <id> 已存在。"
+    lands-unavailable: "<red>Lands 当前不可用，无法读取你拥有的 area。"
   source:
-    title: "&2Source: {id}"
+    title: "<dark_green>Source: <id>"
     lands:
-      name: "&b绑定 Lands 领地"
+      name: "<aqua>绑定 Lands 领地"
       lore:
-        - "&7点击从你当前拥有的 Lands area 中选择。"
-        - "&7当前: {source}"
+        - "<gray>点击从你当前拥有的 Lands area 中选择。"
+        - "<gray>当前: <source>"
     cuboid:
-      name: "&b绑定 Cuboid"
+      name: "<aqua>绑定 Cuboid"
       lore:
-        - "&7左键: 用当前区块生成 Cuboid。"
-        - "&7右键: 输入 world,minX,minY,minZ,maxX,maxY,maxZ。"
+        - "<gray>左键: 用当前区块生成 Cuboid。"
+        - "<gray>右键: 输入 world,minX,minY,minZ,maxX,maxY,maxZ。"
     rename:
-      name: "&e修改显示名称"
+      name: "<yellow>修改显示名称"
       lore:
-        - "&7当前: {name}"
-        - "&7点击输入新名称。"
+        - "<gray>当前: <name>"
+        - "<gray>点击输入新名称。"
     priority:
-      name: "&e优先级: {priority}"
+      name: "<yellow>优先级: <priority>"
       lore:
-        - "&7左键 +1，右键 -1。"
-        - "&7重叠区域中高优先级更先处理。"
-    cuboid-format: "&c格式错误，需要 world,minX,minY,minZ,maxX,maxY,maxZ。"
-    name-blank: "&c名称不能为空。"
+        - "<gray>左键 +1，右键 -1。"
+        - "<gray>重叠区域中高优先级更先处理。"
+    cuboid-format: "<red>格式错误，需要 world,minX,minY,minZ,maxX,maxY,maxZ。"
+    name-blank: "<red>名称不能为空。"
   mode:
-    title: "&2Mode: {id}"
-    current: "&a当前模式"
-    switch: "&7点击切换到此模式"
-    key-value-required: "&c请输入 key=value。"
+    title: "<dark_green>Mode: <id>"
+    current: "<green>当前模式"
+    switch: "<gray>点击切换到此模式"
+    key-value-required: "<red>请输入 key=value。"
     type:
       free_event:
         name: "free_event"
         lore:
-          - "&7通用活动场地，只使用 Flag 与 Effect。"
+          - "<gray>通用活动场地，只使用 Flag 与 Effect。"
       run_race:
         name: "run_race"
         lore:
-          - "&7跑步比赛，参赛者不能骑乘载具。"
+          - "<gray>跑步比赛，参赛者不能骑乘载具。"
       dual_pvp:
         name: "dual_pvp"
         lore:
-          - "&7双方或多人进场后确认开始。"
-          - "&7可设置 kit、armor、min-players。"
+          - "<gray>双方或多人进场后确认开始。"
+          - "<gray>可设置 kit、armor、min-players。"
       boat_race:
         name: "boat_race"
         lore:
-          - "&7划船比赛，参赛者必须坐在船上。"
+          - "<gray>划船比赛，参赛者必须坐在船上。"
       union_war:
         name: "union_war"
         lore:
-          - "&7读取 UnionProvider 判断工会。"
-          - "&7可设置 min-unions、kit、armor。"
+          - "<gray>读取 UnionProvider 判断工会。"
+          - "<gray>可设置 min-unions、kit、armor。"
       horse_race:
         name: "horse_race"
         lore:
-          - "&7骑马比赛，参赛者必须骑马。"
+          - "<gray>骑马比赛，参赛者必须骑马。"
       hide_and_seek:
         name: "hide_and_seek"
         lore:
-          - "&7藏猫猫小游戏，自动分配寻找者和隐藏者。"
-          - "&7寻找者攻击隐藏者即可找到对方，不造成伤害。"
+          - "<gray>藏猫猫小游戏，自动分配寻找者和隐藏者。"
+          - "<gray>寻找者攻击隐藏者即可找到对方，不造成伤害。"
     min-players:
-      name: "&e最小人数: {value}"
-      lore: ["&7左键 +1，右键 -1。"]
+      name: "<yellow>最小人数: <value>"
+      lore: ["<gray>左键 +1，右键 -1。"]
     max-players:
-      name: "&e最大人数: {value}"
-      lore: ["&7左键 +1，右键 -1。", "&7降到 0 会移除此限制。"]
+      name: "<yellow>最大人数: <value>"
+      lore: ["<gray>左键 +1，右键 -1。", "<gray>降到 0 会移除此限制。"]
     require-ready:
-      name: "&e需要全员确认: {value}"
-      lore: ["&7点击切换。"]
+      name: "<yellow>需要全员确认: <value>"
+      lore: ["<gray>点击切换。"]
     replace-gear:
-      name: "&e替换战斗装备: {value}"
-      lore: ["&7点击切换。"]
+      name: "<yellow>替换战斗装备: <value>"
+      lore: ["<gray>点击切换。"]
     min-unions:
-      name: "&e最小工会数: {value}"
-      lore: ["&7union_war 使用。左键 +1，右键 -1。"]
+      name: "<yellow>最小工会数: <value>"
+      lore: ["<gray>union_war 使用。左键 +1，右键 -1。"]
     vehicle:
-      name: "&e全局检查方式: {value}"
-      lore: ["&7点击循环: 步行/任意载具/船/马/矿车/不检查。"]
+      name: "<yellow>全局检查方式: <value>"
+      lore: ["<gray>点击循环: 步行/任意载具/船/马/矿车/不检查。"]
     start-vehicle:
-      name: "&e起点检查方式: {value}"
-      lore: ["&7点击循环，覆盖全局检查方式。"]
+      name: "<yellow>起点检查方式: <value>"
+      lore: ["<gray>点击循环，覆盖全局检查方式。"]
     finish-vehicle:
-      name: "&e终点检查方式: {value}"
-      lore: ["&7点击循环，覆盖全局检查方式。"]
+      name: "<yellow>终点检查方式: <value>"
+      lore: ["<gray>点击循环，覆盖全局检查方式。"]
     set-respawn:
-      name: "&b复活点设为当前位置"
-      lore: ["&7{location}"]
+      name: "<aqua>复活点设为当前位置"
+      lore: ["<gray><location>"]
     respawn:
-      name: "&e当前复活点"
-      lore: ["&7{value}"]
+      name: "<yellow>当前复活点"
+      lore: ["<gray><value>"]
     respawn-clear:
-      name: "&c清除复活点"
+      name: "<red>清除复活点"
     kit-iron:
-      name: "&b预设: 铁剑决斗"
-      lore: ["&7铁剑、弓、盾、铁甲、食物。"]
+      name: "<aqua>预设: 铁剑决斗"
+      lore: ["<gray>铁剑、弓、盾、铁甲、食物。"]
     kit-bow:
-      name: "&b预设: 弓斗"
-      lore: ["&7弓、箭、木剑、皮甲。"]
+      name: "<aqua>预设: 弓斗"
+      lore: ["<gray>弓、箭、木剑、皮甲。"]
     kit-diamond:
-      name: "&b预设: 钻石战"
-      lore: ["&7钻石剑、弓、盾、钻石甲。"]
+      name: "<aqua>预设: 钻石战"
+      lore: ["<gray>钻石剑、弓、盾、钻石甲。"]
     kit-clear:
-      name: "&c清除战斗装备预设"
+      name: "<red>清除战斗装备预设"
     set-start:
-      name: "&b起点设为当前位置"
-      lore: ["&7{value}"]
+      name: "<aqua>起点设为当前位置"
+      lore: ["<gray><value>"]
     set-finish:
-      name: "&b终点设为当前位置"
-      lore: ["&7{value}"]
+      name: "<aqua>终点设为当前位置"
+      lore: ["<gray><value>"]
     add-checkpoint:
-      name: "&b追加检查点"
+      name: "<aqua>追加检查点"
       lore:
-        - "&7当前: {count} 个"
-        - "&7本检查点方式: {vehicle}"
-        - "&7{location}"
+        - "<gray>当前: <count> 个"
+        - "<gray>本检查点方式: <vehicle>"
+        - "<gray><location>"
     clear-checkpoints:
-      name: "&c清空检查点"
+      name: "<red>清空检查点"
     require-start:
-      name: "&e必须在起点准备: {value}"
-      lore: ["&7点击切换。"]
+      name: "<yellow>必须在起点准备: <value>"
+      lore: ["<gray>点击切换。"]
     teleport-start:
-      name: "&e开赛传送到起点: {value}"
-      lore: ["&7点击切换。"]
+      name: "<yellow>开赛传送到起点: <value>"
+      lore: ["<gray>点击切换。"]
     start-mode:
-      name: "&e开赛方式: {value}"
-      lore: ["&7点击切换 vote / judge。"]
+      name: "<yellow>开赛方式: <value>"
+      lore: ["<gray>点击切换 vote / judge。"]
     radius:
-      name: "&e判定半径: {value}"
-      lore: ["&7左键 +1，右键 -1。"]
+      name: "<yellow>判定半径: <value>"
+      lore: ["<gray>左键 +1，右键 -1。"]
     judges:
-      name: "&b裁判加入/移除自己"
-      lore: ["&7当前: {value}"]
+      name: "<aqua>裁判加入/移除自己"
+      lore: ["<gray>当前: <value>"]
     seekers:
-      name: "&e寻找者数量: {value}"
-      lore: ["&7hide_and_seek 使用。左键 +1，右键 -1。"]
+      name: "<yellow>寻找者数量: <value>"
+      lore: ["<gray>hide_and_seek 使用。左键 +1，右键 -1。"]
     hide-seconds:
-      name: "&e躲藏时间: {value} 秒"
-      lore: ["&7左键 +10 秒，右键 -10 秒。"]
+      name: "<yellow>躲藏时间: <value> 秒"
+      lore: ["<gray>左键 +10 秒，右键 -10 秒。"]
     round-seconds:
-      name: "&e回合时长: {value} 秒"
-      lore: ["&7左键 +60 秒，右键 -60 秒。0 表示不限时。"]
+      name: "<yellow>回合时长: <value> 秒"
+      lore: ["<gray>左键 +60 秒，右键 -60 秒。0 表示不限时。"]
     found-becomes-seeker:
-      name: "&e被找到后变寻找者: {value}"
-      lore: ["&7点击切换。"]
+      name: "<yellow>被找到后变寻找者: <value>"
+      lore: ["<gray>点击切换。"]
     timeout-seconds:
-      name: "&e比赛超时: {value} 秒"
-      lore: ["&7赛跑模式使用。左键 +60 秒，右键 -60 秒。", "&7最少 60 秒。"]
+      name: "<yellow>比赛超时: <value> 秒"
+      lore: ["<gray>赛跑模式使用。左键 +60 秒，右键 -60 秒。", "<gray>最少 60 秒。"]
     advanced:
-      name: "&e高级参数"
+      name: "<yellow>高级参数"
       lore:
-        - "&7点击输入 key=value。"
-        - "&7输入 clear <key> 可移除参数。"
+        - "<gray>点击输入 key=value。"
+        - "<gray>输入 clear \\<key> 可移除参数。"
   flag:
-    title: "&2Flags: {id}"
+    title: "<dark_green>Flags: <id>"
     entry:
-      name: "&e{flag}: {color}{value}"
+      name: "<yellow><flag>: <color><value>"
       lore:
-        - "&7点击循环: pass -> deny -> allow"
-        - "&8pass 表示不覆盖 Lands 或服务器规则。"
+        - "<gray>点击循环: pass -> deny -> allow"
+        - "<dark_gray>pass 表示不覆盖 Lands 或服务器规则。"
     advanced:
-      name: "&e高级参数"
+      name: "<yellow>高级参数"
       lore:
-        - "&7点击输入 <flag> <值> [key=value...]。"
-        - "&7例如 commands blocklist values=/spawn,/home。"
-    usage: "&c请输入 <flag> <值>。"
+        - "<gray>点击输入 \\<flag> \\<值> [key=value...]。"
+        - "<gray>例如 commands blocklist values=/spawn,/home。"
+    usage: "<red>请输入 \\<flag> \\<值>。"
     key:
       pvp: "pvp"
       fly: "fly"
@@ -486,68 +487,68 @@ gui:
       deny: "deny"
       pass: "pass"
   effect:
-    title: "&2Effects: {id}"
+    title: "<dark_green>Effects: <id>"
     entry:
-      name: "&e{index}. {type}"
+      name: "<yellow><index>. <type>"
       lore:
-        - "&7scope: {scope}"
-        - "&7combination: {combination}"
-        - "&7{values}"
-        - "&c点击移除此 effect。"
+        - "<gray>scope: <scope>"
+        - "<gray>combination: <combination>"
+        - "<gray><values>"
+        - "<red>点击移除此 effect。"
       no-values: "无参数"
     preset:
       small:
-        name: "&b添加缩放 0.35"
-        lore: ["&7小人国常用 effect。"]
+        name: "<aqua>添加缩放 0.35"
+        lore: ["<gray>小人国常用 effect。"]
       large:
-        name: "&b添加缩放 1.60"
-        lore: ["&7巨人场地常用 effect。"]
+        name: "<aqua>添加缩放 1.60"
+        lore: ["<gray>巨人场地常用 effect。"]
       flight:
-        name: "&b允许飞行"
-        lore: ["&7离开区域会还原原状态。"]
+        name: "<aqua>允许飞行"
+        lore: ["<gray>离开区域会还原原状态。"]
       speed:
-        name: "&b速度药水"
-        lore: ["&7potion SPEED amplifier=1。"]
+        name: "<aqua>速度药水"
+        lore: ["<gray>potion SPEED amplifier=1。"]
       invisibility:
-        name: "&b压制隐身"
-        lore: ["&7用于 vanish: deny 场地。"]
+        name: "<aqua>压制隐身"
+        lore: ["<gray>用于 vanish: deny 场地。"]
     clear:
-      name: "&c清空全部 Effects"
+      name: "<red>清空全部 Effects"
     advanced:
-      name: "&e高级参数"
+      name: "<yellow>高级参数"
       lore:
-        - "&7点击输入 <effect> [key=value...]。"
-        - "&7例如 scale value=0.5 或 potion effect=JUMP。"
-    type-required: "&cEffect 类型不能为空。"
+        - "<gray>点击输入 \\<effect> [key=value...]。"
+        - "<gray>例如 scale value=0.5 或 potion effect=JUMP。"
+    type-required: "<red>Effect 类型不能为空。"
   trigger:
-    title: "&2Triggers: {id}"
-    entry: "&e{trigger}: {count}"
-    block-line: "&7{name} [{execution}] -> {actions}"
+    title: "<dark_green>Triggers: <id>"
+    entry: "<yellow><trigger>: <count>"
+    block-line: "<gray><name> [<execution>] -> <actions>"
     unnamed: "action"
-    clear-hint: "&c点击清空这个触发器。"
+    clear-hint: "<red>点击清空这个触发器。"
     preset:
       enter:
-        name: "&b模板: 进入提示"
-        lore: ["&7on_enter -> message"]
-        text: "&a欢迎进入 {region_name}。"
+        name: "<aqua>模板: 进入提示"
+        lore: ["<gray>on_enter -> message"]
+        text: "<green>欢迎进入 <region_name>。"
       start:
-        name: "&b模板: 开赛标题"
-        lore: ["&7on_mode_start -> title"]
-        title: "&a开始!"
-        subtitle: "{region_name}"
+        name: "<aqua>模板: 开赛标题"
+        lore: ["<gray>on_mode_start -> title"]
+        title: "<green>开始!"
+        subtitle: "<region_name>"
       finish:
-        name: "&b模板: 完赛广播"
-        lore: ["&7on_finish -> broadcast"]
-        text: "&6{player} 完成了 {region_name}，名次 #{rank}。"
+        name: "<aqua>模板: 完赛广播"
+        lore: ["<gray>on_finish -> broadcast"]
+        text: "<gold><player> 完成了 <region_name>，名次 #<rank>。"
     advanced:
-      name: "&e添加 Action"
+      name: "<yellow>添加 Action"
       lore:
-        - "&7输入 <trigger> <action> [key=value...]。"
-        - "&7例如 on_enter message text=欢迎 {player}"
+        - "<gray>输入 \\<trigger> \\<action> [key=value...]。"
+        - "<gray>例如 on_enter message text=欢迎 <player>"
     clear:
-      name: "&c清空全部 Triggers"
-    usage: "&c请输入 <trigger> <action>。"
-    unknown: "&c未知 trigger: {trigger}"
+      name: "<red>清空全部 Triggers"
+    usage: "<red>请输入 \\<trigger> \\<action>。"
+    unknown: "<red>未知 trigger: <trigger>"
     key:
       on_enter: "on_enter"
       on_leave: "on_leave"
@@ -564,95 +565,95 @@ gui:
       on_checkpoint: "on_checkpoint"
       on_finish: "on_finish"
   publish:
-    title: "&2发布预览: {id}"
+    title: "<dark_green>发布预览: <id>"
     change:
-      name: "&e{path}"
+      name: "<yellow><path>"
       lore:
-        - "&c原值: {before}"
-        - "&a新值: {after}"
+        - "<red>原值: <before>"
+        - "<green>新值: <after>"
     no-changes:
-      name: "&7配置内容没有变化"
+      name: "<gray>配置内容没有变化"
       lore:
-        - "&7仍可重新发布，用于恢复已撤回的相同版本。"
+        - "<gray>仍可重新发布，用于恢复已撤回的相同版本。"
     back:
-      name: "&c返回编辑"
+      name: "<red>返回编辑"
     dependencies:
-      ok: "&a依赖已满足"
-      missing: "&c存在缺失依赖"
+      ok: "<green>依赖已满足"
+      missing: "<red>存在缺失依赖"
       none:
-        - "&7此配置没有额外插件依赖。"
-    blocked: "&c发布被阻止: {errors} 个错误"
-    validated: "&a校验通过 · {warnings} 个警告"
-    more-issues: "&7另有 {count} 项，使用 /regions validate {id} 查看。"
+        - "<gray>此配置没有额外插件依赖。"
+    blocked: "<red>发布被阻止: <errors> 个错误"
+    validated: "<green>校验通过 · <warnings> 个警告"
+    more-issues: "<gray>另有 <count> 项，使用 /regions validate <id> 查看。"
     effective:
-      name: "&b最终有效规则"
+      name: "<aqua>最终有效规则"
       lore:
-        - "&7Mode: {mode}"
-        - "&7主 Trigger Region: {trigger}"
-        - "&7Flags: {flags}"
-        - "&7Effects: {effects}"
+        - "<gray>Mode: <mode>"
+        - "<gray>主 Trigger Region: <trigger>"
+        - "<gray>Flags: <flags>"
+        - "<gray>Effects: <effects>"
     confirm:
-      name: "&a确认发布 revision {revision}"
+      name: "<green>确认发布 revision <revision>"
       lore:
-        - "&7共 {count} 项变化。"
+        - "<gray>共 <count> 项变化。"
     fix-first:
-      name: "&c修复错误后才能发布"
+      name: "<red>修复错误后才能发布"
       lore:
-        - "&7共 {count} 项变化。"
-    truncated: "&e界面仅展示前 36 项；完整配置仍会校验。"
-    recheck: "&7发布前会再次校验权限、owner 与能力。"
+        - "<gray>共 <count> 项变化。"
+    truncated: "<yellow>界面仅展示前 36 项；完整配置仍会校验。"
+    recheck: "<gray>发布前会再次校验权限、owner 与能力。"
     overlaps:
-      name: "&e确定重叠区域: {count}"
-    overlap-line: "&7{id} · priority={priority} · {source}"
-    ok: "&a区域 {id} 的草稿已发布。"
-    failed: "&c发布失败: {reason}"
+      name: "<yellow>确定重叠区域: <count>"
+    overlap-line: "<gray><id> · priority=<priority> · <source>"
+    ok: "<green>区域 <id> 的草稿已发布。"
+    failed: "<red>发布失败: <reason>"
   history:
-    header: "&6{id} 的已发布版本 ({count})"
-    empty: "&7暂无已发布历史。"
-    line: "&7- &e#{revision} &f{name} &8mode={mode}"
-    rollback-hint: "&7回滚命令: /regions rollback {id} <revision>"
+    header: "<gold><id> 的已发布版本 (<count>)"
+    empty: "<gray>暂无已发布历史。"
+    line: "<gray>- <yellow>#<revision> <white><name> <dark_gray>mode=<mode>"
+    rollback-hint: "<gray>回滚命令: /regions rollback <id> \\<revision>"
   area:
-    title: "&2选择 Lands Area {page}/{pages}"
+    title: "<dark_green>选择 Lands Area <page>/<pages>"
     entry:
-      name: "&a{name}"
+      name: "<green><name>"
       lore:
-        - "&7Land: {land}"
-        - "&7Area: {area}"
-        - "&e点击选择；保存前会再次检查主人身份。"
+        - "<gray>Land: <land>"
+        - "<gray>Area: <area>"
+        - "<yellow>点击选择；保存前会再次检查主人身份。"
     empty:
-      name: "&c没有可用的 Lands area"
+      name: "<red>没有可用的 Lands area"
       lore:
-        - "&7只有当前主人为你、且你同时拥有统治者权限的 area 才能使用。"
+        - "<gray>只有当前主人为你、且你同时拥有统治者权限的 area 才能使用。"
     count:
-      name: "&b{count} 个可用 area"
+      name: "<aqua><count> 个可用 area"
       lore:
-        - "&7页面 {page}/{pages}"
-    owner-changed: "&e该 area 的主人身份可能刚刚发生变化，列表已刷新。"
+        - "<gray>页面 <page>/<pages>"
+    owner-changed: "<yellow>该 area 的主人身份可能刚刚发生变化，列表已刷新。"
   template:
-    title: "&2选择场地模板 {page}/{pages}"
+    title: "<dark_green>选择场地模板 <page>/<pages>"
     entry:
-      name: "&b{name}"
+      name: "<aqua><name>"
       lore:
-        - "&7{description}"
-        - "&8将应用以下配置："
-        - "&7Mode: {mode}"
-        - "&7Flags: {flags}"
-        - "&7Effects: {effects}"
-        - "&7Triggers: {triggers}"
-        - "&a点击验证并创建场地。"
-    parameters: "&e参数: {keys}"
+        - "<gray><description>"
+        - "<dark_gray>将应用以下配置："
+        - "<gray>Mode: <mode>"
+        - "<gray>Flags: <flags>"
+        - "<gray>Effects: <effects>"
+        - "<gray>Triggers: <triggers>"
+        - "<green>点击验证并创建场地。"
+    parameters: "<yellow>参数: <keys>"
     empty:
-      name: "&c没有可用模板"
+      name: "<red>没有可用模板"
       lore:
-        - "&7请检查 templates.yml。"
+        - "<gray>请检查 templates.yml。"
     count:
-      name: "&b{count} 个模板"
+      name: "<aqua><count> 个模板"
       lore:
-        - "&7页面 {page}/{pages}"
-        - "&7模板会先经过能力 schema 和完整 Region 校验。"
-    back-to-areas: "&c返回选择 Area"
-    owner-changed: "&e该 Lands area 的主人身份已变化，请重新选择。"
-    failed: "&c模板无法应用: {errors}"
+        - "<gray>页面 <page>/<pages>"
+        - "<gray>模板会先经过能力 schema 和完整 Region 校验。"
+    back-to-areas: "<red>返回选择 Area"
+    owner-changed: "<yellow>该 Lands area 的主人身份已变化，请重新选择。"
+    failed: "<red>模板无法应用: <errors>"
   vehicle:
     on-foot: "步行"
     any: "任意载具"

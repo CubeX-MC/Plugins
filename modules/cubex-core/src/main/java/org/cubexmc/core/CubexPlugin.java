@@ -2,6 +2,9 @@ package org.cubexmc.core;
 
 import java.io.File;
 import java.util.logging.Level;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -50,23 +53,54 @@ public abstract class CubexPlugin extends JavaPlugin implements TerminableConsum
         getLogger().log(Level.SEVERE, "Failed to enable plugin.", throwable);
     }
 
-    protected final CubexLogger log() {
+    /**
+     * Structured logger for this plugin.
+     *
+     * <p>Public rather than protected: services, GUIs and other collaborators outside the plugin
+     * class need it too, and forcing them to hold a raw {@link java.util.logging.Logger} is how
+     * every plugin ended up with its own logging and text helpers.
+     */
+    public final CubexLogger log() {
         if (logger == null) {
             logger = new CubexLogger(getLogger());
         }
         return logger;
     }
 
-    protected final Messager messager() {
+    /** Multi-line-aware sender. Public for the same reason as {@link #log()}. */
+    public final Messager messager() {
         return messager;
     }
 
-    protected final CubexText text() {
+    /** Shared colour/sanitisation helper. Public for the same reason as {@link #log()}. */
+    public final CubexText text() {
         return text;
     }
 
     protected final void registerListener(Listener listener) {
         getServer().getPluginManager().registerEvents(listener, this);
+    }
+
+    /**
+     * Wires an executor — and, when it is also a {@link TabCompleter}, the completer — to the named
+     * command from {@code plugin.yml}.
+     *
+     * <p>Returns false when {@code plugin.yml} declares no such command, which is the mistake this
+     * helper exists to surface: the hand-written form is a null check that plugins usually write as
+     * a silent {@code if (cmd != null)}, so a typo in {@code plugin.yml} produces a command that
+     * simply does nothing.
+     */
+    protected final boolean registerCommand(String name, CommandExecutor executor) {
+        PluginCommand command = getCommand(name);
+        if (command == null) {
+            getLogger().severe("Command '" + name + "' is missing from plugin.yml; it will not respond.");
+            return false;
+        }
+        command.setExecutor(executor);
+        if (executor instanceof TabCompleter completer) {
+            command.setTabCompleter(completer);
+        }
+        return true;
     }
 
     protected final void saveResourcesIfMissing(String... resourcePaths) {

@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
+import org.cubexmc.core.CubexLogger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -20,7 +21,7 @@ class PendingTransactionStoreTest {
     void persistsWithdrawDepositAndSettlementEntries() throws Exception {
         PendingTransactionStore store = new PendingTransactionStore(
             tempDir.resolve("pending-transactions.yml").toFile(),
-            Logger.getAnonymousLogger()
+            new CubexLogger(Logger.getAnonymousLogger())
         );
         UUID withdrawPlayer = UUID.randomUUID();
         UUID depositPlayer = UUID.randomUUID();
@@ -58,7 +59,7 @@ class PendingTransactionStoreTest {
     void withdrawCarriesContractIdForRecovery() throws Exception {
         PendingTransactionStore store = new PendingTransactionStore(
             tempDir.resolve("pending-transactions.yml").toFile(),
-            Logger.getAnonymousLogger()
+            new CubexLogger(Logger.getAnonymousLogger())
         );
         UUID player = UUID.randomUUID();
 

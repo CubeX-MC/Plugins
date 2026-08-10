@@ -26,6 +26,21 @@ permissions:
   contract.create.batch:
     default: op
     description: Create more than one service contract in a single batch.
+  contract.template.use:
+    default: true
+    description: Save, load, and delete personal contract templates.
+  contract.template.manage:
+    default: op
+    description: Publish or unpublish reusable server contract templates.
+  contract.template.admin:
+    default: op
+    description: Full contract template library administration.
+    children:
+      contract.template.use: true
+      contract.template.manage: true
+  contract.schedule.create:
+    default: op
+    description: Reserve escrow now and publish a service contract at a future time.
   contract.accept:
     default: true
     description: Accept open contracts.
@@ -55,6 +70,11 @@ permissions:
       contract.admin.settle: true
       contract.admin.view: true
       contract.create.batch: true
+      contract.template.manage: true
+      contract.template.admin: true
+      contract.schedule.create: true
+      contract.bypass.limit: true
+      contract.bypass.fee: true
       contract.bypass.batch-repeat-limit: true
   contract.admin.reload:
     default: op
@@ -68,3 +88,9 @@ permissions:
   contract.bypass.batch-repeat-limit:
     default: op
     description: Bypass per-batch repeat acceptance and cooldown rules.
+  contract.bypass.limit:
+    default: op
+    description: Bypass owner and contractor active contract count limits.
+  contract.bypass.fee:
+    default: op
+    description: Create contracts without paying the configured creation fee.

@@ -1,167 +1,168 @@
-lang-version: 5
+lang-version: 6
 
-prefix: "&#69DB7C[Regions] "
+prefix: "<#69DB7C>[Regions] "
 help: |
-  &#69DB7C/regions gui &#CFD8DC- Open the Regions management GUI
-  &#69DB7C/regions list &#CFD8DC- List regions
-  &#69DB7C/regions create <id> <name> --land <land> [area] &#CFD8DC- Create a venue on your own Lands area
-  &#69DB7C/regions bind <id> cuboid|lands ... &#CFD8DC- Bind a region source
-  &#69DB7C/regions mode set <id> dual_pvp|union_war|run_race|boat_race|horse_race|hide_and_seek ... &#CFD8DC- Set gameplay mode
-  &#69DB7C/regions game <id> ready/start/status/end &#CFD8DC- Ready, judge-start, inspect, or end a game
-  &#69DB7C/regions flag set <id> <flag> <value> &#CFD8DC- Set a rule flag
-  &#69DB7C/regions effect add <id> <effect> [args] &#CFD8DC- Add a scoped effect
-  &#69DB7C/regions trial <id> [start|stop] &#CFD8DC- Isolate draft Effect and Flag testing to yourself
-  &#69DB7C/regions preview <id> &#CFD8DC- Preview dependencies, conflicts, and effective rules
-  &#69DB7C/regions validate [id] &#CFD8DC- Validate configuration
-  &#69DB7C/regions inspect <player> &#CFD8DC- Inspect player region state
-  &#69DB7C/regions cleanup <player> &#CFD8DC- Cleanup player region state
-  &#69DB7C/regions freeze|unfreeze <id> [reason] &#CFD8DC- Freeze or review and unfreeze a venue as super-administrator
-  &#69DB7C/regions audit [id] [limit] &#CFD8DC- View the audit log as super-administrator
-  &#69DB7C/regions reload &#CFD8DC- Reload configuration
+  <#69DB7C>/regions gui <#CFD8DC>- Open the Regions management GUI
+  <#69DB7C>/regions list <#CFD8DC>- List regions
+  <#69DB7C>/regions create \<id> \<name> --land \<land> [area] <#CFD8DC>- Create a venue on your own Lands area
+  <#69DB7C>/regions bind \<id> cuboid|lands ... <#CFD8DC>- Bind a region source
+  <#69DB7C>/regions mode set \<id> dual_pvp|union_war|run_race|boat_race|horse_race|hide_and_seek ... <#CFD8DC>- Set gameplay mode
+  <#69DB7C>/regions game \<id> ready/start/status/end <#CFD8DC>- Ready, judge-start, inspect, or end a game
+  <#69DB7C>/regions flag set \<id> \<flag> \<value> <#CFD8DC>- Set a rule flag
+  <#69DB7C>/regions effect add \<id> \<effect> [args] <#CFD8DC>- Add a scoped effect
+  <#69DB7C>/regions trial \<id> [start|stop] <#CFD8DC>- Isolate draft Effect and Flag testing to yourself
+  <#69DB7C>/regions preview \<id> <#CFD8DC>- Preview dependencies, conflicts, and effective rules
+  <#69DB7C>/regions validate [id] <#CFD8DC>- Validate configuration
+  <#69DB7C>/regions inspect \<player> <#CFD8DC>- Inspect player region state
+  <#69DB7C>/regions cleanup \<player> <#CFD8DC>- Cleanup player region state
+  <#69DB7C>/regions freeze|unfreeze \<id> [reason] <#CFD8DC>- Freeze or review and unfreeze a venue as super-administrator
+  <#69DB7C>/regions audit [id] [limit] <#CFD8DC>- View the audit log as super-administrator
+  <#69DB7C>/regions reload <#CFD8DC>- Reload configuration
 help-publishing: |
-  &#69DB7C/regions publish|withdraw <id> &#CFD8DC- Publish a draft or withdraw the live revision
-  &#69DB7C/regions history <id> &#CFD8DC- View the immutable revision history
-  &#69DB7C/regions rollback <id> <revision> &#CFD8DC- Publish a historical revision as a new one
-  &#69DB7C/regions archive <id> &#CFD8DC- Archive a venue
-help-player: "&#CFD8DCWalk into a configured land or venue to experience Regions. Duel, race, and mini-game venues will prompt you to run &#69DB7C/regions game <venue> ready&#CFD8DC when confirmation is needed."
-reloaded: "&#69DB7CRegions reloaded."
-no-permission: "&#E63946You do not have permission."
-authority-not-ruler: "&#E63946Only RuleGems rulers can manage venues."
-authority-not-source-owner: "&#E63946You are not the current owner of the area this venue is bound to."
-authority-source-unknown: "&#E63946This venue's region source does not exist."
-authority-source-unavailable: "&#E63946This venue's region source is currently unavailable."
-authority-superadmin-required: "&#E63946This action is restricted to Regions super-administrators."
-authority-region-frozen: "&#E63946This venue is frozen; only a Regions super-administrator can handle it."
-authority-ownership-changed: "&#E63946The area owner changed; the venue must be frozen and reviewed by a super-administrator."
-player-only: "&#E63946This command can only be run by a player."
-invalid-usage: "&#FFE066Usage: {usage}"
-not-found: "&#E63946Region not found: {id}"
-player-not-found: "&#E63946Online player not found: {player}"
-list-empty: "&#CFD8DCNo regions configured yet."
-list-header: "&#69DB7CConfigured regions ({count}):"
-list-line: "&#CFD8DC- &#FFE066{id} &#CFD8DC{enabled} &#FFFFFF{name} &#90A4AE[state={lifecycle}, source={source}, mode={mode}]"
-enabled: "&#69DB7Cenabled"
-disabled: "&#90A4AEdisabled"
-validate-ok: "&#69DB7CRegion configuration is valid."
-validate-header: "&#FFE066Region validation results ({count}):"
-validate-line: "&#CFD8DC- &#FFE066{id} &#E63946{severity} &#FFFFFF{message}"
-inspect-header: "&#69DB7CRegions state for {player}:"
-inspect-empty: "&#CFD8DCNo active region sessions."
-inspect-line: "&#CFD8DC- &#FFE066{region} &#90A4AEentered at {entered}"
-cleanup-done: "&#69DB7CCleaned region state for {player} ({count} session(s))."
-doctor-header: "&#69DB7CRegions doctor:"
-doctor-line: "&#CFD8DC- {message}"
+  <#69DB7C>/regions publish|withdraw \<id> <#CFD8DC>- Publish a draft or withdraw the live revision
+  <#69DB7C>/regions history \<id> <#CFD8DC>- View the immutable revision history
+  <#69DB7C>/regions rollback \<id> \<revision> <#CFD8DC>- Publish a historical revision as a new one
+  <#69DB7C>/regions archive \<id> <#CFD8DC>- Archive a venue
+help-player: "<#CFD8DC>Walk into a configured land or venue to experience Regions. Duel, race, and mini-game venues will prompt you to run <#69DB7C>/regions game \\<venue> ready<#CFD8DC> when confirmation is needed."
+reloaded: "<#69DB7C>Regions reloaded."
+reload-failed: "<#E63946>Regions reload failed; the running state is unchanged. Failed stages: <stages>"
+no-permission: "<#E63946>You do not have permission."
+authority-not-ruler: "<#E63946>Only RuleGems rulers can manage venues."
+authority-not-source-owner: "<#E63946>You are not the current owner of the area this venue is bound to."
+authority-source-unknown: "<#E63946>This venue's region source does not exist."
+authority-source-unavailable: "<#E63946>This venue's region source is currently unavailable."
+authority-superadmin-required: "<#E63946>This action is restricted to Regions super-administrators."
+authority-region-frozen: "<#E63946>This venue is frozen; only a Regions super-administrator can handle it."
+authority-ownership-changed: "<#E63946>The area owner changed; the venue must be frozen and reviewed by a super-administrator."
+player-only: "<#E63946>This command can only be run by a player."
+invalid-usage: "<#FFE066>Usage: <usage>"
+not-found: "<#E63946>Region not found: <id>"
+player-not-found: "<#E63946>Online player not found: <player>"
+list-empty: "<#CFD8DC>No regions configured yet."
+list-header: "<#69DB7C>Configured regions (<count>):"
+list-line: "<#CFD8DC>- <#FFE066><id> <#CFD8DC><enabled> <#FFFFFF><name> <#90A4AE>[state=<lifecycle>, source=<source>, mode=<mode>]"
+enabled: "<#69DB7C>enabled"
+disabled: "<#90A4AE>disabled"
+validate-ok: "<#69DB7C>Region configuration is valid."
+validate-header: "<#FFE066>Region validation results (<count>):"
+validate-line: "<#CFD8DC>- <#FFE066><id> <#E63946><severity> <#FFFFFF><message>"
+inspect-header: "<#69DB7C>Regions state for <player>:"
+inspect-empty: "<#CFD8DC>No active region sessions."
+inspect-line: "<#CFD8DC>- <#FFE066><region> <#90A4AE>entered at <entered>"
+cleanup-done: "<#69DB7C>Cleaned region state for <player> (<count> session(s))."
+doctor-header: "<#69DB7C>Regions doctor:"
+doctor-line: "<#CFD8DC>- <message>"
 
 command:
-  flag-denied: "&cThis area does not allow /{command}."
-  region-created: "&aCreated draft region {id} bound to {source}. Run /regions publish {id} once it validates."
-  region-removed: "&aRemoved region {id}."
-  region-enabled: "&aRegion {id} is now enabled."
-  region-disabled: "&aRegion {id} is now disabled."
-  region-failed: "&cAction failed: {reason}"
-  unknown-source: "&cUnknown source: {input}"
-  bound: "&aRegion {id} is now bound to {source}."
-  mode-set: "&aSet the gameplay mode of region {id} to {mode}."
-  flag-set: "&aSet {flag} to {value} on region {id}."
-  flag-cleared: "&aRemoved {flag} from region {id}."
-  effect-added: "&aAdded {effect} to region {id}."
-  effect-removed: "&aRemoved effect #{index} from region {id}."
-  effect-empty: "&7Region {id} has no effects."
-  published: "&aThe draft of region {id} has been published."
-  publish-failed: "&cPublish failed: {reason}"
-  withdrawn: "&eRegion {id} was withdrawn back to a draft."
-  withdraw-failed: "&cWithdraw failed: {reason}"
-  archived: "&eRegion {id} has been archived."
-  rolled-back: "&aRepublished revision {revision} as a new revision of region {id}."
-  rollback-failed: "&cRollback failed: {reason}"
-  frozen: "&eRegion {id} is now frozen."
-  unfrozen: "&aRegion {id} has been unfrozen."
-  freeze-failed: "&cAction failed: {reason}"
-  history-header: "&6Published revisions of {id} ({count})"
-  history-empty: "&7No published history yet."
-  history-line: "&7- &e#{revision} &f{name} &8mode={mode}, state={state}"
-  audit-header: "&6Regions audit log ({count})"
-  audit-empty: "&7No records yet."
-  audit-line: "&7{time} &f{region} &e{action} &7by {actor}{reason}"
-  preview-header: "&6{id} publish preview · revision {revision}"
-  preview-no-draft: "&cRegion {id} has no draft to preview."
-  preview-summary: "&7Changes: {changes}, issues: {issues}, confirmed overlaps: {overlaps}"
-  preview-dependency-ok: "&aDependency {id}: {detail}"
-  preview-dependency-missing: "&cDependency {id}: {detail}"
-  preview-resolution-summary: "&bEffective mode: {mode}; primary trigger region: {trigger}"
-  preview-flag-line: "&7Flag {flag}={value} &8← {source}"
-  preview-effect-line: "&7Effect {effect} [{combination}] &8← {source}"
-  trial-started: "&aIsolated trial started; only you are affected by the draft's effects and flags."
-  trial-stopped: "&eIsolated trial ended."
-  trial-failed: "&cTrial failed: {reason}"
-  game-ended: "&aEnded the match in {id}."
-  game-not-running: "&e{id} has no match in progress."
-  game-status: "&e{id}: {state}"
+  flag-denied: "<red>This area does not allow /<command>."
+  region-created: "<green>Created draft region <id> bound to <source>. Run /regions publish <id> once it validates."
+  region-removed: "<green>Removed region <id>."
+  region-enabled: "<green>Region <id> is now enabled."
+  region-disabled: "<green>Region <id> is now disabled."
+  region-failed: "<red>Action failed: <reason>"
+  unknown-source: "<red>Unknown source: <input>"
+  bound: "<green>Region <id> is now bound to <source>."
+  mode-set: "<green>Set the gameplay mode of region <id> to <mode>."
+  flag-set: "<green>Set <flag> to <value> on region <id>."
+  flag-cleared: "<green>Removed <flag> from region <id>."
+  effect-added: "<green>Added <effect> to region <id>."
+  effect-removed: "<green>Removed effect #<index> from region <id>."
+  effect-empty: "<gray>Region <id> has no effects."
+  published: "<green>The draft of region <id> has been published."
+  publish-failed: "<red>Publish failed: <reason>"
+  withdrawn: "<yellow>Region <id> was withdrawn back to a draft."
+  withdraw-failed: "<red>Withdraw failed: <reason>"
+  archived: "<yellow>Region <id> has been archived."
+  rolled-back: "<green>Republished revision <revision> as a new revision of region <id>."
+  rollback-failed: "<red>Rollback failed: <reason>"
+  frozen: "<yellow>Region <id> is now frozen."
+  unfrozen: "<green>Region <id> has been unfrozen."
+  freeze-failed: "<red>Action failed: <reason>"
+  history-header: "<gold>Published revisions of <id> (<count>)"
+  history-empty: "<gray>No published history yet."
+  history-line: "<gray>- <yellow>#<revision> <white><name> <dark_gray>mode=<mode>, state=<state>"
+  audit-header: "<gold>Regions audit log (<count>)"
+  audit-empty: "<gray>No records yet."
+  audit-line: "<gray><time> <white><region> <yellow><action> <gray>by <actor><reason>"
+  preview-header: "<gold><id> publish preview · revision <revision>"
+  preview-no-draft: "<red>Region <id> has no draft to preview."
+  preview-summary: "<gray>Changes: <changes>, issues: <issues>, confirmed overlaps: <overlaps>"
+  preview-dependency-ok: "<green>Dependency <id>: <detail>"
+  preview-dependency-missing: "<red>Dependency <id>: <detail>"
+  preview-resolution-summary: "<aqua>Effective mode: <mode>; primary trigger region: <trigger>"
+  preview-flag-line: "<gray>Flag <flag>=<value> <dark_gray>← <source>"
+  preview-effect-line: "<gray>Effect <effect> [<combination>] <dark_gray>← <source>"
+  trial-started: "<green>Isolated trial started; only you are affected by the draft's effects and flags."
+  trial-stopped: "<yellow>Isolated trial ended."
+  trial-failed: "<red>Trial failed: <reason>"
+  game-ended: "<green>Ended the match in <id>."
+  game-not-running: "<yellow><id> has no match in progress."
+  game-status: "<yellow><id>: <state>"
 
 game:
   combat:
-    restoring: "&e{name} is still restoring the previous match; come back in a moment."
-    in-progress: "&e{name} has already started; you will not join the current match."
-    full: "&c{name} is full."
-    not-combat: "&cThis region is not a combat mode."
-    not-inside: "&cYou are not inside this venue."
-    already-started: "&eThe match has already started."
-    ready: "&a{player} is ready ({current}/{total})"
-    ready-prompt: "&e{name} has enough players. Run &a/regions game {id} ready &eto confirm."
-    removed: "&eYou were removed from this match; your pre-match state returns on respawn."
-    started: "&cFight!"
-    ended: "&eThe match has ended."
-    waiting-players: "&eMore players need to enter the venue ({current}/{required})."
-    waiting-unions: "&eUnion war needs at least {required} different unions present; {current} detected."
-    not-ready: "&eThe start conditions are not met yet."
-    union-winner: "&6Union war over. Winning union: &e{union}"
+    restoring: "<yellow><name> is still restoring the previous match; come back in a moment."
+    in-progress: "<yellow><name> has already started; you will not join the current match."
+    full: "<red><name> is full."
+    not-combat: "<red>This region is not a combat mode."
+    not-inside: "<red>You are not inside this venue."
+    already-started: "<yellow>The match has already started."
+    ready: "<green><player> is ready (<current>/<total>)"
+    ready-prompt: "<yellow><name> has enough players. Run <green>/regions game <id> ready <yellow>to confirm."
+    removed: "<yellow>You were removed from this match; your pre-match state returns on respawn."
+    started: "<red>Fight!"
+    ended: "<yellow>The match has ended."
+    waiting-players: "<yellow>More players need to enter the venue (<current>/<required>)."
+    waiting-unions: "<yellow>Union war needs at least <required> different unions present; <current> detected."
+    not-ready: "<yellow>The start conditions are not met yet."
+    union-winner: "<gold>Union war over. Winning union: <yellow><union>"
   race:
-    restoring: "&e{name} is still finishing the previous race; come back in a moment."
-    in-progress: "&e{name} has already started; you will join the next race."
-    full: "&c{name} is full."
-    joined: "&aYou entered {name}. Run &e/regions game {id} ready &ato get set."
-    left: "&e{player} left the race."
-    not-inside: "&cYou are not inside this race venue."
-    already-started: "&eThe race has already started."
-    start-required: "&eMove to the start line before readying up."
-    ready: "&a{player} is ready ({current}/{total})"
-    waiting-players: "&eMore players are needed to start the race ({current}/{required})."
-    waiting-at-start: "&eSome players are away from the start line; the race cannot begin."
-    waiting-vehicle: "&eSome players do not meet the start requirement: {vehicle}."
-    started: "&a{name} — go!"
-    timeout: "&eThe race hit its time limit and ended automatically."
-    ended: "&eThe race has ended."
-    checkpoint: "&aCheckpoint {index}/{total} cleared."
-    your-result: "&6Finished! Position: &e#{rank} &7time: {time}s"
-    finished: "&6{player} finished in position #{rank}."
+    restoring: "<yellow><name> is still finishing the previous race; come back in a moment."
+    in-progress: "<yellow><name> has already started; you will join the next race."
+    full: "<red><name> is full."
+    joined: "<green>You entered <name>. Run <yellow>/regions game <id> ready <green>to get set."
+    left: "<yellow><player> left the race."
+    not-inside: "<red>You are not inside this race venue."
+    already-started: "<yellow>The race has already started."
+    start-required: "<yellow>Move to the start line before readying up."
+    ready: "<green><player> is ready (<current>/<total>)"
+    waiting-players: "<yellow>More players are needed to start the race (<current>/<required>)."
+    waiting-at-start: "<yellow>Some players are away from the start line; the race cannot begin."
+    waiting-vehicle: "<yellow>Some players do not meet the start requirement: <vehicle>."
+    started: "<green><name> — go!"
+    timeout: "<yellow>The race hit its time limit and ended automatically."
+    ended: "<yellow>The race has ended."
+    checkpoint: "<green>Checkpoint <index>/<total> cleared."
+    your-result: "<gold>Finished! Position: <yellow>#<rank> <gray>time: <time>s"
+    finished: "<gold><player> finished in position #<rank>."
     require:
-      on-foot: "&eThis stage must be done on foot; no vehicles."
-      any: "&eThis stage requires riding any vehicle."
-      boat: "&eThis stage requires being in a boat."
-      horse: "&eThis stage requires being on a horse."
-      other: "&eThis stage requires: {vehicle}."
+      on-foot: "<yellow>This stage must be done on foot; no vehicles."
+      any: "<yellow>This stage requires riding any vehicle."
+      boat: "<yellow>This stage requires being in a boat."
+      horse: "<yellow>This stage requires being on a horse."
+      other: "<yellow>This stage requires: <vehicle>."
   round:
-    restoring: "&e{name} is still restoring the previous round; come back in a moment."
-    in-progress: "&e{name} is in progress; you will join the next round."
-    full: "&c{name} is full."
-    joined: "&aYou entered {name}. Run &e/regions game {id} ready &ato get set."
-    wait-hiding: "&eWait for the hiding phase to end."
-    removed: "&eYou left the mini-game; your pre-match state returns on respawn."
-    not-inside: "&cYou are not inside this mini-game venue."
-    already-started: "&eThe mini-game has already started."
-    ready: "&a{player} is ready ({current}/{total})"
-    waiting-players: "&eMore players are needed to start ({current}/{required})."
-    started: "&a{name} begins! Seekers are released in {seconds}s."
-    hiders-win-timeout: "&6Time is up — hiders win!"
-    role-seeker: "&cYou are a seeker. Once the countdown ends, attack a hider to tag them."
-    role-hider: "&aYou are a hider. Hide before the countdown ends; being attacked eliminates you."
-    seek-start: "&cThe seekers are released!"
-    found-become-seeker: "&e{seeker} found you — you are now a seeker."
-    found-eliminated: "&e{seeker} found you; you are out of this round."
-    found: "&6{player} was found by {seeker}."
-    seekers-win: "&cEvery hider was found — seekers win!"
-    hiders-win-abandoned: "&6The seekers left the game — hiders win!"
-    ended: "&eThe mini-game ended and your temporary state was restored."
+    restoring: "<yellow><name> is still restoring the previous round; come back in a moment."
+    in-progress: "<yellow><name> is in progress; you will join the next round."
+    full: "<red><name> is full."
+    joined: "<green>You entered <name>. Run <yellow>/regions game <id> ready <green>to get set."
+    wait-hiding: "<yellow>Wait for the hiding phase to end."
+    removed: "<yellow>You left the mini-game; your pre-match state returns on respawn."
+    not-inside: "<red>You are not inside this mini-game venue."
+    already-started: "<yellow>The mini-game has already started."
+    ready: "<green><player> is ready (<current>/<total>)"
+    waiting-players: "<yellow>More players are needed to start (<current>/<required>)."
+    started: "<green><name> begins! Seekers are released in <seconds>s."
+    hiders-win-timeout: "<gold>Time is up — hiders win!"
+    role-seeker: "<red>You are a seeker. Once the countdown ends, attack a hider to tag them."
+    role-hider: "<green>You are a hider. Hide before the countdown ends; being attacked eliminates you."
+    seek-start: "<red>The seekers are released!"
+    found-become-seeker: "<yellow><seeker> found you — you are now a seeker."
+    found-eliminated: "<yellow><seeker> found you; you are out of this round."
+    found: "<gold><player> was found by <seeker>."
+    seekers-win: "<red>Every hider was found — seekers win!"
+    hiders-win-abandoned: "<gold>The seekers left the game — hiders win!"
+    ended: "<yellow>The mini-game ended and your temporary state was restored."
   vehicle:
     pig: "pig"
     strider: "strider"
@@ -172,308 +173,308 @@ game:
 
 gui:
   common:
-    back: "&cBack"
-    close: "&cClose"
+    back: "<red>Back"
+    close: "<red>Close"
     none: "none"
     unset: "not set"
     unlimited: "unlimited"
     auto: "auto"
-    absent: "<none>"
-    previous-page: "&ePrevious page"
-    next-page: "&eNext page"
+    absent: "\\<none>"
+    previous-page: "<yellow>Previous page"
+    next-page: "<yellow>Next page"
   prompt:
-    hint: "&7This message will not be sent to public chat. Type cancel to abort."
+    hint: "<gray>This message will not be sent to public chat. Type cancel to abort."
     cancel-word: "cancel"
-    cancelled: "&7Cancelled."
-    create-id: "&aEnter the new region ID. Letters, digits, underscores and hyphens only. Type cancel to abort."
-    create-name: "&aEnter the region display name. Type - to reuse the ID."
-    delete: "&cDelete region {id}? Type the region ID to confirm, or cancel to abort."
-    rename: "&aEnter the new region display name. Type cancel to abort."
-    cuboid: "&aEnter a cuboid: world,minX,minY,minZ,maxX,maxY,maxZ. Type cancel to abort."
-    mode-value: "&aEnter a mode parameter as key=value, or clear <key> to remove it. Type cancel to abort."
-    flag: "&aEnter <flag> <value> [key=value...], e.g. commands blocklist values=/spawn,/home."
-    effect: "&aEnter <effect> [key=value...]; combination=highest_priority|exclusive|stack|merge_by_type is supported."
-    trigger: "&aEnter <trigger> <action> [key=value...]; execution=primary restricts it to the primary region."
+    cancelled: "<gray>Cancelled."
+    create-id: "<green>Enter the new region ID. Letters, digits, underscores and hyphens only. Type cancel to abort."
+    create-name: "<green>Enter the region display name. Type - to reuse the ID."
+    delete: "<red>Delete region <id>? Type the region ID to confirm, or cancel to abort."
+    rename: "<green>Enter the new region display name. Type cancel to abort."
+    cuboid: "<green>Enter a cuboid: world,minX,minY,minZ,maxX,maxY,maxZ. Type cancel to abort."
+    mode-value: "<green>Enter a mode parameter as key=value, or clear \\<key> to remove it. Type cancel to abort."
+    flag: "<green>Enter \\<flag> \\<value> [key=value...], e.g. commands blocklist values=/spawn,/home."
+    effect: "<green>Enter \\<effect> [key=value...]; combination=highest_priority|exclusive|stack|merge_by_type is supported."
+    trigger: "<green>Enter \\<trigger> \\<action> [key=value...]; execution=primary restricts it to the primary region."
   save:
-    ok: "&aSaved the draft of region {id}."
-    failed: "&cAction failed: {reason}"
+    ok: "<green>Saved the draft of region <id>."
+    failed: "<red>Action failed: <reason>"
   item:
     region:
-      name: "&e{name}"
+      name: "<yellow><name>"
       lore:
-        - "&7ID: {id}"
-        - "&7Source: {source}"
-        - "&7Lifecycle: {lifecycle} · r{revision}"
-        - "&7Mode: {mode}"
-        - "&7Flags: {flags}"
-        - "&7Effects: {effects}"
+        - "<gray>ID: <id>"
+        - "<gray>Source: <source>"
+        - "<gray>Lifecycle: <lifecycle> · r<revision>"
+        - "<gray>Mode: <mode>"
+        - "<gray>Flags: <flags>"
+        - "<gray>Effects: <effects>"
   main:
-    title: "&2Regions"
+    title: "<dark_green>Regions"
     create:
-      name: "&bCreate region"
+      name: "<aqua>Create region"
       lore:
-        - "&7After entering an ID and name,"
-        - "&7pick safely from the Lands areas you own."
+        - "<gray>After entering an ID and name,"
+        - "<gray>pick safely from the Lands areas you own."
     reload:
-      name: "&aReload configuration"
+      name: "<green>Reload configuration"
       lore:
-        - "&7Click to reload the regions configuration from disk."
+        - "<gray>Click to reload the regions configuration from disk."
     count:
-      name: "&eRegions: {count}"
+      name: "<yellow>Regions: <count>"
       lore:
-        - "&7Only venues you currently own are listed here."
+        - "<gray>Only venues you currently own are listed here."
     doctor:
-      name: "&bRun checks"
+      name: "<aqua>Run checks"
       lore:
-        - "&7Click to validate the current region configuration."
-    reloaded: "&aRegions configuration reloaded."
+        - "<gray>Click to validate the current region configuration."
+    reloaded: "<green>Regions configuration reloaded."
   doctor:
-    clean: "&aNo configuration problems found."
-    found: "&eFound {count} configuration problem(s); details below."
-    line: "&7{id}: {severity} {message}"
+    clean: "<green>No configuration problems found."
+    found: "<yellow>Found <count> configuration problem(s); details below."
+    line: "<gray><id>: <severity> <message>"
   detail:
-    title: "&2Region: {id}"
+    title: "<dark_green>Region: <id>"
     source:
-      name: "&bRegion source"
+      name: "<aqua>Region source"
       lore:
-        - "&7{source}"
-        - "&8Click to bind a Lands area or adjust the name and priority."
+        - "<gray><source>"
+        - "<dark_gray>Click to bind a Lands area or adjust the name and priority."
     mode:
-      name: "&bGameplay mode"
+      name: "<aqua>Gameplay mode"
       lore:
-        - "&7{mode}"
-        - "&8Click to choose a duel, race, or mini-game mode."
+        - "<gray><mode>"
+        - "<dark_gray>Click to choose a duel, race, or mini-game mode."
     flags:
-      name: "&bFlags"
+      name: "<aqua>Flags"
       lore:
-        - "&7{count} flag(s)"
-        - "&8Click to toggle the common rules."
+        - "<gray><count> flag(s)"
+        - "<dark_gray>Click to toggle the common rules."
     effects:
-      name: "&bEffects"
+      name: "<aqua>Effects"
       lore:
-        - "&7{count} effect(s)"
-        - "&8Click to add or remove common effects."
+        - "<gray><count> effect(s)"
+        - "<dark_gray>Click to add or remove common effects."
     triggers:
-      name: "&bTriggers & Actions"
+      name: "<aqua>Triggers & Actions"
       lore:
-        - "&7{count} action block(s)"
-        - "&8Click to configure enter/leave/start/finish behaviour."
-    enable: "&aClick to enable"
-    disable: "&eClick to disable"
+        - "<gray><count> action block(s)"
+        - "<dark_gray>Click to configure enter/leave/start/finish behaviour."
+    enable: "<green>Click to enable"
+    disable: "<yellow>Click to disable"
     validate:
-      name: "&bValidate configuration"
+      name: "<aqua>Validate configuration"
     cleanup:
-      name: "&bClean my state"
+      name: "<aqua>Clean my state"
       lore:
-        - "&7Immediately removes your own region effects while testing."
+        - "<gray>Immediately removes your own region effects while testing."
     delete:
-      name: "&cDelete region"
+      name: "<red>Delete region"
       lore:
-        - "&7You will be asked to type the region ID to confirm."
-        - "&cThis removes the region from regions.yml."
+        - "<gray>You will be asked to type the region ID to confirm."
+        - "<red>This removes the region from regions.yml."
     publish:
-      name: "&aPublish draft"
+      name: "<green>Publish draft"
       lore:
-        - "&7Switches the live revision once validation passes."
-        - "&7Current draft revision: {revision}"
+        - "<gray>Switches the live revision once validation passes."
+        - "<gray>Current draft revision: <revision>"
     withdraw:
-      name: "&eWithdraw published revision"
+      name: "<yellow>Withdraw published revision"
       lore:
-        - "&7Stops the venue and returns it to a draft."
+        - "<gray>Stops the venue and returns it to a draft."
     history:
-      name: "&bRevision history"
+      name: "<aqua>Revision history"
       lore:
-        - "&7{count} stored revision(s)."
-        - "&7Click to list revision numbers in chat."
+        - "<gray><count> stored revision(s)."
+        - "<gray>Click to list revision numbers in chat."
     trial-start:
-      name: "&bStart my isolated trial"
+      name: "<aqua>Start my isolated trial"
       lore:
-        - "&7Applies the draft's effects and flags to you only."
-        - "&7No mode starts, no triggers run, nobody else is affected."
+        - "<gray>Applies the draft's effects and flags to you only."
+        - "<gray>No mode starts, no triggers run, nobody else is affected."
     trial-stop:
-      name: "&cEnd my isolated trial"
+      name: "<red>End my isolated trial"
       lore:
-        - "&7Restores your own state immediately."
-    withdrawn: "&eRegion {id} was withdrawn back to a draft."
-    withdraw-failed: "&cWithdraw failed: {reason}"
+        - "<gray>Restores your own state immediately."
+    withdrawn: "<yellow>Region <id> was withdrawn back to a draft."
+    withdraw-failed: "<red>Withdraw failed: <reason>"
   trial:
-    started: "&aIsolated trial started; only you are affected by the draft's effects and flags."
-    stopped: "&eIsolated trial ended."
-    failed: "&cTrial failed: {reason}"
+    started: "<green>Isolated trial started; only you are affected by the draft's effects and flags."
+    stopped: "<yellow>Isolated trial ended."
+    failed: "<red>Trial failed: <reason>"
   delete:
-    cancelled: "&7Deletion cancelled."
-    ok: "&aDeleted region {id}."
-    failed: "&cDeletion failed: {reason}"
+    cancelled: "<gray>Deletion cancelled."
+    ok: "<green>Deleted region <id>."
+    failed: "<red>Deletion failed: <reason>"
   create:
-    bad-id: "&cThat region ID is not valid."
-    exists: "&cRegion {id} already exists."
-    lands-unavailable: "&cLands is unavailable, so your owned areas cannot be listed."
+    bad-id: "<red>That region ID is not valid."
+    exists: "<red>Region <id> already exists."
+    lands-unavailable: "<red>Lands is unavailable, so your owned areas cannot be listed."
   source:
-    title: "&2Source: {id}"
+    title: "<dark_green>Source: <id>"
     lands:
-      name: "&bBind a Lands area"
+      name: "<aqua>Bind a Lands area"
       lore:
-        - "&7Click to pick from the Lands areas you currently own."
-        - "&7Current: {source}"
+        - "<gray>Click to pick from the Lands areas you currently own."
+        - "<gray>Current: <source>"
     cuboid:
-      name: "&bBind a cuboid"
+      name: "<aqua>Bind a cuboid"
       lore:
-        - "&7Left click: build a cuboid from the current chunk."
-        - "&7Right click: enter world,minX,minY,minZ,maxX,maxY,maxZ."
+        - "<gray>Left click: build a cuboid from the current chunk."
+        - "<gray>Right click: enter world,minX,minY,minZ,maxX,maxY,maxZ."
     rename:
-      name: "&eChange display name"
+      name: "<yellow>Change display name"
       lore:
-        - "&7Current: {name}"
-        - "&7Click to enter a new name."
+        - "<gray>Current: <name>"
+        - "<gray>Click to enter a new name."
     priority:
-      name: "&ePriority: {priority}"
+      name: "<yellow>Priority: <priority>"
       lore:
-        - "&7Left click +1, right click -1."
-        - "&7Higher priority wins in overlapping areas."
-    cuboid-format: "&cInvalid format; expected world,minX,minY,minZ,maxX,maxY,maxZ."
-    name-blank: "&cThe name cannot be empty."
+        - "<gray>Left click +1, right click -1."
+        - "<gray>Higher priority wins in overlapping areas."
+    cuboid-format: "<red>Invalid format; expected world,minX,minY,minZ,maxX,maxY,maxZ."
+    name-blank: "<red>The name cannot be empty."
   mode:
-    title: "&2Mode: {id}"
-    current: "&aCurrent mode"
-    switch: "&7Click to switch to this mode"
-    key-value-required: "&cEnter key=value."
+    title: "<dark_green>Mode: <id>"
+    current: "<green>Current mode"
+    switch: "<gray>Click to switch to this mode"
+    key-value-required: "<red>Enter key=value."
     type:
       free_event:
         name: "free_event"
         lore:
-          - "&7General event venue driven by flags and effects only."
+          - "<gray>General event venue driven by flags and effects only."
       run_race:
         name: "run_race"
         lore:
-          - "&7Foot race; participants may not ride a vehicle."
+          - "<gray>Foot race; participants may not ride a vehicle."
       dual_pvp:
         name: "dual_pvp"
         lore:
-          - "&7Two or more players ready up after entering."
-          - "&7Supports kit, armor and min-players."
+          - "<gray>Two or more players ready up after entering."
+          - "<gray>Supports kit, armor and min-players."
       boat_race:
         name: "boat_race"
         lore:
-          - "&7Boat race; participants must be in a boat."
+          - "<gray>Boat race; participants must be in a boat."
       union_war:
         name: "union_war"
         lore:
-          - "&7Uses the UnionProvider to resolve unions."
-          - "&7Supports min-unions, kit and armor."
+          - "<gray>Uses the UnionProvider to resolve unions."
+          - "<gray>Supports min-unions, kit and armor."
       horse_race:
         name: "horse_race"
         lore:
-          - "&7Horse race; participants must be mounted."
+          - "<gray>Horse race; participants must be mounted."
       hide_and_seek:
         name: "hide_and_seek"
         lore:
-          - "&7Hide and seek with automatic role assignment."
-          - "&7Seekers tag hiders by attacking them; no damage is dealt."
+          - "<gray>Hide and seek with automatic role assignment."
+          - "<gray>Seekers tag hiders by attacking them; no damage is dealt."
     min-players:
-      name: "&eMinimum players: {value}"
-      lore: ["&7Left click +1, right click -1."]
+      name: "<yellow>Minimum players: <value>"
+      lore: ["<gray>Left click +1, right click -1."]
     max-players:
-      name: "&eMaximum players: {value}"
-      lore: ["&7Left click +1, right click -1.", "&7Dropping to 0 removes the limit."]
+      name: "<yellow>Maximum players: <value>"
+      lore: ["<gray>Left click +1, right click -1.", "<gray>Dropping to 0 removes the limit."]
     require-ready:
-      name: "&eRequire everyone ready: {value}"
-      lore: ["&7Click to toggle."]
+      name: "<yellow>Require everyone ready: <value>"
+      lore: ["<gray>Click to toggle."]
     replace-gear:
-      name: "&eReplace combat gear: {value}"
-      lore: ["&7Click to toggle."]
+      name: "<yellow>Replace combat gear: <value>"
+      lore: ["<gray>Click to toggle."]
     min-unions:
-      name: "&eMinimum unions: {value}"
-      lore: ["&7Used by union_war. Left click +1, right click -1."]
+      name: "<yellow>Minimum unions: <value>"
+      lore: ["<gray>Used by union_war. Left click +1, right click -1."]
     vehicle:
-      name: "&eGlobal vehicle check: {value}"
-      lore: ["&7Click to cycle: on foot / any vehicle / boat / horse / minecart / ignore."]
+      name: "<yellow>Global vehicle check: <value>"
+      lore: ["<gray>Click to cycle: on foot / any vehicle / boat / horse / minecart / ignore."]
     start-vehicle:
-      name: "&eStart vehicle check: {value}"
-      lore: ["&7Click to cycle; overrides the global check."]
+      name: "<yellow>Start vehicle check: <value>"
+      lore: ["<gray>Click to cycle; overrides the global check."]
     finish-vehicle:
-      name: "&eFinish vehicle check: {value}"
-      lore: ["&7Click to cycle; overrides the global check."]
+      name: "<yellow>Finish vehicle check: <value>"
+      lore: ["<gray>Click to cycle; overrides the global check."]
     set-respawn:
-      name: "&bSet respawn to current position"
-      lore: ["&7{location}"]
+      name: "<aqua>Set respawn to current position"
+      lore: ["<gray><location>"]
     respawn:
-      name: "&eCurrent respawn point"
-      lore: ["&7{value}"]
+      name: "<yellow>Current respawn point"
+      lore: ["<gray><value>"]
     respawn-clear:
-      name: "&cClear respawn point"
+      name: "<red>Clear respawn point"
     kit-iron:
-      name: "&bPreset: iron duel"
-      lore: ["&7Iron sword, bow, shield, iron armor, food."]
+      name: "<aqua>Preset: iron duel"
+      lore: ["<gray>Iron sword, bow, shield, iron armor, food."]
     kit-bow:
-      name: "&bPreset: archery"
-      lore: ["&7Bow, arrows, wooden sword, leather armor."]
+      name: "<aqua>Preset: archery"
+      lore: ["<gray>Bow, arrows, wooden sword, leather armor."]
     kit-diamond:
-      name: "&bPreset: diamond fight"
-      lore: ["&7Diamond sword, bow, shield, diamond armor."]
+      name: "<aqua>Preset: diamond fight"
+      lore: ["<gray>Diamond sword, bow, shield, diamond armor."]
     kit-clear:
-      name: "&cClear combat gear preset"
+      name: "<red>Clear combat gear preset"
     set-start:
-      name: "&bSet start to current position"
-      lore: ["&7{value}"]
+      name: "<aqua>Set start to current position"
+      lore: ["<gray><value>"]
     set-finish:
-      name: "&bSet finish to current position"
-      lore: ["&7{value}"]
+      name: "<aqua>Set finish to current position"
+      lore: ["<gray><value>"]
     add-checkpoint:
-      name: "&bAppend checkpoint"
+      name: "<aqua>Append checkpoint"
       lore:
-        - "&7Current: {count}"
-        - "&7This checkpoint's check: {vehicle}"
-        - "&7{location}"
+        - "<gray>Current: <count>"
+        - "<gray>This checkpoint's check: <vehicle>"
+        - "<gray><location>"
     clear-checkpoints:
-      name: "&cClear checkpoints"
+      name: "<red>Clear checkpoints"
     require-start:
-      name: "&eMust ready at the start: {value}"
-      lore: ["&7Click to toggle."]
+      name: "<yellow>Must ready at the start: <value>"
+      lore: ["<gray>Click to toggle."]
     teleport-start:
-      name: "&eTeleport to start on begin: {value}"
-      lore: ["&7Click to toggle."]
+      name: "<yellow>Teleport to start on begin: <value>"
+      lore: ["<gray>Click to toggle."]
     start-mode:
-      name: "&eStart method: {value}"
-      lore: ["&7Click to switch between vote and judge."]
+      name: "<yellow>Start method: <value>"
+      lore: ["<gray>Click to switch between vote and judge."]
     radius:
-      name: "&eDetection radius: {value}"
-      lore: ["&7Left click +1, right click -1."]
+      name: "<yellow>Detection radius: <value>"
+      lore: ["<gray>Left click +1, right click -1."]
     judges:
-      name: "&bAdd/remove yourself as judge"
-      lore: ["&7Current: {value}"]
+      name: "<aqua>Add/remove yourself as judge"
+      lore: ["<gray>Current: <value>"]
     seekers:
-      name: "&eSeeker count: {value}"
-      lore: ["&7Used by hide_and_seek. Left click +1, right click -1."]
+      name: "<yellow>Seeker count: <value>"
+      lore: ["<gray>Used by hide_and_seek. Left click +1, right click -1."]
     hide-seconds:
-      name: "&eHiding time: {value}s"
-      lore: ["&7Left click +10s, right click -10s."]
+      name: "<yellow>Hiding time: <value>s"
+      lore: ["<gray>Left click +10s, right click -10s."]
     round-seconds:
-      name: "&eRound length: {value}s"
-      lore: ["&7Left click +60s, right click -60s. 0 means no limit."]
+      name: "<yellow>Round length: <value>s"
+      lore: ["<gray>Left click +60s, right click -60s. 0 means no limit."]
     found-becomes-seeker:
-      name: "&eFound players become seekers: {value}"
-      lore: ["&7Click to toggle."]
+      name: "<yellow>Found players become seekers: <value>"
+      lore: ["<gray>Click to toggle."]
     timeout-seconds:
-      name: "&eMatch timeout: {value}s"
-      lore: ["&7Used by race modes. Left click +60s, right click -60s.", "&7Minimum 60s."]
+      name: "<yellow>Match timeout: <value>s"
+      lore: ["<gray>Used by race modes. Left click +60s, right click -60s.", "<gray>Minimum 60s."]
     advanced:
-      name: "&eAdvanced parameters"
+      name: "<yellow>Advanced parameters"
       lore:
-        - "&7Click to enter key=value."
-        - "&7Enter clear <key> to remove a parameter."
+        - "<gray>Click to enter key=value."
+        - "<gray>Enter clear \\<key> to remove a parameter."
   flag:
-    title: "&2Flags: {id}"
+    title: "<dark_green>Flags: <id>"
     entry:
-      name: "&e{flag}: {color}{value}"
+      name: "<yellow><flag>: <color><value>"
       lore:
-        - "&7Click to cycle: pass -> deny -> allow"
-        - "&8pass leaves Lands and server rules untouched."
+        - "<gray>Click to cycle: pass -> deny -> allow"
+        - "<dark_gray>pass leaves Lands and server rules untouched."
     advanced:
-      name: "&eAdvanced parameters"
+      name: "<yellow>Advanced parameters"
       lore:
-        - "&7Click to enter <flag> <value> [key=value...]."
-        - "&7For example commands blocklist values=/spawn,/home."
-    usage: "&cEnter <flag> <value>."
+        - "<gray>Click to enter \\<flag> \\<value> [key=value...]."
+        - "<gray>For example commands blocklist values=/spawn,/home."
+    usage: "<red>Enter \\<flag> \\<value>."
     key:
       pvp: "pvp"
       fly: "fly"
@@ -486,68 +487,68 @@ gui:
       deny: "deny"
       pass: "pass"
   effect:
-    title: "&2Effects: {id}"
+    title: "<dark_green>Effects: <id>"
     entry:
-      name: "&e{index}. {type}"
+      name: "<yellow><index>. <type>"
       lore:
-        - "&7scope: {scope}"
-        - "&7combination: {combination}"
-        - "&7{values}"
-        - "&cClick to remove this effect."
+        - "<gray>scope: <scope>"
+        - "<gray>combination: <combination>"
+        - "<gray><values>"
+        - "<red>Click to remove this effect."
       no-values: "no parameters"
     preset:
       small:
-        name: "&bAdd scale 0.35"
-        lore: ["&7The effect used by miniature venues."]
+        name: "<aqua>Add scale 0.35"
+        lore: ["<gray>The effect used by miniature venues."]
       large:
-        name: "&bAdd scale 1.60"
-        lore: ["&7The effect used by giant venues."]
+        name: "<aqua>Add scale 1.60"
+        lore: ["<gray>The effect used by giant venues."]
       flight:
-        name: "&bAllow flight"
-        lore: ["&7The original state is restored on leave."]
+        name: "<aqua>Allow flight"
+        lore: ["<gray>The original state is restored on leave."]
       speed:
-        name: "&bSpeed potion"
-        lore: ["&7potion SPEED amplifier=1."]
+        name: "<aqua>Speed potion"
+        lore: ["<gray>potion SPEED amplifier=1."]
       invisibility:
-        name: "&bSuppress invisibility"
-        lore: ["&7For venues that set vanish: deny."]
+        name: "<aqua>Suppress invisibility"
+        lore: ["<gray>For venues that set vanish: deny."]
     clear:
-      name: "&cClear all effects"
+      name: "<red>Clear all effects"
     advanced:
-      name: "&eAdvanced parameters"
+      name: "<yellow>Advanced parameters"
       lore:
-        - "&7Click to enter <effect> [key=value...]."
-        - "&7For example scale value=0.5 or potion effect=JUMP."
-    type-required: "&cThe effect type cannot be empty."
+        - "<gray>Click to enter \\<effect> [key=value...]."
+        - "<gray>For example scale value=0.5 or potion effect=JUMP."
+    type-required: "<red>The effect type cannot be empty."
   trigger:
-    title: "&2Triggers: {id}"
-    entry: "&e{trigger}: {count}"
-    block-line: "&7{name} [{execution}] -> {actions}"
+    title: "<dark_green>Triggers: <id>"
+    entry: "<yellow><trigger>: <count>"
+    block-line: "<gray><name> [<execution>] -> <actions>"
     unnamed: "action"
-    clear-hint: "&cClick to clear this trigger."
+    clear-hint: "<red>Click to clear this trigger."
     preset:
       enter:
-        name: "&bTemplate: entry message"
-        lore: ["&7on_enter -> message"]
-        text: "&aWelcome to {region_name}."
+        name: "<aqua>Template: entry message"
+        lore: ["<gray>on_enter -> message"]
+        text: "<green>Welcome to <region_name>."
       start:
-        name: "&bTemplate: start title"
-        lore: ["&7on_mode_start -> title"]
-        title: "&aGo!"
-        subtitle: "{region_name}"
+        name: "<aqua>Template: start title"
+        lore: ["<gray>on_mode_start -> title"]
+        title: "<green>Go!"
+        subtitle: "<region_name>"
       finish:
-        name: "&bTemplate: finish broadcast"
-        lore: ["&7on_finish -> broadcast"]
-        text: "&6{player} finished {region_name} in position #{rank}."
+        name: "<aqua>Template: finish broadcast"
+        lore: ["<gray>on_finish -> broadcast"]
+        text: "<gold><player> finished <region_name> in position #<rank>."
     advanced:
-      name: "&eAdd an action"
+      name: "<yellow>Add an action"
       lore:
-        - "&7Enter <trigger> <action> [key=value...]."
-        - "&7For example on_enter message text=Welcome {player}"
+        - "<gray>Enter \\<trigger> \\<action> [key=value...]."
+        - "<gray>For example on_enter message text=Welcome <player>"
     clear:
-      name: "&cClear all triggers"
-    usage: "&cEnter <trigger> <action>."
-    unknown: "&cUnknown trigger: {trigger}"
+      name: "<red>Clear all triggers"
+    usage: "<red>Enter \\<trigger> \\<action>."
+    unknown: "<red>Unknown trigger: <trigger>"
     key:
       on_enter: "on_enter"
       on_leave: "on_leave"
@@ -564,95 +565,95 @@ gui:
       on_checkpoint: "on_checkpoint"
       on_finish: "on_finish"
   publish:
-    title: "&2Publish preview: {id}"
+    title: "<dark_green>Publish preview: <id>"
     change:
-      name: "&e{path}"
+      name: "<yellow><path>"
       lore:
-        - "&cBefore: {before}"
-        - "&aAfter: {after}"
+        - "<red>Before: <before>"
+        - "<green>After: <after>"
     no-changes:
-      name: "&7No configuration changes"
+      name: "<gray>No configuration changes"
       lore:
-        - "&7You can still republish to restore a withdrawn revision."
+        - "<gray>You can still republish to restore a withdrawn revision."
     back:
-      name: "&cBack to editing"
+      name: "<red>Back to editing"
     dependencies:
-      ok: "&aDependencies satisfied"
-      missing: "&cMissing dependencies"
+      ok: "<green>Dependencies satisfied"
+      missing: "<red>Missing dependencies"
       none:
-        - "&7This configuration has no extra plugin dependencies."
-    blocked: "&cPublishing blocked: {errors} error(s)"
-    validated: "&aValidation passed · {warnings} warning(s)"
-    more-issues: "&7{count} more; run /regions validate {id} to see them all."
+        - "<gray>This configuration has no extra plugin dependencies."
+    blocked: "<red>Publishing blocked: <errors> error(s)"
+    validated: "<green>Validation passed · <warnings> warning(s)"
+    more-issues: "<gray><count> more; run /regions validate <id> to see them all."
     effective:
-      name: "&bEffective rules"
+      name: "<aqua>Effective rules"
       lore:
-        - "&7Mode: {mode}"
-        - "&7Primary trigger region: {trigger}"
-        - "&7Flags: {flags}"
-        - "&7Effects: {effects}"
+        - "<gray>Mode: <mode>"
+        - "<gray>Primary trigger region: <trigger>"
+        - "<gray>Flags: <flags>"
+        - "<gray>Effects: <effects>"
     confirm:
-      name: "&aPublish revision {revision}"
+      name: "<green>Publish revision <revision>"
       lore:
-        - "&7{count} change(s) total."
+        - "<gray><count> change(s) total."
     fix-first:
-      name: "&cFix the errors before publishing"
+      name: "<red>Fix the errors before publishing"
       lore:
-        - "&7{count} change(s) total."
-    truncated: "&eOnly the first 36 are shown; the full configuration is still validated."
-    recheck: "&7Permissions, ownership and capabilities are re-checked on publish."
+        - "<gray><count> change(s) total."
+    truncated: "<yellow>Only the first 36 are shown; the full configuration is still validated."
+    recheck: "<gray>Permissions, ownership and capabilities are re-checked on publish."
     overlaps:
-      name: "&eConfirmed overlapping regions: {count}"
-    overlap-line: "&7{id} · priority={priority} · {source}"
-    ok: "&aThe draft of region {id} has been published."
-    failed: "&cPublish failed: {reason}"
+      name: "<yellow>Confirmed overlapping regions: <count>"
+    overlap-line: "<gray><id> · priority=<priority> · <source>"
+    ok: "<green>The draft of region <id> has been published."
+    failed: "<red>Publish failed: <reason>"
   history:
-    header: "&6Published revisions of {id} ({count})"
-    empty: "&7No published history yet."
-    line: "&7- &e#{revision} &f{name} &8mode={mode}"
-    rollback-hint: "&7Rollback command: /regions rollback {id} <revision>"
+    header: "<gold>Published revisions of <id> (<count>)"
+    empty: "<gray>No published history yet."
+    line: "<gray>- <yellow>#<revision> <white><name> <dark_gray>mode=<mode>"
+    rollback-hint: "<gray>Rollback command: /regions rollback <id> \\<revision>"
   area:
-    title: "&2Select a Lands area {page}/{pages}"
+    title: "<dark_green>Select a Lands area <page>/<pages>"
     entry:
-      name: "&a{name}"
+      name: "<green><name>"
       lore:
-        - "&7Land: {land}"
-        - "&7Area: {area}"
-        - "&eClick to select; ownership is re-checked before saving."
+        - "<gray>Land: <land>"
+        - "<gray>Area: <area>"
+        - "<yellow>Click to select; ownership is re-checked before saving."
     empty:
-      name: "&cNo usable Lands areas"
+      name: "<red>No usable Lands areas"
       lore:
-        - "&7Only areas you currently own, while holding ruler access, can be used."
+        - "<gray>Only areas you currently own, while holding ruler access, can be used."
     count:
-      name: "&b{count} available area(s)"
+      name: "<aqua><count> available area(s)"
       lore:
-        - "&7Page {page}/{pages}"
-    owner-changed: "&eOwnership of that area may have just changed; the list was refreshed."
+        - "<gray>Page <page>/<pages>"
+    owner-changed: "<yellow>Ownership of that area may have just changed; the list was refreshed."
   template:
-    title: "&2Select a venue template {page}/{pages}"
+    title: "<dark_green>Select a venue template <page>/<pages>"
     entry:
-      name: "&b{name}"
+      name: "<aqua><name>"
       lore:
-        - "&7{description}"
-        - "&8Applies the following configuration:"
-        - "&7Mode: {mode}"
-        - "&7Flags: {flags}"
-        - "&7Effects: {effects}"
-        - "&7Triggers: {triggers}"
-        - "&aClick to validate and create the venue."
-    parameters: "&eParameters: {keys}"
+        - "<gray><description>"
+        - "<dark_gray>Applies the following configuration:"
+        - "<gray>Mode: <mode>"
+        - "<gray>Flags: <flags>"
+        - "<gray>Effects: <effects>"
+        - "<gray>Triggers: <triggers>"
+        - "<green>Click to validate and create the venue."
+    parameters: "<yellow>Parameters: <keys>"
     empty:
-      name: "&cNo templates available"
+      name: "<red>No templates available"
       lore:
-        - "&7Check templates.yml."
+        - "<gray>Check templates.yml."
     count:
-      name: "&b{count} template(s)"
+      name: "<aqua><count> template(s)"
       lore:
-        - "&7Page {page}/{pages}"
-        - "&7Templates pass the capability schema and full region validation first."
-    back-to-areas: "&cBack to area selection"
-    owner-changed: "&eOwnership of that Lands area changed; please pick again."
-    failed: "&cThe template could not be applied: {errors}"
+        - "<gray>Page <page>/<pages>"
+        - "<gray>Templates pass the capability schema and full region validation first."
+    back-to-areas: "<red>Back to area selection"
+    owner-changed: "<yellow>Ownership of that Lands area changed; please pick again."
+    failed: "<red>The template could not be applied: <errors>"
   vehicle:
     on-foot: "on foot"
     any: "any vehicle"

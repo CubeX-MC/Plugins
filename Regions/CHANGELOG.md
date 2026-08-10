@@ -7,10 +7,20 @@
 - `on_interact` 与 `on_timer` 的运行时触发点；`on_timer` 有可配置间隔与 5 秒下限。
 - TRIGGER 纳入 Capability Catalog，启动时校验枚举与 descriptor 一致。
 - `RegionSource.containing` 批量位置解析，Lands 每次检测只做一次反射解析。
-- GUI、命令与 Mode 运行时文案的完整 zh_CN / en_US 语言键（`lang-version: 5`）。
-- 语言文件回归测试：键集一致、基线版本一致、en_US 无源语言残留。
+- GUI、命令与 Mode 运行时文案的完整 zh_CN / en_US 语言键（`lang-version: 6`）。
+- 语言文件回归测试：键集一致、基线版本一致、en_US 无源语言残留、全部值为合法 MiniMessage 且无遗留 `&` 颜色码。
+- `/regions reload` 失败时报出失败阶段（`reload-failed`），不再一律回报成功。
+
+### Fixed
+
+- `/regions reload` 会丢弃只存在于内存中的草稿：`regions.yml` 仅在关服或显式 flush 时落盘，而 reload 直接 `load()` 覆盖内存。现在 reload 走 `ReloadChain`，数据阶段以 flush 成功为前提。
 
 ### Changed
+
+- 语言文件改用 MiniMessage 与 `<name>` 占位符（`lang-version` 5 → 6）；帮助文本里 `/regions rollback <id>` 这类用法尖括号已转义，不会被当成占位符。按既有预发布策略，`RegionBaseline` 拒绝旧文件而非迁移，请重新生成。
+- 语言读取改为共享 `I18nService`：缺失键沿 locale 链回退到 `zh_CN`，不再渲染成键名本身。删除本地的 `PaperText`。
+- 存储与审计实现 `Reloadable` + `Terminable`，由 `bind(store)` 负责关服落盘。
+- 日志改走 `CubexLogger`（`log()`）；Kotlin 源码从 `src/main/java` 迁到 `src/main/kotlin`。
 
 - `RegionsGui` 拆分为协调器加五个菜单类及共享的文案/取值/物品辅助，单文件从 1436 行降到 257 行以内。
 - Effect escrow 从每次应用/恢复整文件重写改为按批写入；进出区域的一组 Effect 只写一次。

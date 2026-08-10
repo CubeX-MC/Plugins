@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.logging.Logger;
+import org.cubexmc.core.CubexLogger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -24,7 +25,7 @@ class ContractStorageTest {
     Path tempDir;
 
     private ContractStorage newStorage() {
-        return new ContractStorage(tempDir.resolve("contract.yml").toFile(), Logger.getAnonymousLogger());
+        return new ContractStorage(tempDir.resolve("contract.yml").toFile(), new CubexLogger(Logger.getAnonymousLogger()));
     }
 
     private Contract sampleContract() {

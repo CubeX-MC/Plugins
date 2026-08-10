@@ -7,14 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ContractTermsTest {
     @Test
-    void blankPreviewShowsMissingState() {
-        assertEquals("未填写", ContractTerms.preview(null));
-        assertEquals("未填写", ContractTerms.preview("   "));
+    void blankPreviewShowsCallerSuppliedEmptyLabel() {
+        assertEquals("not set", ContractTerms.preview(null, "not set"));
+        assertEquals("not set", ContractTerms.preview("   ", "not set"));
     }
 
     @Test
     void previewCollapsesLinesAndTruncates() {
-        String preview = ContractTerms.preview("Line one\nLine two\n" + "x".repeat(80));
+        String preview = ContractTerms.preview("Line one\nLine two\n" + "x".repeat(80), "not set");
 
         assertTrue(preview.contains(" / "));
         assertTrue(preview.endsWith("..."));

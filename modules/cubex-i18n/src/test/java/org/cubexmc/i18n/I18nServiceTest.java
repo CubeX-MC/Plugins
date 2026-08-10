@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -131,6 +132,79 @@ class I18nServiceTest {
 
         // Assert
         assertTrue(message.startsWith("§x§f§4§d§0§3§fGold"));
+    }
+
+    @Test
+    void buildsComponentsWithoutTheLegacyRoundTrip() throws Exception {
+        // Arrange
+        writeLang("zh_CN", """
+                prefix: "<dark_gray>[<aqua>Test<dark_gray>] <reset>"
+                hello: "<prefix><green>Hello <name>"
+                lore:
+                  - "<gray>First <name>"
+                  - "<gray>Second"
+                """);
+        I18nService service = service(I18nOptions.create()
+                .currentLocale("zh_CN")
+                .prefixToken("<prefix>")
+                .placeholderStyles(List.of(PlaceholderStyle.MINIMESSAGE_TAG))
+                .colorMode(ColorMode.MINIMESSAGE));
+
+        // Act
+        Component hello = service.component("hello", Map.of("name", "Ada"));
+        List<Component> lore = service.componentList("lore", Map.of("name", "Ada"));
+
+        // Assert
+        assertEquals("§8[§bTest§8] §aHello Ada", LegacyComponentSerializer.legacySection().serialize(hello));
+        assertEquals(2, lore.size());
+        assertEquals("§7First Ada", LegacyComponentSerializer.legacySection().serialize(lore.get(0)));
+    }
+
+    @Test
+    void componentOfReadsBackTheServicesOwnHexOutput() throws Exception {
+        // Arrange
+        writeLang("zh_CN", """
+                hex: "<#F4D03F>Gold"
+                """);
+        I18nService service = service(I18nOptions.create()
+                .currentLocale("zh_CN")
+                .colorMode(ColorMode.MINIMESSAGE));
+
+        // Act — the round trip a GUI performs when it concatenates rendered fragments.
+        String rendered = service.message("hex");
+        Component component = service.componentOf(rendered);
+
+        // Assert — componentOf is the exact inverse of the service's own rendering, hex included.
+        // legacySection() cannot read the §x form back: it downsamples the colour to the nearest
+        // named one, which is the bug this method exists to keep callers away from.
+        assertEquals(rendered, hexAwareSerializer().serialize(component));
+        assertEquals("§eGold", LegacyComponentSerializer.legacySection().serialize(component));
+    }
+
+    private LegacyComponentSerializer hexAwareSerializer() {
+        return LegacyComponentSerializer.builder()
+                .character(LegacyComponentSerializer.SECTION_CHAR)
+                .hexColors()
+                .useUnusualXRepeatedCharacterHexFormat()
+                .build();
+    }
+
+    @Test
+    void componentsFallBackToLegacyParsingWhenColorModeIsLegacy() throws Exception {
+        // Arrange
+        writeLang("zh_CN", """
+                hello: "&aHello {name}"
+                """);
+        I18nService service = service(I18nOptions.create()
+                .currentLocale("zh_CN")
+                .placeholderStyles(List.of(PlaceholderStyle.BRACE_NAME))
+                .colorMode(ColorMode.LEGACY_AND_HEX));
+
+        // Act
+        Component component = service.component("hello", Map.of("name", "Ada"));
+
+        // Assert
+        assertEquals("§aHello Ada", LegacyComponentSerializer.legacySection().serialize(component));
     }
 
     @Test

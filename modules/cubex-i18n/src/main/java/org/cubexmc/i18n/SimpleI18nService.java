@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
@@ -70,6 +71,16 @@ final class SimpleI18nService implements I18nService {
     }
 
     @Override
+    public String rawOrNull(String key) {
+        return rawOrNull(key, currentLocale);
+    }
+
+    @Override
+    public String rawOrNull(String key, String locale) {
+        return lookup(locale, key);
+    }
+
+    @Override
     public String raw(String key, String locale) {
         String resolved = lookup(locale, key);
         if (resolved != null) {
@@ -128,6 +139,37 @@ final class SimpleI18nService implements I18nService {
             formatted.add(format(line, placeholders));
         }
         return formatted;
+    }
+
+    @Override
+    public Component component(String key) {
+        return component(key, Map.of());
+    }
+
+    @Override
+    public Component component(String key, Map<String, ?> placeholders) {
+        if (options.colorMode() == ColorMode.MINIMESSAGE) {
+            return deserializeMiniMessage(raw(key, currentLocale), placeholders);
+        }
+        return componentOf(message(key, placeholders));
+    }
+
+    @Override
+    public List<Component> componentList(String key, Map<String, ?> placeholders) {
+        List<Component> components = new ArrayList<>();
+        for (String line : rawList(key)) {
+            if (options.colorMode() == ColorMode.MINIMESSAGE) {
+                components.add(deserializeMiniMessage(line, placeholders));
+            } else {
+                components.add(componentOf(format(line, placeholders)));
+            }
+        }
+        return components;
+    }
+
+    @Override
+    public Component componentOf(String renderedMessage) {
+        return legacySerializer.deserialize(renderedMessage == null ? "" : renderedMessage);
     }
 
     @Override
@@ -263,13 +305,15 @@ final class SimpleI18nService implements I18nService {
     }
 
     private String renderMiniMessage(String template, Map<String, ?> placeholders) {
+        return legacySerializer.serialize(deserializeMiniMessage(template, placeholders));
+    }
+
+    private Component deserializeMiniMessage(String template, Map<String, ?> placeholders) {
         String resolvedTemplate = template == null ? "" : template;
         if (!options.prefixToken().isEmpty()) {
             resolvedTemplate = resolvedTemplate.replace(options.prefixToken(), prefixTemplate == null ? "" : prefixTemplate);
         }
-        TagResolver resolver = buildResolver(placeholders);
-        var component = miniMessage.deserialize(resolvedTemplate, resolver);
-        return legacySerializer.serialize(component);
+        return miniMessage.deserialize(resolvedTemplate, buildResolver(placeholders));
     }
 
     private TagResolver buildResolver(Map<String, ?> placeholders) {

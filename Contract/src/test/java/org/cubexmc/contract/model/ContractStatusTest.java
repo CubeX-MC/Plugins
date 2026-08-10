@@ -12,6 +12,7 @@ class ContractStatusTest {
         assertTrue(ContractStatus.CANCELLED.isFinal());
         assertTrue(ContractStatus.EXPIRED.isFinal());
         assertFalse(ContractStatus.OPEN.isFinal());
+        assertFalse(ContractStatus.SCHEDULED.isFinal());
         assertFalse(ContractStatus.IN_PROGRESS.isFinal());
         assertFalse(ContractStatus.SUBMITTED.isFinal());
         assertFalse(ContractStatus.DISPUTED.isFinal());
@@ -20,6 +21,7 @@ class ContractStatusTest {
     @Test
     void ownerActiveExcludesFinalStates() {
         assertTrue(ContractStatus.OPEN.countsAsOwnerActive());
+        assertTrue(ContractStatus.SCHEDULED.countsAsOwnerActive());
         assertTrue(ContractStatus.IN_PROGRESS.countsAsOwnerActive());
         assertTrue(ContractStatus.SUBMITTED.countsAsOwnerActive());
         assertTrue(ContractStatus.DISPUTED.countsAsOwnerActive());
@@ -31,6 +33,7 @@ class ContractStatusTest {
     @Test
     void contractorActiveExcludesOpen() {
         assertFalse(ContractStatus.OPEN.countsAsContractorActive());
+        assertFalse(ContractStatus.SCHEDULED.countsAsContractorActive());
         assertTrue(ContractStatus.IN_PROGRESS.countsAsContractorActive());
         assertTrue(ContractStatus.SUBMITTED.countsAsContractorActive());
         assertTrue(ContractStatus.DISPUTED.countsAsContractorActive());
@@ -43,6 +46,7 @@ class ContractStatusTest {
         assertFalse(ContractStatus.PENDING_ACCEPT.isFinal());
         assertTrue(ContractStatus.PENDING_ACCEPT.awaitsAcceptance());
         assertTrue(ContractStatus.OPEN.awaitsAcceptance());
+        assertFalse(ContractStatus.SCHEDULED.awaitsAcceptance());
         assertFalse(ContractStatus.IN_PROGRESS.awaitsAcceptance());
     }
 }

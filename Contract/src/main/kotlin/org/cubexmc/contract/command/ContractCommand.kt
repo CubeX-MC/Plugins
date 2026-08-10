@@ -1,0 +1,983 @@
+package org.cubexmc.contract.command
+
+import org.bukkit.command.Command
+import org.bukkit.command.CommandExecutor
+import org.bukkit.command.CommandSender
+import org.bukkit.command.TabCompleter
+import org.bukkit.entity.Player
+import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.contract.model.Contract
+import org.cubexmc.contract.model.BatchRepeatPolicy
+import org.cubexmc.contract.model.ContractObjective
+import org.cubexmc.contract.model.ContractStatus
+import org.cubexmc.contract.model.ObjectiveType
+import org.cubexmc.contract.model.Participant
+import org.cubexmc.contract.model.PayoutCondition
+import org.cubexmc.contract.model.PayoutRecipient
+import org.cubexmc.contract.model.PayoutRule
+import org.cubexmc.contract.service.ServiceResult
+import java.math.BigDecimal
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.Optional
+
+class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, TabCompleter {
+    override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {
+        if (args.isEmpty()) {
+            if (sender is Player && sender.hasPermission("contract.use")) {
+                plugin.gui().open(sender)
+            } else {
+                send(sender, plugin.lang().message("help"))
+            }
+            return true
+        }
+
+        if (args[0].equals("help", ignoreCase = true)) {
+            send(sender, plugin.lang().message("help"))
+            return true
+        }
+
+        return when (args[0].lowercase(Locale.ROOT)) {
+            "service" -> service(sender, args)
+            "wager" -> wager(sender, args)
+            "resolve" -> resolve(sender, args)
+            "mediate" -> mediate(sender, args)
+            "partner" -> partner(sender, args)
+            "gui" -> gui(sender)
+            "list" -> list(sender, args, false)
+            "all" -> list(sender, args, true)
+            "my" -> my(sender)
+            "rep" -> rep(sender, args)
+            "info" -> info(sender, args)
+            "accept" -> accept(sender, args)
+            "submit" -> submit(sender, args)
+            "claim" -> claim(sender, args)
+            "approve" -> approve(sender, args)
+            "cancel" -> cancel(sender, args)
+            "dispute" -> dispute(sender, args)
+            "withdraw" -> withdraw(sender, args)
+            "admin" -> admin(sender, args)
+            else -> {
+                send(sender, plugin.lang().message("help"))
+                true
+            }
+        }
+    }
+
+    private fun gui(sender: CommandSender): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.use")) {
+            return true
+        }
+        plugin.gui().open(player)
+        return true
+    }
+
+    private fun wager(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.create")) {
+            return true
+        }
+        if (args.size < 6) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-wager"))))
+            return true
+        }
+        val opponentName = args[1]
+        val stake = parseDouble(args[2])
+        val days = parseInt(args[3])
+        val arbiterName = args[4]
+        if (stake == null || days == null) {
+            send(sender, plugin.lang().message("invalid-number"))
+            return true
+        }
+        val text = parseContractText(args, 5, false)
+        if (text == null) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-wager"))))
+            return true
+        }
+        val result = plugin.contracts().createWager(
+            player,
+            opponentName,
+            BigDecimal.valueOf(stake),
+            days,
+            arbiterName,
+            text.title(),
+            text.description(),
+        )
+        if (!result.success()) {
+            send(sender, plugin.lang().message("cannot-create", mapOf("reason" to result.reason())))
+            return true
+        }
+        val contract = result.contract() ?: throw NullPointerException("contract")
+        send(sender, plugin.lang().message("wager-create-success", mapOf(
+            "id" to contract.shortId(),
+            "opponent" to opponentName,
+            "stake" to plugin.economy().format(result.amount()),
+        )))
+        return true
+    }
+
+    private fun partner(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.create")) {
+            return true
+        }
+        if (args.size < 6) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-partner"))))
+            return true
+        }
+        val partnerName = args[1]
+        val stakeA = parseDouble(args[2])
+        val stakeB = parseDouble(args[3])
+        val days = parseInt(args[4])
+        if (stakeA == null || stakeB == null || days == null) {
+            send(sender, plugin.lang().message("invalid-number"))
+            return true
+        }
+        val text = parseContractText(args, 5, true)
+        if (text == null) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-partner"))))
+            return true
+        }
+        val result = plugin.contracts().createPartnership(
+            player,
+            partnerName,
+            BigDecimal.valueOf(stakeA),
+            BigDecimal.valueOf(stakeB),
+            days,
+            text.title(),
+            text.description(),
+            text.mediatorName(),
+        )
+        if (!result.success()) {
+            send(sender, plugin.lang().message("cannot-create", mapOf("reason" to result.reason())))
+            return true
+        }
+        val contract = result.contract() ?: throw NullPointerException("contract")
+        send(sender, plugin.lang().message("partner-create-success", mapOf(
+            "id" to contract.shortId(),
+            "partner" to partnerName,
+            "stake" to plugin.economy().format(result.amount()),
+        )))
+        return true
+    }
+
+    private fun resolve(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.use")) {
+            return true
+        }
+        if (args.size < 3) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract resolve <id> <a|b>")))
+            return true
+        }
+        val contract = plugin.storage().findByPrefix(args[1])
+        if (contract.isEmpty) {
+            send(sender, plugin.lang().message("not-found"))
+            return true
+        }
+        val value = contract.get()
+        val result = plugin.contracts().resolveWager(player, value, args[2])
+        if (!result.success()) {
+            sendFailure(sender, result)
+            return true
+        }
+        send(sender, plugin.lang().message("resolve-success", mapOf(
+            "id" to value.shortId(),
+            "winner" to args[2].uppercase(Locale.ROOT),
+        )))
+        return true
+    }
+
+    private fun mediate(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.mediate")) {
+            return true
+        }
+        if (args.size < 3) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract mediate <id> <accept|pay|refund|owner|contractor>")))
+            return true
+        }
+        val contract = plugin.storage().findByPrefix(args[1])
+        if (contract.isEmpty) {
+            send(sender, plugin.lang().message("not-found"))
+            return true
+        }
+        val value = contract.get()
+        val result = plugin.contracts().mediate(player, value, args[2])
+        if (!result.success()) {
+            sendFailure(sender, result)
+            return true
+        }
+        val successKey = if (args[2].equals("accept", ignoreCase = true)) "mediate-accept-success" else "mediate-success"
+        send(sender, plugin.lang().message(successKey, mapOf(
+            "id" to value.shortId(),
+            "decision" to args[2].lowercase(Locale.ROOT),
+        )))
+        return true
+    }
+
+    private fun service(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.create")) {
+            return true
+        }
+        if (args.size < 4) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-service"))))
+            return true
+        }
+        val itemReward = args[1].equals("item", ignoreCase = true)
+        val reward = if (itemReward) 0.0 else parseDouble(args[1])
+        val days = parseInt(args[2])
+        if (reward == null || days == null) {
+            send(sender, plugin.lang().message("invalid-number"))
+            return true
+        }
+        val text = parseContractText(args, 3, true, true, true)
+        if (text == null) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-service"))))
+            return true
+        }
+        val result =
+            if (itemReward) {
+                plugin.contracts().createWithItemReward(
+                    player,
+                    days,
+                    text.title(),
+                    text.description(),
+                    text.mediatorName(),
+                    text.objective(),
+                    text.contractCount(),
+                    text.repeatPolicy(),
+                    text.repeatCooldownHours(),
+                )
+            } else {
+                plugin.contracts().create(
+                    player,
+                    reward,
+                    days,
+                    text.title(),
+                    text.description(),
+                    text.mediatorName(),
+                    text.objective(),
+                    text.contractCount(),
+                    text.repeatPolicy(),
+                    text.repeatCooldownHours(),
+                )
+            }
+        if (!result.success()) {
+            send(sender, plugin.lang().message("cannot-create", mapOf("reason" to result.reason())))
+            return true
+        }
+        val contract = result.contract() ?: throw NullPointerException("contract")
+        val successKey = if (text.contractCount() > 1) "batch-create-success" else "create-success"
+        send(sender, plugin.lang().message(successKey, mapOf(
+            "id" to contract.shortId(),
+            "amount" to rewardSummary(contract),
+            "count" to text.contractCount().toString(),
+        )))
+        return true
+    }
+
+    private fun list(sender: CommandSender, args: Array<String>, all: Boolean): Boolean {
+        if (all && !sender.hasPermission("contract.admin.view")) {
+            send(sender, plugin.lang().message("no-permission"))
+            return true
+        }
+        if (!sender.hasPermission("contract.use")) {
+            send(sender, plugin.lang().message("no-permission"))
+            return true
+        }
+        val page = if (args.size >= 2) kotlin.math.max(1, parseInt(args[1], 1)) else 1
+        val contracts = if (all) plugin.contracts().allContracts() else plugin.contracts().openContracts()
+        sendContractList(sender, contracts, page)
+        return true
+    }
+
+    private fun my(sender: CommandSender): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.use")) {
+            return true
+        }
+        val contracts = plugin.contracts().allContracts().stream()
+            .filter { contract -> contract.relatedTo(player.uniqueId) }
+            .toList()
+        send(sender, plugin.lang().message("my-header"))
+        sendContractList(sender, contracts, 1)
+        return true
+    }
+
+    private fun info(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("contract.use")) {
+            send(sender, plugin.lang().message("no-permission"))
+            return true
+        }
+        val contract = findContract(sender, args)
+        contract.ifPresent { value -> sendInfo(sender, value) }
+        return true
+    }
+
+    private fun accept(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.accept")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().accept(player, contract.get())
+        sendResult(sender, result, "accept-success")
+        return true
+    }
+
+    private fun submit(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.submit")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().submit(player, contract.get())
+        sendResult(sender, result, "submit-success")
+        return true
+    }
+
+    private fun claim(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.claim")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().claimDeliveryItems(player, contract.get())
+        sendResult(sender, result, "claim-success")
+        return true
+    }
+
+    private fun approve(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.approve")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().approve(player, contract.get())
+        if (!result.success()) {
+            sendFailure(sender, result)
+            return true
+        }
+        val resultContract = result.contract() ?: throw NullPointerException("contract")
+        send(sender, plugin.lang().message("approve-success", mapOf(
+            "player" to (resultContract.contractorName() ?: ""),
+            "amount" to plugin.economy().format(result.amount()),
+        )))
+        return true
+    }
+
+    private fun cancel(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.cancel")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().cancel(player, contract.get())
+        sendResult(sender, result, "cancel-success")
+        return true
+    }
+
+    private fun dispute(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.dispute")) {
+            return true
+        }
+        if (args.size < 3) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-dispute"))))
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().dispute(player, contract.get(), join(args, 2))
+        sendResult(sender, result, "dispute-success")
+        return true
+    }
+
+    private fun rep(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("contract.use")) {
+            send(sender, plugin.lang().message("no-permission"))
+            return true
+        }
+        val record = if (args.size >= 2) {
+            plugin.reputation().findByName(args[1])
+        } else {
+            val player = requirePlayer(sender) ?: return true
+            plugin.reputation().snapshot(player.uniqueId)
+        }
+        val fallbackName = if (args.size >= 2) args[1] else sender.name
+        if (record == null) {
+            send(sender, plugin.lang().ui("rep-empty", mapOf("name" to fallbackName)))
+            return true
+        }
+        send(sender, plugin.lang().ui("rep-header", mapOf("name" to record.name.ifBlank { fallbackName })))
+        send(sender, plugin.lang().ui("rep-line", mapOf("completed" to record.completed.toString(), "cancelled" to record.cancelled.toString(), "expired" to record.expired.toString(), "disputed" to record.disputed.toString())))
+        return true
+    }
+
+    private fun withdraw(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.dispute")) {
+            return true
+        }
+        val contract = findContract(sender, args)
+        if (contract.isEmpty) {
+            return true
+        }
+        val result = plugin.contracts().withdrawDispute(player, contract.get())
+        sendResult(sender, result, "withdraw-success")
+        return true
+    }
+
+    private fun admin(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("contract.admin")) {
+            send(sender, plugin.lang().message("no-permission"))
+            return true
+        }
+        if (args.size < 2) {
+            send(sender, plugin.lang().ui("usage-admin"))
+            return true
+        }
+        val action = args[1].lowercase(Locale.ROOT)
+        if (action == "reload") {
+            if (!sender.hasPermission("contract.admin.reload")) {
+                send(sender, plugin.lang().message("no-permission"))
+                return true
+            }
+            val report = plugin.reloadContracts()
+            if (report.ok()) {
+                send(sender, plugin.lang().message("reloaded"))
+            } else {
+                // Naming the stage matters: a failed migration and a failed data reload need
+                // different operator responses, and the console may be far from whoever ran this.
+                send(sender, plugin.lang().message("reload-failed", mapOf("stages" to report.failureSummaries().joinToString("; "))))
+            }
+            if (report.skipped().isNotEmpty()) {
+                send(sender, plugin.lang().message("reload-skipped", mapOf("stages" to report.skipped().joinToString(", "))))
+            }
+            return true
+        }
+        if (!sender.hasPermission("contract.admin.settle")) {
+            send(sender, plugin.lang().message("no-permission"))
+            return true
+        }
+        if (args.size < 3) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract admin $action <id>")))
+            return true
+        }
+        val contract = plugin.storage().findByPrefix(args[2])
+        if (contract.isEmpty) {
+            send(sender, plugin.lang().message("not-found"))
+            return true
+        }
+        val value = contract.get()
+        val result: ServiceResult
+        val successKey: String
+        when (action) {
+            "pay" -> {
+                result = plugin.contracts().adminPay(value, sender.name)
+                successKey = "admin-pay-success"
+            }
+            "refund" -> {
+                result = plugin.contracts().adminRefund(value, sender.name)
+                successKey = "admin-refund-success"
+            }
+            "close" -> {
+                result = plugin.contracts().adminClose(value, sender.name)
+                successKey = "admin-close-success"
+            }
+            else -> {
+                send(sender, plugin.lang().ui("usage-admin"))
+                return true
+            }
+        }
+        if (!result.success()) {
+            sendFailure(sender, result)
+            return true
+        }
+        send(sender, plugin.lang().message(successKey, mapOf("id" to value.shortId())))
+        return true
+    }
+
+    private fun findContract(sender: CommandSender, args: Array<String>): Optional<Contract> {
+        if (args.size < 2) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to "/contract ${args[0]} <id>")))
+            return Optional.empty()
+        }
+        val contract = plugin.storage().findByPrefix(args[1])
+        if (contract.isEmpty) {
+            send(sender, plugin.lang().message("not-found"))
+        }
+        return contract
+    }
+
+    private fun sendContractList(sender: CommandSender, contracts: List<Contract>, page: Int) {
+        if (contracts.isEmpty()) {
+            send(sender, plugin.lang().message("empty-list"))
+            return
+        }
+        val pageSize = kotlin.math.max(1, plugin.config.getInt("display.page-size", 8))
+        val pages = kotlin.math.max(1, kotlin.math.ceil(contracts.size.toDouble() / pageSize).toInt())
+        val currentPage = kotlin.math.min(kotlin.math.max(1, page), pages)
+        val start = (currentPage - 1) * pageSize
+        val end = kotlin.math.min(start + pageSize, contracts.size)
+        send(sender, plugin.lang().message("list-header", mapOf("page" to currentPage.toString(), "pages" to pages.toString())))
+        for (index in start until end) {
+            val contract = contracts[index]
+            send(sender, plugin.lang().message("list-line", mapOf(
+                "id" to contract.shortId(),
+                "title" to contract.title(),
+                "type" to plugin.lang().type(contract.type()),
+                "status" to plugin.lang().status(contract.status()),
+                "reward" to rewardSummary(contract),
+                "owner" to (contract.ownerName() ?: ""),
+            )))
+        }
+        send(sender, plugin.lang().message("list-footer"))
+    }
+
+    private fun sendInfo(sender: CommandSender, contract: Contract) {
+        val privileged = isPrivilegedViewer(sender, contract)
+        send(sender, plugin.lang().message("info", mapOf(
+            "id" to contract.shortId(),
+            "title" to contract.title(),
+            "type" to plugin.lang().type(contract.type()),
+            "status" to plugin.lang().status(contract.status()),
+            "participants" to participantLines(contract, privileged),
+            "arbiter" to arbiterLine(contract, privileged),
+            "reward" to rewardSummary(contract),
+            "payouts" to payoutLines(contract),
+            "approval" to approvalLine(contract),
+            "deadline" to DATE_FORMAT.format(Instant.ofEpochMilli(contract.expiresAt())),
+            "description" to contract.description(),
+        )))
+        if (privileged && contract.status() == ContractStatus.DISPUTED && contract.disputeReason() != null) {
+            send(sender, plugin.lang().ui("info-dispute-reason", mapOf("value" to (contract.disputeReason() ?: ""))))
+        }
+        val objective = contract.objective()
+        if (objective != null) {
+            send(sender, plugin.lang().ui("info-objective", mapOf("type" to plugin.lang().objective(objective.type()), "target" to objective.target(), "progress" to objective.progressText())))
+        }
+        batchRepeatSummary(contract)?.let { summary ->
+            send(sender, plugin.lang().ui("info-repeat", mapOf("value" to summary)))
+        }
+        if (contract.hasDeliveryItems()) {
+            send(sender, plugin.lang().ui("info-stored-delivery", mapOf("count" to contract.deliveryItemCount().toString())))
+        }
+        if (contract.hasRewardItems()) {
+            send(sender, plugin.lang().ui("info-stored-reward", mapOf("count" to contract.rewardItemCount().toString())))
+        }
+    }
+
+    private fun batchRepeatSummary(contract: Contract): String? {
+        if (contract.metadata["batch-id"].isNullOrBlank()) {
+            return null
+        }
+        return when (BatchRepeatPolicy.fromStored(contract.metadata["repeat-policy"])) {
+            BatchRepeatPolicy.UNLIMITED -> plugin.lang().ui("repeat-summary-unlimited")
+            BatchRepeatPolicy.ONCE -> plugin.lang().ui("repeat-summary-once")
+            BatchRepeatPolicy.COOLDOWN -> {
+                val hours = contract.metadata["repeat-cooldown-hours"]?.toIntOrNull() ?: DEFAULT_REPEAT_COOLDOWN_HOURS
+                plugin.lang().ui("repeat-summary-cooldown", mapOf("hours" to hours.toString()))
+            }
+        }
+    }
+
+    private fun isPrivilegedViewer(sender: CommandSender, contract: Contract): Boolean {
+        if (sender.hasPermission("contract.admin.view")) {
+            return true
+        }
+        if (sender !is Player) {
+            return false
+        }
+        return contract.relatedTo(sender.uniqueId)
+    }
+
+    private fun participantLines(contract: Contract, privileged: Boolean): String {
+        val lines = ArrayList<String>()
+        for (participant in contract.participants()) {
+            val name = visibleParticipantName(participant, privileged)
+            val stake = stakeSummary(participant)
+            val stakeText =
+                if (stake.isNotBlank()) ui("info-stake", mapOf("label" to plugin.lang().term("stake", "Stake"), "value" to stake)) else ""
+            lines.add(ui("info-participant", mapOf("role" to plugin.lang().role(participant.role()), "name" to name)) + stakeText)
+        }
+        return lines.joinToString("\n")
+    }
+
+    private fun rewardSummary(contract: Contract): String {
+        val parts = ArrayList<String>()
+        if (contract.reward().signum() > 0) {
+            parts.add(plugin.economy().format(contract.reward()))
+        }
+        if (contract.hasRewardItems()) {
+            parts.add(plugin.lang().ui("item-count", mapOf("count" to contract.rewardItemCount().toString())))
+        }
+        return if (parts.isEmpty()) plugin.economy().format(BigDecimal.ZERO) else parts.joinToString(" + ")
+    }
+
+    private fun stakeSummary(participant: Participant): String {
+        val parts = ArrayList<String>()
+        val money = participant.moneyStake()
+        if (money.signum() > 0) {
+            parts.add(plugin.economy().format(money))
+        }
+        if (participant.itemStakeCount() > 0) {
+            parts.add(plugin.lang().ui("item-stake-count", mapOf("count" to participant.itemStakeCount().toString())))
+        }
+        return parts.joinToString(" + ")
+    }
+
+    private fun visibleParticipantName(participant: Participant, privileged: Boolean): String {
+        val displayName = participant.displayName()
+        if (displayName.isNullOrBlank()) {
+            return plugin.lang().term("unspecified", "Unspecified")
+        }
+        if (privileged) {
+            return displayName
+        }
+        return when (participant.role()) {
+            org.cubexmc.contract.model.ParticipantRole.CONTRACTOR,
+            org.cubexmc.contract.model.ParticipantRole.PARTY_B,
+            org.cubexmc.contract.model.ParticipantRole.PARTNER,
+            org.cubexmc.contract.model.ParticipantRole.CLAIMER,
+            org.cubexmc.contract.model.ParticipantRole.DEBTOR,
+            -> plugin.lang().term("assigned", "Assigned")
+            else -> displayName
+        }
+    }
+
+    private fun arbiterLine(contract: Contract, privileged: Boolean): String {
+        val arbiter = contract.arbiter() ?: return ""
+        val name = if (privileged) arbiter.displayName() else plugin.lang().term("assigned", "Assigned")
+        val accepted =
+            if (contract.arbiterAccepted()) plugin.lang().term("mediator-accepted", "Mediator accepted") else plugin.lang().term("mediator-pending", "Mediator pending")
+        return ui(
+            "info-arbiter",
+            mapOf("role" to plugin.lang().role(arbiter.role()), "name" to (name ?: ""), "state" to accepted),
+        ) + "\n"
+    }
+
+    private fun payoutLines(contract: Contract): String {
+        val lines = ArrayList<String>()
+        for (condition in PayoutCondition.entries) {
+            val rules = contract.payoutsFor(condition)
+            if (rules.isEmpty()) {
+                continue
+            }
+            lines.add(ui("info-payout", mapOf("condition" to plugin.lang().condition(condition), "value" to summarizeRules(rules))))
+        }
+        return if (lines.isEmpty()) ui("info-payout-none", mapOf("value" to plugin.lang().term("none", "None"))) else lines.joinToString("\n")
+    }
+
+    private fun summarizeRules(rules: List<PayoutRule>): String {
+        val parts = ArrayList<String>()
+        for (rule in rules) {
+            parts.add("${plugin.lang().role(rule.source())} ${rule.sharePercent().stripTrailingZeros().toPlainString()}% -> ${recipientLabel(rule.recipient())}")
+        }
+        return parts.joinToString(", ")
+    }
+
+    private fun recipientLabel(recipient: PayoutRecipient): String =
+        when (recipient.kind()) {
+            PayoutRecipient.Kind.PARTICIPANT -> plugin.lang().role(recipient.role() ?: throw NullPointerException("recipient.role"))
+            PayoutRecipient.Kind.SYSTEM_SINK -> plugin.lang().term("system-sink", "System sink")
+            PayoutRecipient.Kind.ARBITER -> plugin.lang().term("arbiter", "Arbiter")
+        }
+
+    private fun approvalLine(contract: Contract): String {
+        val approved = contract.metadata["approved-roles"]
+        if (approved.isNullOrBlank()) {
+            return ""
+        }
+        return ui("info-approved", mapOf("label" to plugin.lang().term("approved-roles", "Approved roles"), "value" to approved)) + "\n"
+    }
+
+    private fun sendResult(sender: CommandSender, result: ServiceResult, successKey: String) {
+        if (!result.success()) {
+            sendFailure(sender, result)
+            return
+        }
+        val contract = result.contract() ?: throw NullPointerException("contract")
+        send(sender, plugin.lang().message(successKey, mapOf("id" to contract.shortId())))
+    }
+
+    private fun sendFailure(sender: CommandSender, result: ServiceResult) {
+        send(sender, plugin.lang().message("operation-failed", mapOf("reason" to result.reason())))
+    }
+
+    private fun requirePlayer(sender: CommandSender): Player? {
+        if (sender is Player) {
+            return sender
+        }
+        send(sender, plugin.lang().message("player-only"))
+        return null
+    }
+
+    private fun requirePermission(player: Player, permission: String): Boolean {
+        if (player.hasPermission(permission)) {
+            return true
+        }
+        send(player, plugin.lang().message("no-permission"))
+        return false
+    }
+
+    private fun ui(key: String, placeholders: Map<String, String> = emptyMap()): String =
+        plugin.lang().ui(key, placeholders)
+
+    /** Multi-line aware delivery; [org.cubexmc.core.Messager] splits on any line separator. */
+    private fun send(sender: CommandSender, message: String) {
+        plugin.messager().send(sender, message)
+    }
+
+    private fun join(args: Array<String>, start: Int): String {
+        val builder = StringBuilder()
+        for (index in start until args.size) {
+            if (builder.isNotEmpty()) {
+                builder.append(' ')
+            }
+            builder.append(args[index])
+        }
+        return builder.toString()
+    }
+
+    private fun parseContractText(
+        args: Array<String>,
+        start: Int,
+        allowMediator: Boolean,
+        allowObjective: Boolean = false,
+        allowCount: Boolean = false,
+    ): ContractText? {
+        if (start >= args.size) {
+            return null
+        }
+        var mediatorName: String? = null
+        var objective: ContractObjective? = null
+        var contractCount = 1
+        var repeatPolicy = BatchRepeatPolicy.ONCE
+        var repeatCooldownHours = DEFAULT_REPEAT_COOLDOWN_HOURS
+        var textStart = start
+        while (textStart < args.size) {
+            if (allowMediator && isMediatorFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                mediatorName = args[textStart + 1]
+                textStart += 2
+                continue
+            }
+            if (allowObjective && isObjectiveFlag(args[textStart])) {
+                if (textStart + 4 >= args.size) {
+                    return null
+                }
+                val type = parseObjectiveType(args[textStart + 1]) ?: return null
+                val required = parseInt(args[textStart + 3]) ?: return null
+                objective = ContractObjective.of(type, args[textStart + 2], required)
+                textStart += 4
+                continue
+            }
+            if (allowCount && isCountFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                contractCount = parseInt(args[textStart + 1]) ?: return null
+                textStart += 2
+                continue
+            }
+            if (allowCount && isRepeatFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                repeatPolicy = parseBatchRepeatPolicy(args[textStart + 1]) ?: return null
+                textStart += 2
+                continue
+            }
+            if (allowCount && isCooldownFlag(args[textStart])) {
+                if (textStart + 2 >= args.size) {
+                    return null
+                }
+                repeatCooldownHours = parseInt(args[textStart + 1]) ?: return null
+                textStart += 2
+                continue
+            }
+            break
+        }
+        val rest = join(args, textStart)
+        if (rest.isBlank()) {
+            return null
+        }
+        val splitIndex = rest.indexOf('|')
+        if (splitIndex < 0) {
+            return ContractText(rest, "", mediatorName, objective, contractCount, repeatPolicy, repeatCooldownHours)
+        }
+        return ContractText(
+            rest.substring(0, splitIndex),
+            rest.substring(splitIndex + 1),
+            mediatorName,
+            objective,
+            contractCount,
+            repeatPolicy,
+            repeatCooldownHours,
+        )
+    }
+
+    private fun isMediatorFlag(arg: String): Boolean = arg.equals("--mediator", ignoreCase = true) || arg.equals("-m", ignoreCase = true)
+
+    private fun isObjectiveFlag(arg: String): Boolean = arg.equals("--objective", ignoreCase = true) || arg.equals("-o", ignoreCase = true)
+
+    private fun isCountFlag(arg: String): Boolean = arg.equals("--count", ignoreCase = true) || arg.equals("-n", ignoreCase = true)
+
+    private fun isRepeatFlag(arg: String): Boolean = arg.equals("--repeat", ignoreCase = true)
+
+    private fun isCooldownFlag(arg: String): Boolean = arg.equals("--cooldown", ignoreCase = true)
+
+    private fun parseBatchRepeatPolicy(input: String): BatchRepeatPolicy? =
+        when (input.lowercase(Locale.ROOT)) {
+            "unlimited", "none", "off" -> BatchRepeatPolicy.UNLIMITED
+            "once", "single" -> BatchRepeatPolicy.ONCE
+            "cooldown", "interval" -> BatchRepeatPolicy.COOLDOWN
+            else -> null
+        }
+
+    private fun parseObjectiveType(input: String): ObjectiveType? =
+        when (input.lowercase(Locale.ROOT)) {
+            "craft_item", "craftitem", "craft" -> ObjectiveType.CRAFT_ITEM
+            "block_break", "blockbreak", "break_block", "breakblock", "mine" -> ObjectiveType.BLOCK_BREAK
+            "fish", "fishing" -> ObjectiveType.FISH
+            "block_place", "blockplace", "place_block", "placeblock", "interact", "place" -> ObjectiveType.BLOCK_PLACE
+            "kill_entity", "killnormal", "kill_normal", "entity", "mob", "killmob", "kill" -> ObjectiveType.KILL_ENTITY
+            "kill_player", "killplayer", "player", "pvp" -> ObjectiveType.KILL_PLAYER
+            "consume_item", "consume", "eat", "drink" -> ObjectiveType.CONSUME_ITEM
+            "deliver_item", "deliver", "item", "submit_item", "submit" -> ObjectiveType.DELIVER_ITEM
+            "enchant_item", "enchantment", "enchant" -> ObjectiveType.ENCHANT_ITEM
+            "shear" -> ObjectiveType.SHEAR
+            "breed" -> ObjectiveType.BREED
+            "tame" -> ObjectiveType.TAME
+            "chat", "message", "say" -> ObjectiveType.CHAT
+            "block_interact", "blockinteract", "interaction", "interact_block", "interactblock" -> ObjectiveType.BLOCK_INTERACT
+            "run_command", "command", "cmd" -> ObjectiveType.RUN_COMMAND
+            "use_item", "use" -> ObjectiveType.USE_ITEM
+            "deliver_money", "money", "submit_money", "pay_money" -> ObjectiveType.DELIVER_MONEY
+            else -> try {
+                ObjectiveType.valueOf(input.uppercase(Locale.ROOT))
+            } catch (ex: IllegalArgumentException) {
+                null
+            }
+        }
+
+    private fun parseDouble(value: String): Double? =
+        try {
+            val parsed = value.toDouble()
+            if (parsed.isFinite()) parsed else null
+        } catch (ex: NumberFormatException) {
+            null
+        }
+
+    private fun parseInt(value: String): Int? =
+        try {
+            value.toInt()
+        } catch (ex: NumberFormatException) {
+            null
+        }
+
+    private fun parseInt(value: String, fallback: Int): Int = parseInt(value) ?: fallback
+
+    override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<String>): List<String> {
+        if (args.size == 1) {
+            return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "list", "all", "my", "rep", "info", "accept", "submit", "claim", "approve", "cancel", "dispute", "withdraw", "admin", "help"), args[0])
+        }
+        if (args.size == 4 && args[0].equals("service", ignoreCase = true)) {
+            val flags = ArrayList(listOf("--mediator", "--objective"))
+            if (sender.hasPermission(BATCH_CREATE_PERMISSION)) {
+                flags.addAll(0, listOf("--count", "--repeat", "--cooldown"))
+            }
+            return startsWith(flags, args[3])
+        }
+        if (args.size >= 5 && args[0].equals("service", ignoreCase = true) && args[args.size - 2].equals("--repeat", ignoreCase = true)) {
+            return startsWith(listOf("unlimited", "once", "cooldown"), args.last())
+        }
+        if (args.size >= 5 && args[0].equals("service", ignoreCase = true) && args[args.size - 2].equals("--objective", ignoreCase = true)) {
+            return startsWith(ObjectiveType.entries.map { it.name.lowercase(Locale.ROOT) }, args.last())
+        }
+        if (args.size == 6 && args[0].equals("partner", ignoreCase = true)) {
+            return startsWith(listOf("--mediator"), args[5])
+        }
+        if (args.size == 3 && args[0].equals("mediate", ignoreCase = true)) {
+            return startsWith(listOf("accept", "pay", "refund", "owner", "contractor", "a", "b"), args[2])
+        }
+        if (args.size == 2 && args[0].equals("admin", ignoreCase = true)) {
+            return startsWith(listOf("reload", "pay", "refund", "close"), args[1])
+        }
+        if ((args.size == 2 && listOf("info", "accept", "submit", "claim", "approve", "cancel", "dispute", "withdraw", "resolve", "mediate").contains(args[0].lowercase(Locale.ROOT))) ||
+            (args.size == 3 && args[0].equals("admin", ignoreCase = true))
+        ) {
+            val prefix = args[args.size - 1].lowercase(Locale.ROOT)
+            val adminView = sender.hasPermission("contract.admin.view")
+            val viewerUuid = if (sender is Player) sender.uniqueId else null
+            return plugin.contracts().allContracts().stream()
+                .filter { contract -> adminView || contract.status() == ContractStatus.OPEN || viewerUuid != null && contract.relatedTo(viewerUuid) }
+                .map { contract -> contract.shortId() }
+                .filter { id -> id.lowercase(Locale.ROOT).startsWith(prefix) }
+                .limit(20)
+                .toList()
+        }
+        return listOf()
+    }
+
+    private fun startsWith(values: List<String>, prefix: String): List<String> {
+        val lower = prefix.lowercase(Locale.ROOT)
+        val result = ArrayList<String>()
+        for (value in values) {
+            if (value.startsWith(lower)) {
+                result.add(value)
+            }
+        }
+        return result
+    }
+
+    private class ContractText(
+        private val title: String,
+        private val description: String,
+        private val mediatorName: String?,
+        private val objective: ContractObjective?,
+        private val contractCount: Int,
+        private val repeatPolicy: BatchRepeatPolicy,
+        private val repeatCooldownHours: Int,
+    ) {
+        fun title(): String = title
+        fun description(): String = description
+        fun mediatorName(): String? = mediatorName
+        fun objective(): ContractObjective? = objective
+        fun contractCount(): Int = contractCount
+        fun repeatPolicy(): BatchRepeatPolicy = repeatPolicy
+        fun repeatCooldownHours(): Int = repeatCooldownHours
+    }
+
+    companion object {
+        private const val BATCH_CREATE_PERMISSION = "contract.create.batch"
+        private const val DEFAULT_REPEAT_COOLDOWN_HOURS = 24
+        private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT)
+            .withZone(ZoneId.systemDefault())
+    }
+}

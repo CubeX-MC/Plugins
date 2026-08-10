@@ -22,6 +22,8 @@
 - 每个 `RegionTrigger` 枚举项都必须有运行时触发点，并在 `BuiltInRegionCapabilities` 注册 TRIGGER descriptor；启动期校验会拒绝不一致。
 - 没有可取消事件的 `deny` Flag 必须在 `RegionOverlapResolver` 合成对应 Effect，不能只靠监听器；合成 Effect 要沿用 Flag 的豁免规则。
 - 玩家可见文案一律走语言文件，不写字面量；新增键必须同时补 `zh_CN` 与 `en_US`。
+- 语言文件值是 MiniMessage，占位符写 `<name>`；文案里作为字面量的尖括号（帮助文本中的 `<id>` 之类）必须写成 `\<`，否则会和真占位符同名冲突。
+- 共享能力优先用 `modules/cubex-*`：文案渲染走 `LanguageManager`（内部是 `I18nService`），日志走 `log()`，有状态的 store 实现 `Reloadable`/`Terminable` 并用 `bind(store)` 注册。缺能力就改 `modules/`，不要在插件里再写一份。
 
 新增能力时同步更新 `BuiltInRegionCapabilities`、验证器、GUI/模板、语言资源、回归测试和相关文档。
 
