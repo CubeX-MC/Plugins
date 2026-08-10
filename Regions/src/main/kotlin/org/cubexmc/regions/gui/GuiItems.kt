@@ -94,7 +94,7 @@ internal class GuiItems(private val text: GuiText, private val keys: GuiKeys) {
         else -> Material.CAMPFIRE
     }
 
-    fun back(): ItemStack = text.named(Material.BARRIER, text.text("gui.common.back"))
+    fun back(): ItemStack = text.named(GuiIcons.BACK, text.text("gui.common.back"))
 
     fun describeVehicle(value: String): String = when (value.lowercase(Locale.ROOT)) {
         "none", "on_foot", "on-foot", "no_vehicle", "no-vehicle", "foot" -> text.text("gui.vehicle.on-foot")

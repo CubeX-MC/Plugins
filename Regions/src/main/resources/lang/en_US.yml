@@ -195,6 +195,10 @@ gui:
     flag: "<green>Enter \\<flag> \\<value> [key=value...], e.g. commands blocklist values=/spawn,/home."
     effect: "<green>Enter \\<effect> [key=value...]; combination=highest_priority|exclusive|stack|merge_by_type is supported."
     trigger: "<green>Enter \\<trigger> \\<action> [key=value...]; execution=primary restricts it to the primary region."
+    here-word: "here"
+    template-value: "<green>Enter a value for template parameter <parameter>. Type cancel to abort."
+    template-location: "<green>Enter the <parameter> location as world,x,y,z, or type here to use where you are standing. Type cancel to abort."
+    judge: "<green>Enter a player name: already a judge removes them, otherwise adds them. Type clear to empty the list, cancel to abort."
   save:
     ok: "<green>Saved the draft of region <id>."
     failed: "<red>Action failed: <reason>"
@@ -338,6 +342,7 @@ gui:
     current: "<green>Current mode"
     switch: "<gray>Click to switch to this mode"
     key-value-required: "<red>Enter key=value."
+    judge-unknown: "<red>No such player: <name>. They must have joined this server at least once."
     type:
       free_event:
         name: "free_event"
@@ -440,8 +445,13 @@ gui:
       name: "<yellow>Detection radius: <value>"
       lore: ["<gray>Left click +1, right click -1."]
     judges:
-      name: "<aqua>Add/remove yourself as judge"
-      lore: ["<gray>Current: <value>"]
+      name: "<aqua>Judge team"
+      lore:
+        - "<gray>Current: <value>"
+        - "<gray>Judges may start a round and force it to end,"
+        - "<gray>but cannot edit, publish or delete the venue."
+        - "<yellow>Left click to enter a player name (clear to empty the list)."
+        - "<yellow>Right click to add/remove yourself."
     seekers:
       name: "<yellow>Seeker count: <value>"
       lore: ["<gray>Used by hide_and_seek. Left click +1, right click -1."]
@@ -642,6 +652,7 @@ gui:
         - "<gray>Triggers: <triggers>"
         - "<green>Click to validate and create the venue."
     parameters: "<yellow>Parameters: <keys>"
+    parameter-invalid: "<red>That value does not work: <reason>"
     empty:
       name: "<red>No templates available"
       lore:

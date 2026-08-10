@@ -7,6 +7,7 @@ import org.cubexmc.regions.integration.RegionSourceRegistry
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionLifecycle
 import org.cubexmc.regions.model.RegionSourceRef
+import java.util.UUID
 
 enum class AuthorityDenial(val messageKey: String) {
     NOT_RULER("authority-not-ruler"),
@@ -66,6 +67,37 @@ class RegionAuthorityService(
         if (isSuperAdmin(sender)) AuthorityDecision.allow()
         else authorizeRegionSource(sender, region)
 
+    /**
+     * 谁能发令开赛 / 强制结束一局。
+     *
+     * 场主（[canManage]）始终可以；此外场主可以在 Mode 页面指定一个裁判团队，名单里的人**额外**获得
+     * 这两项操作——和 Residence 里领地主给领地设 admin 是同一个思路。裁判权限仅限开赛和结束，
+     * 不含改配置、发布、删场地。
+     *
+     * 名单存 UUID 而不是玩家名：玩家改名后按名字匹配会失效，更糟的是旧名可能被别人注册走，
+     * 等于把发令权悄悄转给了陌生人。
+     */
+    fun canJudge(sender: CommandSender, region: RegionDefinition): AuthorityDecision {
+        val managed = canManage(sender, region)
+        if (managed.allowed) return managed
+        // 场地冻结/归档后连场主都停权了，裁判自然也不该还能开赛。
+        if (managed.denial == AuthorityDenial.REGION_FROZEN) return managed
+        val player = sender as? Player ?: return managed
+        return if (judgeIds(region).contains(player.uniqueId)) {
+            AuthorityDecision.allow()
+        } else {
+            managed
+        }
+    }
+
+    /** 解析 `judges` 里的 UUID 名单；解析不出来的条目（例如旧版按名字写的）直接忽略。 */
+    fun judgeIds(region: RegionDefinition): Set<UUID> =
+        region.mode?.values?.get(JUDGES_KEY)
+            ?.split(',', ';')
+            ?.mapNotNull { entry -> runCatching { UUID.fromString(entry.trim()) }.getOrNull() }
+            ?.toSet()
+            .orEmpty()
+
     fun visibleRegions(sender: CommandSender, regions: Collection<RegionDefinition>): List<RegionDefinition> {
         if (isSuperAdmin(sender)) {
             return regions.toList()
@@ -112,5 +144,8 @@ class RegionAuthorityService(
         const val RULER_PERMISSION = "regions.admin"
         const val SUPERADMIN_PERMISSION = "regions.superadmin"
         const val SOURCE_OWNER_METADATA = "source-owner"
+
+        /** Mode 参数名：逗号分隔的裁判 UUID 名单。 */
+        const val JUDGES_KEY = "judges"
     }
 }

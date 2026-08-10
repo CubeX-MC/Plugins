@@ -1227,6 +1227,17 @@ interface RegionAuthorityService {
 
 授权检查必须覆盖创建、列表过滤、查看详情、编辑、删除、模板应用、发布、启停和玩法控制。仅在 GUI 打开时检查一次是不够的，每个写操作都要重新检查。
 
+### 9.x 裁判团队（judges）
+
+场主可以为场地指定一个裁判团队，思路对标 Residence 的“领地主给领地设 admin”：办比赛的人未必是那块地的主人。
+
+- 权限边界：裁判**只**获得 `/regions game <id> start` 和 `/regions game <id> stop|end` 两项，也就是 `canJudge`。改配置、发布、删场地、控制生命周期仍然只有场主和 superadmin 能做，`canManage` 不受影响。
+- 叠加关系：`canJudge` = `canManage` **或** 在裁判名单里。场主永远不需要把自己加进名单。
+- 场地 `FROZEN` / `ARCHIVED` 后裁判一并停权——场主都已经停权了，裁判不该还能开赛。
+- 存储：mode 参数 `judges`，逗号分隔的 **UUID** 名单。**不存玩家名**：按名字匹配在玩家改名后失效，而且旧名可能被别人注册走，等于把发令权悄悄转给陌生人。解析不出 UUID 的条目一律忽略。
+- GUI：Mode 页第 44 格。左键输入玩家名加入/移除（`clear` 清空），右键切换自己。名字只从在线玩家和服务器已缓存的档案里解析，不查 Mojang API——那会阻塞主线程，还会给打错的名字凭空造出一个 UUID。
+- 与 `start-mode` 无关：`start-mode: judge` 只表示“ready 人数够了也不自动开赛，必须有人发令”，它不决定谁能发令。两者名字相近但互不影响。
+
 ## 10. Lands 对接计划
 
 MVP 对接目标：
@@ -1428,7 +1439,7 @@ Regions 以 **Java 21 + Paper 1.21.11** 为唯一服务端基线，不再声明 
 
 - [x] 编译依赖仅使用 `paper-api`，编译版本、`api-version` 与本地 `runServer` 统一为 1.21.11。
 - [x] 消息、GUI 标题、物品名称/说明与 title action 全部迁移到 Adventure `Component`。
-- [x] GUI 文本输入迁移到 Paper `AsyncChatEvent`，不再监听旧 `AsyncPlayerChatEvent`。
+- [x] GUI 文本输入同时监听 Paper `AsyncChatEvent` 与旧 `AsyncPlayerChatEvent`。**不要再"顺手"删掉旧事件**：只要服务器上有任何插件监听旧聊天事件（CMI、Contract 都会），Paper 就走 legacy 聊天链路，`AsyncChatEvent` 一次都不会触发——表现为提示词收不到输入、玩家的回答还被广播到公屏。两个都监听后由 `RegionsGui.capture` 去重，任一链路都不会漏。
 - [x] Sound、Attribute 与 PotionEffect 查询改用现代常量或 Registry key，不再调用旧枚举名称查找。
 - [x] 战斗装备托管使用 Paper `ItemStack.serializeAsBytes`；首次公开发布不接受内部开发阶段的旧对象流格式。
 - [x] 保留 Folia 调度适配并继续声明 `folia-supported: true`；发布 JAR 已将 FoliaLib relocation 到 Regions 私有命名空间，避免与其他插件冲突。

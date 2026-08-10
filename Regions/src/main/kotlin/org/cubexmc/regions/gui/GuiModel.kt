@@ -1,6 +1,7 @@
 package org.cubexmc.regions.gui
 
 import org.bukkit.Bukkit
+import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
@@ -46,6 +47,22 @@ internal class RegionsHolder(
 }
 
 internal class PendingInput(val onSubmit: (String) -> Unit)
+
+/**
+ * Icons shared by several menus.
+ *
+ * Every menu click is cancelled, but an icon on display is only ever one unhandled exception away
+ * from ending up in a player's inventory, so menus never show a block players cannot legitimately
+ * obtain — no barrier, no command block. Keep new icons survival-obtainable for the same reason.
+ */
+internal object GuiIcons {
+    val BACK: Material = Material.ARROW
+    val CLOSE: Material = Material.RED_STAINED_GLASS_PANE
+    val EMPTY: Material = Material.GRAY_STAINED_GLASS_PANE
+    val BLOCKED: Material = Material.RED_CONCRETE
+    val CLEAR: Material = Material.BUCKET
+    val TRIGGER: Material = Material.REPEATER
+}
 
 /** Persistent-data keys used to carry a selection through an inventory click. */
 internal class GuiKeys(plugin: RegionsPlugin) {

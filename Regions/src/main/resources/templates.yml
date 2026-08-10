@@ -38,7 +38,14 @@ templates:
 
   run_race:
     name: "跑步赛道"
-    description: "跑步/跑酷比赛。管理者需要在 GUI 中设置起点、终点和检查点。"
+    description: "跑步/跑酷比赛。创建时会问你要起点和终点；检查点可选，之后在 GUI 里加。"
+    parameters:
+      start:
+        type: location
+        required: true
+      finish:
+        type: location
+        required: true
     mode:
       type: run_race
       min-players: 1
@@ -47,8 +54,8 @@ templates:
       radius: 2.5
       timeout-seconds: 300
       vehicle: none
-      start: ""
-      finish: ""
+      start: "${start}"
+      finish: "${finish}"
       checkpoints: ""
       checkpoint-vehicles: ""
     flags:
@@ -65,7 +72,14 @@ templates:
 
   boat_race:
     name: "划船赛道"
-    description: "划船比赛。参赛者必须坐在船上才会记录检查点和终点。"
+    description: "划船比赛。参赛者必须坐在船上才会记录检查点和终点。创建时会问你要起点和终点。"
+    parameters:
+      start:
+        type: location
+        required: true
+      finish:
+        type: location
+        required: true
     mode:
       type: boat_race
       min-players: 1
@@ -74,8 +88,8 @@ templates:
       radius: 3.0
       timeout-seconds: 300
       vehicle: boat
-      start: ""
-      finish: ""
+      start: "${start}"
+      finish: "${finish}"
       checkpoints: ""
       checkpoint-vehicles: ""
     flags:
@@ -92,20 +106,29 @@ templates:
 
   horse_race:
     name: "骑马赛道"
-    description: "骑马比赛。参赛者必须骑马才会记录检查点和终点。"
+    description: "骑马比赛。参赛者必须骑马才会记录检查点和终点。创建时会问你要起点和终点。"
+    parameters:
+      start:
+        type: location
+        required: true
+      finish:
+        type: location
+        required: true
     mode:
       type: horse_race
       min-players: 1
+      # start-mode: judge —— 开赛由裁判发令，也就是任何能管理本场地的人执行
+      # /regions game <id> start。这里不要写 judges：RaceModeService.canJudge 只看
+      # authority().canManage()，那个字段任何模式服务都不读，填了会让人以为名单生效了。
       start-mode: judge
       require-start: true
       radius: 3.0
       timeout-seconds: 300
       vehicle: horse
-      start: ""
-      finish: ""
+      start: "${start}"
+      finish: "${finish}"
       checkpoints: ""
       checkpoint-vehicles: ""
-      judges: ""
     flags:
       pvp:
         value: deny
@@ -121,6 +144,10 @@ templates:
   dual_pvp:
     name: "双人决斗场"
     description: "2 名玩家进入后全员确认开始，开战时扣押原装备并发放指定装备。"
+    parameters:
+      respawn:
+        type: location
+        required: true
     mode:
       type: dual_pvp
       min-players: 2
@@ -130,7 +157,7 @@ templates:
       kit: "IRON_SWORD:1,BOW:1,ARROW:16,COOKED_BEEF:8"
       armor: "IRON_BOOTS:1,IRON_LEGGINGS:1,IRON_CHESTPLATE:1,IRON_HELMET:1"
       offhand: "SHIELD:1"
-      respawn: "world,0,80,0"
+      respawn: "${respawn}"
     flags:
       pvp:
         value: allow
@@ -154,6 +181,10 @@ templates:
   union_war:
     name: "工会战场"
     description: "多人进入后全员确认开始，使用指定战斗装备。工会关系判定后续接入 UnionProvider。"
+    parameters:
+      respawn:
+        type: location
+        required: true
     mode:
       type: union_war
       min-players: 4
@@ -163,9 +194,11 @@ templates:
       kit: "IRON_SWORD:1,BOW:1,ARROW:32,COOKED_BEEF:16"
       armor: "IRON_BOOTS:1,IRON_LEGGINGS:1,IRON_CHESTPLATE:1,IRON_HELMET:1"
       offhand: "SHIELD:1"
-      respawn: "world,0,80,0"
-      reward-source: "contract"
-      reward-contract: ""
+      respawn: "${respawn}"
+      # 不要在这里写 reward-source / reward-contract：Contract 集成还没落地，
+      # RegionValidationService 会把带奖励字段的场地判成 ERROR 并拒绝发布，
+      # 套用本模板的人就只能自己回 Mode 页面把它们删掉才能发布。
+      # 等 Contract 集成完成、验证器那条拦截撤掉之后再加回来（见 PLAN.md 5.3 / 奖励来源一节）。
     flags:
       pvp:
         value: allow
@@ -188,6 +221,10 @@ templates:
   hide_and_seek:
     name: "藏猫猫场地"
     description: "回合制小游戏。玩家进入后 ready，开局自动分配寻找者和隐藏者。寻找者攻击隐藏者即找到对方，不造成真实伤害。"
+    parameters:
+      respawn:
+        type: location
+        required: true
     mode:
       type: hide_and_seek
       min-players: 2
@@ -199,7 +236,7 @@ templates:
       round-seconds: 300
       found-becomes-seeker: true
       replace-gear: false
-      respawn: "world,0,80,0"
+      respawn: "${respawn}"
     flags:
       pvp:
         value: allow

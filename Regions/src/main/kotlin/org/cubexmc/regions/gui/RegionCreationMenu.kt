@@ -9,6 +9,9 @@ import org.cubexmc.regions.model.ModeConfig
 import org.cubexmc.regions.model.OwnerPolicy
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionSourceRef
+import org.cubexmc.regions.service.RegionTemplate
+import org.cubexmc.regions.service.TemplateParameter
+import org.cubexmc.regions.service.TemplateParameterType
 import java.util.Locale
 
 /**
@@ -79,7 +82,7 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
             inventory.setItem(slot, item)
         }
         if (options.isEmpty()) {
-            inventory.setItem(22, text.item(Material.BARRIER, "gui.area.empty"))
+            inventory.setItem(22, text.item(GuiIcons.EMPTY, "gui.area.empty"))
         }
         if (page > 0) inventory.setItem(45, text.named(Material.ARROW, text.text("gui.common.previous-page")))
         inventory.setItem(
@@ -171,7 +174,7 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
             inventory.setItem(slot, item)
         }
         if (templates.isEmpty()) {
-            inventory.setItem(22, text.item(Material.BARRIER, "gui.template.empty"))
+            inventory.setItem(22, text.item(GuiIcons.EMPTY, "gui.template.empty"))
         }
         if (page > 0) inventory.setItem(45, text.named(Material.ARROW, text.text("gui.common.previous-page")))
         inventory.setItem(
@@ -182,7 +185,7 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
                 mapOf("count" to templates.size.toString(), "page" to (page + 1).toString(), "pages" to pageCount.toString()),
             ),
         )
-        inventory.setItem(50, text.named(Material.BARRIER, text.text("gui.template.back-to-areas")))
+        inventory.setItem(50, text.named(GuiIcons.BACK, text.text("gui.template.back-to-areas")))
         if (page + 1 < pageCount) inventory.setItem(53, text.named(Material.ARROW, text.text("gui.common.next-page")))
         player.openInventory(inventory)
     }
@@ -211,6 +214,71 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
             text.send(player, "gui.create.exists", mapOf("id" to context.targetId))
             return gui.openMain(player)
         }
+        val template = plugin.templates().find(templateId)
+        if (template == null) {
+            text.send(player, "gui.template.failed", mapOf("errors" to templateId))
+            return openTemplates(player, context)
+        }
+        collectParameters(player, context, template, template.parameters.values.toList(), emptyMap())
+    }
+
+    /**
+     * 逐个把模板声明的参数问出来，凑齐了再套用。
+     *
+     * 模板不声明参数时（多数模板如此）直接套用，流程和以前一样。声明了参数的模板不再随包硬编码
+     * 一个占位值——像复活点那种只校验格式不校验世界是否存在的字段，硬编码会一路通过校验，
+     * 直到玩家死在场地里才发现坐标是错的。
+     */
+    private fun collectParameters(
+        player: Player,
+        context: TemplateContext,
+        template: RegionTemplate,
+        pending: List<TemplateParameter>,
+        collected: Map<String, String>,
+    ) {
+        val parameter = pending.firstOrNull() ?: return applyTemplate(player, context, template, collected)
+        val promptKey = if (parameter.type == TemplateParameterType.LOCATION) {
+            "gui.prompt.template-location"
+        } else {
+            "gui.prompt.template-value"
+        }
+        gui.promptLine(player, promptKey, mapOf("parameter" to parameter.id)) { raw ->
+            val value = resolveHereKeyword(player, parameter, raw)
+            val error = parameter.validate(value)
+            if (error != null) {
+                text.send(player, "gui.template.parameter-invalid", mapOf("reason" to error))
+                return@promptLine collectParameters(player, context, template, pending, collected)
+            }
+            collectParameters(player, context, template, pending.drop(1), collected + (parameter.id to value))
+        }
+    }
+
+    /** 位置参数支持一个 `here`，直接取玩家脚下的坐标，省得对着屏幕手抄 world,x,y,z。 */
+    private fun resolveHereKeyword(player: Player, parameter: TemplateParameter, raw: String): String {
+        val trimmed = raw.trim()
+        if (parameter.type != TemplateParameterType.LOCATION) return trimmed
+        val here = trimmed.equals("here", ignoreCase = true) ||
+            trimmed.equals(text.text("gui.prompt.here-word"), ignoreCase = true)
+        if (!here) return trimmed
+        val location = player.location
+        return "${location.world?.name},${location.blockX},${location.blockY},${location.blockZ}"
+    }
+
+    private fun applyTemplate(
+        player: Player,
+        context: TemplateContext,
+        template: RegionTemplate,
+        supplied: Map<String, String>,
+    ) {
+        // 问参数期间玩家可能已经被撤权，或者这块地被别人先绑走了——写之前重新核一次。
+        if (!gui.allow(player, plugin.authority().canCreate(player, context.source))) {
+            text.send(player, "gui.template.owner-changed")
+            return gui.openMain(player)
+        }
+        if (gui.editable(context.targetId) != null) {
+            text.send(player, "gui.create.exists", mapOf("id" to context.targetId))
+            return gui.openMain(player)
+        }
         val base = RegionDefinition(
             id = context.targetId,
             name = context.targetName,
@@ -218,7 +286,7 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
             ownerPolicy = OwnerPolicy.LANDS_OWNER,
             mode = ModeConfig("free_event"),
         )
-        val applied = plugin.templates().apply(templateId, base)
+        val applied = plugin.templates().apply(template.id, base, supplied)
         val region = applied.region
         if (!applied.success || region == null) {
             text.send(player, "gui.template.failed", mapOf("errors" to applied.errors.joinToString("; ")))

@@ -3,8 +3,10 @@ package org.cubexmc.regions.gui
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
 import org.cubexmc.regions.model.ModeConfig
 import org.cubexmc.regions.model.RegionDefinition
+import java.util.UUID
 
 /**
  * The gameplay-mode editor. Only the settings that belong to the selected mode are rendered, and the
@@ -55,7 +57,7 @@ internal class RegionModeMenu(private val gui: RegionsGui) {
         inventory.setItem(28, text.item(Material.IRON_SWORD, "gui.mode.kit-iron"))
         inventory.setItem(29, text.item(Material.BOW, "gui.mode.kit-bow"))
         inventory.setItem(30, text.item(Material.DIAMOND_SWORD, "gui.mode.kit-diamond"))
-        inventory.setItem(31, text.item(Material.BARRIER, "gui.mode.kit-clear"))
+        inventory.setItem(31, text.item(GuiIcons.CLEAR, "gui.mode.kit-clear"))
         inventory.setItem(
             32,
             setting(Material.REDSTONE, "gui.mode.finish-vehicle", items.describeVehicle(values["finish-vehicle"] ?: values["vehicle"] ?: defaultVehicle)),
@@ -84,7 +86,7 @@ internal class RegionModeMenu(private val gui: RegionsGui) {
         inventory.setItem(41, setting(Material.ENDER_EYE, "gui.mode.teleport-start", values["teleport-start"] ?: "false"))
         inventory.setItem(42, setting(Material.LEVER, "gui.mode.start-mode", values["start-mode"] ?: "vote"))
         inventory.setItem(43, setting(Material.SLIME_BALL, "gui.mode.radius", values["radius"] ?: "2.5"))
-        inventory.setItem(44, text.item(Material.NAME_TAG, "gui.mode.judges", mapOf("value" to (values["judges"] ?: text.text("gui.common.none")))))
+        inventory.setItem(44, judgeItem(values))
         inventory.setItem(45, setting(Material.ENDER_EYE, "gui.mode.seekers", values["seekers"] ?: text.text("gui.common.auto")))
         inventory.setItem(46, setting(Material.CLOCK, "gui.mode.hide-seconds", values["hide-seconds"] ?: "30"))
         inventory.setItem(47, setting(Material.RECOVERY_COMPASS, "gui.mode.round-seconds", values["round-seconds"] ?: "300"))
@@ -145,7 +147,11 @@ internal class RegionModeMenu(private val gui: RegionsGui) {
                 this["start-mode"] = if (this["start-mode"].equals("judge", ignoreCase = true)) "vote" else "judge"
             }
             43 -> GuiValues.adjustDouble(values, "radius", 2.5, rightClick, min = 1.0)
-            44 -> GuiValues.toggleJudge(values, player)
+            44 -> return if (rightClick) {
+                save(player, region, GuiValues.toggleJudge(values, player.uniqueId))
+            } else {
+                promptJudge(player, region)
+            }
             45 -> GuiValues.adjustInt(values, "seekers", 1, rightClick, min = 1)
             46 -> GuiValues.adjustInt(values, "hide-seconds", 30, rightClick, min = 0, step = 10)
             47 -> GuiValues.adjustInt(values, "round-seconds", 300, rightClick, min = 0, removeAtZero = true, step = 60)
@@ -172,6 +178,48 @@ internal class RegionModeMenu(private val gui: RegionsGui) {
     private fun save(player: Player, region: RegionDefinition, values: Map<String, String>) {
         val mode = region.mode ?: ModeConfig("free_event")
         gui.saveAndReopen(player, region.copy(mode = mode.copy(values = values))) { open(player, region.id) }
+    }
+
+    /** 名单存的是 UUID，展示时换回名字——否则这一格就是一串没人看得懂的十六进制。 */
+    private fun judgeItem(values: Map<String, String>): ItemStack {
+        val judges = GuiValues.parseJudges(values)
+        val names = judges.map { id ->
+            Bukkit.getOfflinePlayer(id).name ?: id.toString()
+        }
+        return text.item(
+            Material.NAME_TAG,
+            "gui.mode.judges",
+            mapOf("value" to names.joinToString(", ").ifBlank { text.text("gui.common.none") }),
+        )
+    }
+
+    private fun promptJudge(player: Player, region: RegionDefinition) {
+        gui.promptLine(player, "gui.prompt.judge") { raw ->
+            val name = raw.trim()
+            val mode = region.mode ?: ModeConfig("free_event")
+            if (name.equals("clear", ignoreCase = true)) {
+                return@promptLine save(player, region, GuiValues.clearJudges(mode.values))
+            }
+            val target = resolvePlayer(name)
+            if (target == null) {
+                text.send(player, "gui.mode.judge-unknown", mapOf("name" to name))
+                return@promptLine open(player, region.id)
+            }
+            save(player, region, GuiValues.toggleJudge(mode.values, target))
+        }
+    }
+
+    /**
+     * 在线玩家优先，否则只认服务器已经缓存过的档案。
+     *
+     * 刻意不用 `Bukkit.getOfflinePlayer(name)`：那个方法对没见过的名字会去请求 Mojang API，
+     * 既阻塞主线程，又会给打错的名字凭空造出一个 UUID——那意味着把发令权发给一个不存在的人。
+     */
+    private fun resolvePlayer(name: String): UUID? {
+        if (name.isBlank()) return null
+        Bukkit.getPlayerExact(name)?.let { return it.uniqueId }
+        val cached = Bukkit.getOfflinePlayerIfCached(name) ?: return null
+        return cached.uniqueId
     }
 
     private fun promptModeValue(player: Player, region: RegionDefinition) {

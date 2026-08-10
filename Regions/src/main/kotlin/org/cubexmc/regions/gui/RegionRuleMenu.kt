@@ -160,7 +160,7 @@ internal class RegionRuleMenu(private val gui: RegionsGui) {
             inventory.setItem(
                 slot,
                 text.named(
-                    Material.COMMAND_BLOCK,
+                    GuiIcons.TRIGGER,
                     text.text(
                         "gui.trigger.entry",
                         mapOf(

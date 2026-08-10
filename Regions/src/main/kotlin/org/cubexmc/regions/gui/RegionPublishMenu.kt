@@ -49,7 +49,7 @@ internal class RegionPublishMenu(private val gui: RegionsGui) {
             inventory.setItem(22, text.item(Material.PAPER, "gui.publish.no-changes"))
         }
 
-        inventory.setItem(45, text.item(Material.BARRIER, "gui.publish.back"))
+        inventory.setItem(45, text.item(GuiIcons.BACK, "gui.publish.back"))
         inventory.setItem(46, dependencyItem(report))
         inventory.setItem(47, issueItem(issues, errors, warnings, regionId))
         inventory.setItem(48, effectiveRulesItem(report))
@@ -136,7 +136,7 @@ internal class RegionPublishMenu(private val gui: RegionsGui) {
     private fun confirmItem(errors: Int, changeCount: Int, revision: Long): org.bukkit.inventory.ItemStack {
         val truncated = changeCount > 36
         return text.item(
-            if (errors > 0) Material.BARRIER else Material.EMERALD_BLOCK,
+            if (errors > 0) GuiIcons.BLOCKED else Material.EMERALD_BLOCK,
             if (errors > 0) "gui.publish.fix-first" else "gui.publish.confirm",
             mapOf("revision" to revision.toString(), "count" to changeCount.toString()),
             extraLore = listOf(text.text(if (truncated) "gui.publish.truncated" else "gui.publish.recheck")),
