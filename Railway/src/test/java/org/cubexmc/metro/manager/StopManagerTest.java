@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -169,6 +170,20 @@ class StopManagerTest {
         assertTrue(savedYaml.contains("- red"));
         assertTrue(savedYaml.contains("linked_lines:"));
         assertTrue(savedYaml.contains("- green"));
+    }
+
+    @Test
+    void shouldPreserveNullableLookupAndLegacyNoOpEntryPoints() throws IOException {
+        Files.writeString(tempDir.resolve("stops.yml"), "");
+        StopManager manager = new StopManager(createPluginMock(tempDir));
+
+        manager.tick();
+        manager.saveStops();
+
+        assertNull(manager.getStop(null));
+        assertFalse(manager.deleteStop(null));
+        assertThrows(NullPointerException.class,
+                () -> manager.createStop(null, "Invalid", null, null, null));
     }
 
     private Metro createPluginMock(Path dataDir) {

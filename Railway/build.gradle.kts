@@ -1,6 +1,6 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.ServiceFileTransformer
 
-plugins { id("cubex-plugin") }
+plugins { id("cubex-kotlin-plugin") }
 
 version = "0.4.0"
 description = "railway"
