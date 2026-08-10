@@ -7,6 +7,7 @@ import org.bukkit.entity.Player
 import org.cubexmc.regions.integration.RegionSource
 import org.cubexmc.regions.integration.RegionSourceRegistry
 import org.cubexmc.regions.model.ExternalRegion
+import org.cubexmc.regions.model.ModeConfig
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.RegionLifecycle
 import org.cubexmc.regions.model.RegionSourceRef
@@ -99,6 +100,57 @@ class RegionAuthorityServiceTest {
 
         assertEquals(AuthorityDenial.OWNERSHIP_CHANGED, service.canManage(player(newOwner, ruler = true), changed).denial)
     }
+
+    @Test
+    fun `judges may start and end a round without gaining any management rights`() {
+        val ownerId = UUID.randomUUID()
+        val judgeId = UUID.randomUUID()
+        val service = service(FakeSource("lands", owners = mutableSetOf(ownerId)))
+        val venue = withJudges(region(), judgeId)
+
+        val owner = player(ownerId, ruler = true)
+        val judge = player(judgeId)
+        val bystander = player(UUID.randomUUID())
+
+        assertTrue(service.canJudge(owner, venue).allowed, "the venue owner always runs their own event")
+        assertTrue(service.canJudge(judge, venue).allowed)
+        assertFalse(service.canJudge(bystander, venue).allowed)
+
+        // 裁判权限只覆盖开赛/结束——改配置、发布、删场地仍然只有场主能做。
+        assertFalse(service.canManage(judge, venue).allowed)
+        assertEquals(AuthorityDenial.NOT_RULER, service.canManage(judge, venue).denial)
+    }
+
+    @Test
+    fun `a frozen venue strips the judges too`() {
+        val ownerId = UUID.randomUUID()
+        val judgeId = UUID.randomUUID()
+        val service = service(FakeSource("lands", owners = mutableSetOf(ownerId)))
+        val frozen = withJudges(region(), judgeId).copy(lifecycle = RegionLifecycle.FROZEN)
+
+        assertEquals(AuthorityDenial.REGION_FROZEN, service.canJudge(player(judgeId), frozen).denial)
+        assertEquals(AuthorityDenial.REGION_FROZEN, service.canJudge(player(ownerId, ruler = true), frozen).denial)
+    }
+
+    @Test
+    fun `only well formed uuids count as judges`() {
+        val ownerId = UUID.randomUUID()
+        val judgeId = UUID.randomUUID()
+        val service = service(FakeSource("lands", owners = mutableSetOf(ownerId)))
+
+        // 名单存 UUID。旧版本按玩家名写下的条目会被忽略——按名字匹配在改名后失效，
+        // 而且旧名可能被别人注册走，等于把发令权转给陌生人。
+        val byName = region().copy(mode = ModeConfig("run_race", mapOf("judges" to "Steve,Alex")))
+        assertTrue(service.judgeIds(byName).isEmpty())
+        assertFalse(service.canJudge(player(judgeId), byName).allowed)
+
+        val mixed = region().copy(mode = ModeConfig("run_race", mapOf("judges" to "Steve, $judgeId ;")))
+        assertEquals(setOf(judgeId), service.judgeIds(mixed))
+        assertTrue(service.canJudge(player(judgeId), mixed).allowed)
+    }
+
+    private fun withJudges(region: RegionDefinition, vararg judges: UUID): RegionDefinition =
+        region.copy(mode = ModeConfig("run_race", mapOf("judges" to judges.joinToString(",") { it.toString() })))
 
     private fun service(vararg sources: RegionSource): RegionAuthorityService {
         val registry = RegionSourceRegistry()

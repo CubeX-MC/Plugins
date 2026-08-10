@@ -90,6 +90,9 @@ class ContractPlugin : CubexPlugin() {
         batchAcceptances().load()
         reconcileBatchAcceptances()
 
+        // 首次启动铺一份服务器预设，否则模板库开出来是空的。saveResource 在文件已存在时自行跳过,
+        // 而删掉某个预设后 flushIfDirty 会按内存全量重写这个文件——所以删掉的预设不会被塞回来。
+        saveResource("templates.yml", false)
         templateStore = bind(ContractTemplateStore(this))
         templates().load()
         rebuildTemplateService()

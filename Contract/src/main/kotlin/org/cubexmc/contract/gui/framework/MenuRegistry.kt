@@ -7,6 +7,7 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
+import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import java.util.UUID
 
@@ -42,6 +43,16 @@ class MenuRegistry : Listener {
             return
         }
         menu.handleClick(event)
+    }
+
+    /** Nothing in a menu is ever meant to move, so a drag over its slots is refused outright. */
+    @EventHandler
+    fun onDrag(event: InventoryDragEvent) {
+        val player = event.whoClicked as? Player ?: return
+        val menu = open[player.uniqueId] ?: return
+        if (event.view.topInventory === menu.inventory) {
+            event.isCancelled = true
+        }
     }
 
     @EventHandler

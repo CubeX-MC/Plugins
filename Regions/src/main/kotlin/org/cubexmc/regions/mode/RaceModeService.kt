@@ -444,8 +444,9 @@ class RaceModeService(private val plugin: RegionsPlugin) {
             ?.coerceAtLeast(0L)
             ?: DEFAULT_TIMEOUT_SECONDS
 
+    /** 场主始终可以，场主指定的裁判团队额外可以。规则见 [RegionAuthorityService.canJudge]。 */
     private fun canJudge(sender: CommandSender, region: RegionDefinition): Boolean {
-        return plugin.authority().canManage(sender, region).allowed
+        return plugin.authority().canJudge(sender, region).allowed
     }
 
     private fun state(region: RegionDefinition): RaceState =

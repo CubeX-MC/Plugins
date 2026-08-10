@@ -17,7 +17,7 @@ import org.cubexmc.regions.model.TriggerExecution
 import java.io.File
 import java.util.Locale
 
-enum class TemplateParameterType { STRING, INTEGER, DOUBLE, BOOLEAN }
+enum class TemplateParameterType { STRING, INTEGER, DOUBLE, BOOLEAN, LOCATION }
 
 data class TemplateParameter(
     val id: String,
@@ -36,6 +36,9 @@ data class TemplateParameter(
             TemplateParameterType.DOUBLE -> value.toDoubleOrNull()
                 ?: return "$id must be a number"
             TemplateParameterType.BOOLEAN -> if (value.toBooleanStrictOrNull() == null) return "$id must be true or false" else null
+            // 和 RegionValidationService.validateLocation 用同一套格式，模板才不会产出一份
+            // 自己校验得过、发布时又被判 ERROR 的坐标。
+            TemplateParameterType.LOCATION -> if (!isLocation(value)) return "$id must use world,x,y,z" else null
             TemplateParameterType.STRING -> null
         }
         if (numeric != null && min != null && numeric < min) return "$id must be at least $min"
@@ -44,6 +47,15 @@ data class TemplateParameter(
             return "$id must be one of: ${options.joinToString(", ")}"
         }
         return null
+    }
+
+    private companion object {
+        fun isLocation(raw: String): Boolean {
+            val parts = raw.split(',')
+            return parts.size >= 4 &&
+                parts[0].isNotBlank() &&
+                (1..3).all { parts[it].trim().toDoubleOrNull() != null }
+        }
     }
 }
 

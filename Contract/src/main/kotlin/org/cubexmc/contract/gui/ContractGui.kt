@@ -96,7 +96,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         menu.button(3, viewButton(HallView.SUBMITTED, view, Material.DIAMOND, ui("hall-view-submitted"))) { openHall(player, HallView.SUBMITTED, 1) }
         menu.button(4, viewButton(HallView.DISPUTED, view, Material.REDSTONE, ui("hall-view-disputed"))) { openHall(player, HallView.DISPUTED, 1) }
         menu.button(5, viewButton(HallView.DONE, view, Material.NETHER_STAR, ui("hall-view-done"))) { openHall(player, HallView.DONE, 1) }
-        menu.button(6, viewButton(HallView.CLOSED, view, Material.BARRIER, ui("hall-view-closed"))) { openHall(player, HallView.CLOSED, 1) }
+        menu.button(6, viewButton(HallView.CLOSED, view, GuiIcons.INACTIVE, ui("hall-view-closed"))) { openHall(player, HallView.CLOSED, 1) }
 
         val back = { openHall(player, view, current) }
         val start = (current - 1) * BOARD_SLOTS.size
@@ -142,7 +142,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         if (player.hasPermission("contract.admin.view")) {
             menu.button(51, button(Material.CRAFTING_TABLE, ui("hall-admin"), ui("hall-admin-detail"))) { openAdmin(player, AdminFilter.DISPUTED, 1) }
         }
-        menu.button(52, button(Material.KNOWLEDGE_BOOK, ui("hall-help"), ui("hall-help-detail"))) { sendHelp(player) }
+        menu.button(52, button(Material.BOOK, ui("hall-help"), ui("hall-help-detail"))) { sendHelp(player) }
         menu.button(53, button(Material.ARROW, ui("nav-next"), pageLore(current, pages))) { openHall(player, view, current + 1) }
 
         registry.open(player, menu)
@@ -332,7 +332,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             action(11, button(Material.RED_WOOL, ui("action-resolve-b"), ui("action-resolve-b-detail")))
         }
         if (!contract.status().isFinal() && canCancel(player, contract)) {
-            action(15, button(Material.BARRIER, ui("action-cancel"), ui("action-cancel-detail"), ui("sign-required")))
+            action(15, button(GuiIcons.DESTRUCTIVE, ui("action-cancel"), ui("action-cancel-detail"), ui("sign-required")))
         }
         if (canDispute(contract)) {
             action(16, button(Material.REDSTONE_BLOCK, ui("action-dispute"), ui("action-dispute-detail"), ui("action-dispute-timeout")))
@@ -350,7 +350,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         val contractId = contract.id()
         menu.button(10, button(Material.EMERALD, ui("admin-pay"), ui("admin-pay-detail"), ui("sign-required")), adminHandler(player, contractId, 10, back))
         menu.button(12, button(Material.REDSTONE, ui("admin-refund"), ui("admin-refund-detail"), ui("sign-required")), adminHandler(player, contractId, 12, back))
-        menu.button(14, button(Material.BARRIER, ui("admin-close"), ui("admin-close-detail"), ui("sign-required")), adminHandler(player, contractId, 14, back))
+        menu.button(14, button(GuiIcons.DESTRUCTIVE, ui("admin-close"), ui("admin-close-detail"), ui("sign-required")), adminHandler(player, contractId, 14, back))
     }
 
     private fun participantHandler(player: Player, contractId: String, slot: Int, back: () -> Unit): (org.bukkit.event.inventory.InventoryClickEvent) -> Unit = {
@@ -534,7 +534,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             }
         }
         if (template.ownerUuid == player.uniqueId || player.hasPermission(TEMPLATE_MANAGE_PERMISSION)) {
-            menu.button(16, button(Material.BARRIER, ui("template-delete"), ui("template-delete-detail"), ui("template-delete-confirm"))) {
+            menu.button(16, button(GuiIcons.DESTRUCTIVE, ui("template-delete"), ui("template-delete-detail"), ui("template-delete-confirm"))) {
                 openTemplateDeleteConfirm(player, template, page)
             }
         }
@@ -545,7 +545,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
     private fun openTemplateDeleteConfirm(player: Player, template: ContractTemplate, page: Int) {
         val menu = Menu(ui("confirm-title"), 3)
         fillBorder(menu.inventory)
-        menu.decoration(13, button(Material.BARRIER, ui("template-delete-title"), ui("template-name-line", mapOf("name" to template.name)), ui("template-delete-safe")))
+        menu.decoration(13, button(GuiIcons.DESTRUCTIVE, ui("template-delete-title"), ui("template-name-line", mapOf("name" to template.name)), ui("template-delete-safe")))
         menu.button(11, button(Material.ARROW, ui("nav-back"), ui("template-keep"))) { openTemplateDetails(player, template.id, page) }
         menu.button(15, button(Material.REDSTONE_BLOCK, ui("template-delete-permanent"), ui("template-delete-irreversible"))) {
             val result = plugin.templateService().delete(player.uniqueId, template.id, player.hasPermission(TEMPLATE_MANAGE_PERMISSION))
@@ -688,7 +688,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         if (draft.type() == ContractType.SERVICE && player.hasPermission(SCHEDULE_CREATE_PERMISSION)) {
             menu.button(43, scheduleButton(draft)) { promptSchedule(player, draft) }
         }
-        menu.button(46, button(Material.BARRIER, ui("wizard-abandon"), ui("wizard-abandon-detail"))) { cancelDraft(player) }
+        menu.button(46, button(GuiIcons.DESTRUCTIVE, ui("wizard-abandon"), ui("wizard-abandon-detail"))) { cancelDraft(player) }
         if (player.hasPermission(TEMPLATE_USE_PERMISSION)) {
             menu.button(47, button(Material.CHEST, ui("template-save"), ui("template-save-detail"))) { saveDraftAsTemplate(player, draft) }
         }
@@ -749,7 +749,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         lore.add("")
         lore.add(ui("confirm-note"))
         menu.decoration(13, button(Material.PAPER, ui("confirm-title"), *lore.toTypedArray()))
-        menu.button(11, button(Material.BARRIER, ui("confirm-cancel"), ui("confirm-cancel-detail"))) { onReturn() }
+        menu.button(11, button(GuiIcons.DESTRUCTIVE, ui("confirm-cancel"), ui("confirm-cancel-detail"))) { onReturn() }
         menu.button(15, button(Material.WRITABLE_BOOK, ui("confirm-sign"), ui("confirm-sign-detail"), ui("confirm-sign-warn"))) { executeAction(player, action, onReturn) }
         registry.open(player, menu)
     }
@@ -1272,7 +1272,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             ObjectiveType.TAME -> Material.BONE
             ObjectiveType.CHAT -> Material.WRITABLE_BOOK
             ObjectiveType.BLOCK_INTERACT -> Material.OAK_BUTTON
-            ObjectiveType.RUN_COMMAND -> Material.COMMAND_BLOCK
+            ObjectiveType.RUN_COMMAND -> Material.LEVER
             ObjectiveType.USE_ITEM -> Material.ENDER_PEARL
             ObjectiveType.DELIVER_MONEY -> Material.GOLD_INGOT
             null -> Material.COMPASS

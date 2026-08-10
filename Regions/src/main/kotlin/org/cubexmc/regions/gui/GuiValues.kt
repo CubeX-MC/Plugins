@@ -7,7 +7,9 @@ import org.cubexmc.regions.model.EffectCombination
 import org.cubexmc.regions.model.EffectScope
 import org.cubexmc.regions.model.RegionSourceRef
 import org.cubexmc.regions.model.RegionTrigger
+import org.cubexmc.regions.service.RegionAuthorityService
 import java.util.Locale
+import java.util.UUID
 
 /**
  * Pure value helpers behind the mode/flag/effect editors. Nothing here touches Bukkit state, so the
@@ -55,23 +57,33 @@ internal object GuiValues {
         }
     }
 
-    fun toggleJudge(values: Map<String, String>, player: Player): Map<String, String> {
-        val judges = values["judges"]
-            ?.split(',', ';')
-            ?.map { it.trim() }
-            ?.filter { it.isNotBlank() }
-            ?.toMutableList()
-            ?: ArrayList()
-        val isSelf = { entry: String ->
-            entry.equals(player.name, ignoreCase = true) || entry.equals(player.uniqueId.toString(), ignoreCase = true)
-        }
-        val hadSelf = judges.any(isSelf)
-        judges.removeIf(isSelf)
-        if (!hadSelf) judges.add(player.name)
+    /**
+     * 把 [target] 加进裁判名单，已在名单里则移除。
+     *
+     * 名单存 UUID 而不是玩家名：按名字匹配会在玩家改名后失效，更糟的是旧名可能被别人注册走，
+     * 等于把发令权悄悄转给陌生人。旧版本按名字写下的条目在这里被丢弃——那时候这个字段还没有被
+     * 任何玩法逻辑读过，没有行为可以保留。
+     */
+    fun toggleJudge(values: Map<String, String>, target: UUID): Map<String, String> {
+        val judges = parseJudges(values).toMutableList()
+        if (!judges.remove(target)) judges.add(target)
         return LinkedHashMap(values).apply {
-            if (judges.isEmpty()) remove("judges") else this["judges"] = judges.joinToString(",")
+            if (judges.isEmpty()) {
+                remove(RegionAuthorityService.JUDGES_KEY)
+            } else {
+                this[RegionAuthorityService.JUDGES_KEY] = judges.joinToString(",")
+            }
         }
     }
+
+    fun clearJudges(values: Map<String, String>): Map<String, String> =
+        LinkedHashMap(values).apply { remove(RegionAuthorityService.JUDGES_KEY) }
+
+    fun parseJudges(values: Map<String, String>): List<UUID> =
+        values[RegionAuthorityService.JUDGES_KEY]
+            ?.split(',', ';')
+            ?.mapNotNull { entry -> runCatching { UUID.fromString(entry.trim()) }.getOrNull() }
+            .orEmpty()
 
     fun appendTrigger(
         current: Map<RegionTrigger, List<ActionBlockConfig>>,

@@ -195,6 +195,10 @@ gui:
     flag: "<green>请输入 \\<flag> \\<值> [key=value...]，例如 commands blocklist values=/spawn,/home。"
     effect: "<green>请输入 \\<effect> [key=value...]；可用 combination=highest_priority|exclusive|stack|merge_by_type。"
     trigger: "<green>请输入 \\<trigger> \\<action> [key=value...]；execution=primary 可限制为主 Region 执行。"
+    here-word: "此处"
+    template-value: "<green>请输入模板参数 <parameter> 的值。输入 cancel 取消。"
+    template-location: "<green>请输入 <parameter> 的位置 world,x,y,z；或输入 here 直接使用你当前站的位置。输入 cancel 取消。"
+    judge: "<green>请输入玩家名：已在裁判名单里就移除，不在就加入。输入 clear 清空名单，cancel 取消。"
   save:
     ok: "<green>已保存区域 <id> 的草稿。"
     failed: "<red>操作失败: <reason>"
@@ -338,6 +342,7 @@ gui:
     current: "<green>当前模式"
     switch: "<gray>点击切换到此模式"
     key-value-required: "<red>请输入 key=value。"
+    judge-unknown: "<red>找不到玩家 <name>。对方需要在本服登录过一次。"
     type:
       free_event:
         name: "free_event"
@@ -440,8 +445,13 @@ gui:
       name: "<yellow>判定半径: <value>"
       lore: ["<gray>左键 +1，右键 -1。"]
     judges:
-      name: "<aqua>裁判加入/移除自己"
-      lore: ["<gray>当前: <value>"]
+      name: "<aqua>裁判团队"
+      lore:
+        - "<gray>当前: <value>"
+        - "<gray>裁判可以发令开赛、强制结束本局，"
+        - "<gray>但改不了配置、发布不了、删不掉场地。"
+        - "<yellow>左键输入玩家名加入/移除（输入 clear 清空）。"
+        - "<yellow>右键把自己加入/移除。"
     seekers:
       name: "<yellow>寻找者数量: <value>"
       lore: ["<gray>hide_and_seek 使用。左键 +1，右键 -1。"]
@@ -642,6 +652,7 @@ gui:
         - "<gray>Triggers: <triggers>"
         - "<green>点击验证并创建场地。"
     parameters: "<yellow>参数: <keys>"
+    parameter-invalid: "<red>这个值不行：<reason>"
     empty:
       name: "<red>没有可用模板"
       lore:

@@ -7,6 +7,8 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.InventoryDragEvent
+import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.RegionDefinition
@@ -23,6 +25,9 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
     private val pendingInputs: MutableMap<UUID, PendingInput> = ConcurrentHashMap()
+
+    /** Lines already taken by a prompt, so a server firing both chat events never leaks the input. */
+    private val consumedLines: MutableMap<UUID, String> = ConcurrentHashMap()
 
     internal val text = GuiText(plugin)
     internal val keys = GuiKeys(plugin)
@@ -96,24 +101,59 @@ class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
         }
     }
 
+    /** Nothing in a Regions menu is ever meant to move, so a drag over its slots is refused outright. */
+    @EventHandler
+    fun onDrag(event: InventoryDragEvent) {
+        if (event.inventory.holder !is RegionsHolder) return
+        event.isCancelled = true
+    }
+
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     fun onChat(event: AsyncChatEvent) {
-        val pending = pendingInputs.remove(event.player.uniqueId) ?: return
-        event.isCancelled = true
         val message = PlainTextComponentSerializer.plainText().serialize(event.message())
-        plugin.regionScheduler().runAtEntity(event.player, Runnable {
+        if (capture(event.player, message)) {
+            event.isCancelled = true
+        }
+    }
+
+    /**
+     * Paper only routes chat through [AsyncChatEvent] while no plugin listens to the legacy event; as
+     * soon as one does — CMI and Contract both do on a typical server — every message takes the legacy
+     * path and the modern event never fires, which used to leave the prompt uncaptured and echo the
+     * player's answer to public chat. Handling both keeps the prompt working either way.
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    fun onLegacyChat(event: AsyncPlayerChatEvent) {
+        if (capture(event.player, event.message)) {
+            event.isCancelled = true
+        }
+    }
+
+    /**
+     * Hands [message] to [player]'s pending prompt, returning whether the line belongs to Regions and
+     * must be kept off public chat. A line already taken through the other chat event is swallowed
+     * again so a server that fires both does not echo it.
+     */
+    private fun capture(player: Player, message: String): Boolean {
+        val playerId = player.uniqueId
+        val pending = pendingInputs.remove(playerId) ?: return consumedLines.remove(playerId) == message
+        consumedLines[playerId] = message
+        plugin.regionScheduler().runAtEntity(player, Runnable {
+            consumedLines.remove(playerId)
             if (isCancelWord(message.trim())) {
-                text.send(event.player, "gui.prompt.cancelled")
-                openMain(event.player)
+                text.send(player, "gui.prompt.cancelled")
+                openMain(player)
                 return@Runnable
             }
             pending.onSubmit(message)
         })
+        return true
     }
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         pendingInputs.remove(event.player.uniqueId)
+        consumedLines.remove(event.player.uniqueId)
     }
 
     internal fun promptLine(player: Player, promptKey: String, placeholders: Map<String, String> = emptyMap(), onSubmit: (String) -> Unit) {

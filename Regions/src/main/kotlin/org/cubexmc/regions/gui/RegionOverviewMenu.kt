@@ -30,7 +30,7 @@ internal class RegionOverviewMenu(private val gui: RegionsGui) {
         }
         inventory.setItem(49, text.item(Material.MAP, "gui.main.count", mapOf("count" to regions.size.toString())))
         inventory.setItem(51, text.item(Material.SPYGLASS, "gui.main.doctor"))
-        inventory.setItem(53, text.named(Material.BARRIER, text.text("gui.common.close")))
+        inventory.setItem(53, text.named(GuiIcons.CLOSE, text.text("gui.common.close")))
         player.openInventory(inventory)
     }
 
@@ -89,7 +89,7 @@ internal class RegionOverviewMenu(private val gui: RegionsGui) {
         inventory.setItem(16, text.item(Material.BLAZE_POWDER, "gui.detail.effects", mapOf("count" to region.effects.size.toString())))
         inventory.setItem(
             22,
-            text.item(Material.COMMAND_BLOCK, "gui.detail.triggers", mapOf("count" to region.triggers.values.sumOf { it.size }.toString())),
+            text.item(GuiIcons.TRIGGER, "gui.detail.triggers", mapOf("count" to region.triggers.values.sumOf { it.size }.toString())),
         )
         inventory.setItem(
             28,
