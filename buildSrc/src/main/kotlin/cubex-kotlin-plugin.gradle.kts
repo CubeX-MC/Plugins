@@ -11,9 +11,11 @@ kotlin {
     jvmToolchain(CubexVersions.developmentJdk)
 }
 
+val javaRelease = tasks.named<JavaCompile>("compileJava").flatMap { it.options.release }
+
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.fromTarget(CubexVersions.targetJdk.toString()))
+        jvmTarget.set(javaRelease.map { JvmTarget.fromTarget(it.toString()) })
         javaParameters.set(true)
         freeCompilerArgs.add("-Xjsr305=strict")
     }

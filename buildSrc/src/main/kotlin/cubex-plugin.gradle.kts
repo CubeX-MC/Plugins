@@ -102,7 +102,7 @@ tasks.register("jarGate") {
     // 允许的字节码版本:插件自己的 java release(Clarity 覆盖成 21),Kotlin 侧固定 jvmTarget。
     // cubex-* 共享模块保持全仓 Java 17 基线,shade 进 Java 21 的 Clarity 时仍是兼容字节码。
     val javaRelease = tasks.named<JavaCompile>("compileJava").map { it.options.release.orNull ?: CubexVersions.targetJdk }
-    val kotlinMajor = CubexVersions.targetJdk + 44
+    val sharedModuleMajor = CubexVersions.targetJdk + 44
     val sharedModulePrefixes = listOf(
         "org/cubexmc/core/",
         "org/cubexmc/config/",
@@ -120,8 +120,7 @@ tasks.register("jarGate") {
 
     doLast {
         val libsPrefix = CubexRelocations.libsNamespace(projectName).replace('.', '/')
-        val pluginAllowedMajors =
-            if (isKotlinPlugin) setOf(javaRelease.get() + 44, kotlinMajor) else setOf(javaRelease.get() + 44)
+        val pluginAllowedMajors = setOf(javaRelease.get() + 44)
         val failures = mutableListOf<String>()
         val report = mutableListOf<String>()
 
@@ -166,10 +165,10 @@ tasks.register("jarGate") {
                 }
                 val major = ((header[6].toInt() and 0xFF) shl 8) or (header[7].toInt() and 0xFF)
                 val allowedMajors =
-                    if (sharedModulePrefixes.any(entry.name::startsWith)) setOf(kotlinMajor) else pluginAllowedMajors
+                    if (sharedModulePrefixes.any(entry.name::startsWith)) setOf(sharedModuleMajor) else pluginAllowedMajors
                 if (major in allowedMajors) null else "${entry.name}(major=$major, allowed=${allowedMajors.sorted()})"
             }
-            report += "ownClasses=${ownClasses.size} pluginBytecodeMajors=${pluginAllowedMajors.sorted()} sharedBytecodeMajor=$kotlinMajor"
+            report += "ownClasses=${ownClasses.size} pluginBytecodeMajors=${pluginAllowedMajors.sorted()} sharedBytecodeMajor=$sharedModuleMajor"
             if (wrongBytecode.isNotEmpty()) {
                 failures += "字节码版本不符的类 ${wrongBytecode.size} 个:" + wrongBytecode.take(5).joinToString(", ")
             }
