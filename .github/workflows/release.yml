@@ -62,6 +62,9 @@ jobs:
             regions|region)
               project="Regions"
               ;;
+            statecharge|state-charge)
+              project="StateCharge"
+              ;;
             *)
               echo "Unsupported release tag prefix: $prefix" >&2
               exit 1

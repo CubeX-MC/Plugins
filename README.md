@@ -76,8 +76,9 @@ plugins/
 │     ├─ CubexVersions.kt / CubexDependencies.kt / CubexRelocations.kt
 ├─ modules/                 # 共享模块(无 shadowJar,被各插件依赖后 shade 进去)
 │  ├─ cubex-core/  cubex-scheduler/  cubex-config/  cubex-i18n/
-└─ <各插件>/                # BookLite FAWEReplacer MountLicense Contracts
+└─ <各插件>/                # BookLite FAWEReplacer MountLicense Contract
                             # EcoBalancer RuleGems Metro Railway Clarity Reputations
+                            # Regions StateCharge
 ```
 
 ### Kotlin 约定插件

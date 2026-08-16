@@ -1,0 +1,53 @@
+# StateCharge 语言文件(zh_CN)。所有值使用 MiniMessage;占位符为 <name> 形式。
+# 新增/修改 key 后请同步 en_US.yml,并 bump lang-version(见 DESIGND.md §7)。
+lang-version: 1
+
+prefix: "<gradient:#FFC24B:#FF8A00>StateCharge</gradient> <dark_gray>»</dark_gray> "
+
+messages:
+  no-permission: "<prefix><red>你没有权限使用这个命令。</red>"
+  player-only: "<prefix><red>该命令只能由玩家执行。</red>"
+  help: |-
+    <prefix><gold>==== StateCharge 帮助 ====</gold>
+    <prefix><dark_gray>/statecharge list</dark_gray> <gray>查看可购买的状态</gray>
+    <prefix><dark_gray>/statecharge status</dark_gray> <gray>查看我的生效状态与剩余时间</gray>
+    <prefix><dark_gray>/statecharge buy <状态> [份数]</dark_gray> <gray>购买限时状态(在线计时,可叠加)</gray>
+  buy-success: "<prefix><green>购买成功!</green> 你获得了 <gold><time></gold> 的 <yellow><state></yellow> 状态,花费 <white><price></white>。总剩余: <green><total></green>。"
+  buy-unknown-state: "<prefix><red>未知状态: <state>。用 /statecharge list 查看可购买的状态。</red>"
+  buy-disabled: "<prefix><red>状态 <state> 当前不可购买。</red>"
+  buy-no-permission: "<prefix><red>你没有权限购买该状态。</red>"
+  buy-conflict: "<prefix><red>你正在使用同组的 <yellow><other></yellow> 状态,先等它结束吧。</red>"
+  buy-max-stack: "<prefix><red>超出该状态的累计上限(<white><max></white>)。</red>"
+  buy-insufficient: "<prefix><red>余额不足,需要 <white><price></white>。</red>"
+  buy-economy-failed: "<prefix><red>扣款失败: <reason>。</red>"
+  buy-invalid-count: "<prefix><red>份数无效,请输入 1 到 1000 之间的整数。</red>"
+  expiry-warning: "<prefix><yellow>你的 <white><state></white> 状态将在 <red><time></red> 后到期!</yellow>"
+  expired: "<prefix><yellow>你的 <white><state></white> 状态已到期。</yellow>"
+  actionbar-countdown: "<yellow><state> 剩余 <time></yellow>"
+  admin-give-success: "<prefix><green>已给 <player> 发放 <time> 的 <state> 状态。</green>"
+  admin-give-unknown-state: "<prefix><red>未知状态: <state>。</red>"
+  admin-give-invalid-seconds: "<prefix><red>秒数无效,请输入正整数。</red>"
+  admin-player-unknown: "<prefix><red>找不到玩家: <player>。</red>"
+  admin-clear-success: "<prefix><green>已清除 <player> 的 <count> 个状态。</green>"
+  admin-clear-none: "<prefix><yellow><player> 没有任何生效中的状态。</yellow>"
+  admin-reload-success: "<prefix><green>重载完成。</green>"
+  admin-reload-failed: "<prefix><red>重载失败,出错的阶段: <stage>。详见控制台日志。</red>"
+
+ui:
+  list-header: "<prefix><gold>可购买的状态:</gold>"
+  list-line: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray>"
+  list-line-limited: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray><dark_gray> · 上限 </dark_gray><gray><max></gray>"
+  list-empty: "<prefix><gray>当前没有可购买的状态。</gray>"
+  status-header: "<prefix><gold>你正在生效的状态:</gold>"
+  status-line: "<prefix><dark_gray> - </dark_gray><white><state></white><dark_gray> · 剩余 </dark_gray><green><time></green>"
+  status-empty: "<prefix><gray>你没有生效中的状态。用 /statecharge list 看看有什么可以买。</gray>"
+  usage-buy: "<gray>用法: /statecharge buy <状态> [份数]</gray>"
+  usage-list: "<gray>用法: /statecharge list</gray>"
+  usage-status: "<gray>用法: /statecharge status</gray>"
+  usage-admin-give: "<gray>用法: /statecharge admin give <玩家> <状态> <秒数></gray>"
+  usage-admin-clear: "<gray>用法: /statecharge admin clear <玩家> [状态]</gray>"
+  usage-admin-reload: "<gray>用法: /statecharge admin reload</gray>"
+  time-day: "天"
+  time-hour: "小时"
+  time-minute: "分"
+  time-second: "秒"

@@ -1,0 +1,53 @@
+# StateCharge language file (en_US). All values are MiniMessage; placeholders use <name> form.
+# Keep zh_CN.yml in sync and bump lang-version when keys change (see DESIGN.md §7).
+lang-version: 1
+
+prefix: "<gradient:#FFC24B:#FF8A00>StateCharge</gradient> <dark_gray>»</dark_gray> "
+
+messages:
+  no-permission: "<prefix><red>You do not have permission to use this command.</red>"
+  player-only: "<prefix><red>This command can only be run by a player.</red>"
+  help: |-
+    <prefix><gold>==== StateCharge Help ====</gold>
+    <prefix><dark_gray>/statecharge list</dark_gray> <gray>List purchasable states</gray>
+    <prefix><dark_gray>/statecharge status</dark_gray> <gray>Show your active states and remaining time</gray>
+    <prefix><dark_gray>/statecharge buy <state> [count]</dark_gray> <gray>Buy a timed state (online time, stackable)</gray>
+  buy-success: "<prefix><green>Purchased!</green> You got <gold><time></gold> of <yellow><state></yellow> for <white><price></white>. Total remaining: <green><total></green>."
+  buy-unknown-state: "<prefix><red>Unknown state: <state>. Use /statecharge list to see purchasable states.</red>"
+  buy-disabled: "<prefix><red>The <state> state is not purchasable right now.</red>"
+  buy-no-permission: "<prefix><red>You do not have permission to buy this state.</red>"
+  buy-conflict: "<prefix><red>You already have the <yellow><other></yellow> state from the same group; wait for it to end first.</red>"
+  buy-max-stack: "<prefix><red>That would exceed the state's stacking limit (<white><max></white>).</red>"
+  buy-insufficient: "<prefix><red>Not enough money; you need <white><price></white>.</red>"
+  buy-economy-failed: "<prefix><red>Payment failed: <reason>.</red>"
+  buy-invalid-count: "<prefix><red>Invalid count; use a whole number between 1 and 1000.</red>"
+  expiry-warning: "<prefix><yellow>Your <white><state></white> state expires in <red><time></red>!</yellow>"
+  expired: "<prefix><yellow>Your <white><state></white> state has expired.</yellow>"
+  actionbar-countdown: "<yellow><state> remaining <time></yellow>"
+  admin-give-success: "<prefix><green>Granted <player> <time> of <state>.</green>"
+  admin-give-unknown-state: "<prefix><red>Unknown state: <state>.</red>"
+  admin-give-invalid-seconds: "<prefix><red>Invalid duration; use a positive whole number of seconds.</red>"
+  admin-player-unknown: "<prefix><red>Player not found: <player>.</red>"
+  admin-clear-success: "<prefix><green>Cleared <count> states from <player>.</green>"
+  admin-clear-none: "<prefix><yellow><player> has no active states.</yellow>"
+  admin-reload-success: "<prefix><green>Reload complete.</green>"
+  admin-reload-failed: "<prefix><red>Reload failed at stage: <stage>. See console for details.</red>"
+
+ui:
+  list-header: "<prefix><gold>Purchasable states:</gold>"
+  list-line: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray>"
+  list-line-limited: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray><dark_gray> · max </dark_gray><gray><max></gray>"
+  list-empty: "<prefix><gray>No states are purchasable right now.</gray>"
+  status-header: "<prefix><gold>Your active states:</gold>"
+  status-line: "<prefix><dark_gray> - </dark_gray><white><state></white><dark_gray> · remaining </dark_gray><green><time></green>"
+  status-empty: "<prefix><gray>You have no active states. Check /statecharge list for what is on sale.</gray>"
+  usage-buy: "<gray>Usage: /statecharge buy <state> [count]</gray>"
+  usage-list: "<gray>Usage: /statecharge list</gray>"
+  usage-status: "<gray>Usage: /statecharge status</gray>"
+  usage-admin-give: "<gray>Usage: /statecharge admin give <player> <state> <seconds></gray>"
+  usage-admin-clear: "<gray>Usage: /statecharge admin clear <player> [state]</gray>"
+  usage-admin-reload: "<gray>Usage: /statecharge admin reload</gray>"
+  time-day: "d"
+  time-hour: "h"
+  time-minute: "m"
+  time-second: "s"

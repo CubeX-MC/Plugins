@@ -1,0 +1,67 @@
+# StateCharge 配置
+# 文档: StateCharge/DESIGN.md
+config-version: 1
+
+# 语言文件: lang/<language>.yml(zh_CN / en_US)
+language: zh_CN
+
+timing:
+  # 主计时器周期(秒)。剩余时长按"在线秒数"扣减,1 为推荐值(最小 1)。
+  tick-seconds: 1
+
+storage:
+  # states.yml 的落盘间隔(秒,最小 5)。崩溃最多丢这一窗口内的扣减。
+  flush-interval-seconds: 60
+
+notifications:
+  # 到期前在这些剩余秒数发聊天提示(空列表关闭)。
+  expiry-warning-seconds: [60, 30, 10, 5, 4, 3, 2, 1]
+  # 最后 N 秒在 actionbar 显示倒计时,0 关闭。
+  actionbar-countdown-seconds: 10
+
+# 状态定义。每个状态一段;段名即状态 id(用于命令/权限),须匹配 [a-z0-9_-]{1,32}。
+# 字段:
+#   enabled: true/false            — false 时不可购买(admin give 仍可用)
+#   display: 展示名                — 缺省用 id;纯文本(颜色由语言文件模板控制,不能含 MiniMessage 标签)
+#   price: 每份价格                — 0 = 免费
+#   unit-seconds: 每份时长(秒)
+#   max-stack-seconds: 累计上限    — 0 = 不限
+#   permission: 权限节点           — 空 = 不检查购买权限
+#   conflict-group: 互斥组         — 同组状态同时只能有一个生效;显式 "" 关闭互斥
+#   effect: 效果参数
+#     type: scale                  — 体型(参数 scale: 0.1..16.0,1.0 为原大小)
+#     type: fly                    — 飞行(参数 auto-start: true/false,购买后自动起飞)
+states:
+  small:
+    enabled: true
+    display: "变小"
+    price: 100.0
+    unit-seconds: 1800
+    max-stack-seconds: 21600
+    permission: ""
+    conflict-group: scale
+    effect:
+      type: scale
+      scale: 0.5
+  giant:
+    enabled: true
+    display: "变大"
+    price: 100.0
+    unit-seconds: 1800
+    max-stack-seconds: 21600
+    permission: ""
+    conflict-group: scale
+    effect:
+      type: scale
+      scale: 1.6
+  fly:
+    enabled: true
+    display: "飞行"
+    price: 200.0
+    unit-seconds: 3600
+    max-stack-seconds: 86400
+    permission: ""
+    conflict-group: fly
+    effect:
+      type: fly
+      auto-start: true
