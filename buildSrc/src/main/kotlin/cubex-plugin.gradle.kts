@@ -99,9 +99,16 @@ tasks.register("jarGate") {
     val jarFile = tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFile }
     val projectName = project.name
     val isKotlinPlugin = project.plugins.hasPlugin("org.jetbrains.kotlin.jvm")
-    // 允许的字节码版本:插件自己的 java release(Clarity 覆盖成 21),Kotlin 侧固定 jvmTarget
+    // 允许的字节码版本:插件自己的 java release(Clarity 覆盖成 21),Kotlin 侧固定 jvmTarget。
+    // cubex-* 共享模块保持全仓 Java 17 基线,shade 进 Java 21 的 Clarity 时仍是兼容字节码。
     val javaRelease = tasks.named<JavaCompile>("compileJava").map { it.options.release.orNull ?: CubexVersions.targetJdk }
     val kotlinMajor = CubexVersions.targetJdk + 44
+    val sharedModulePrefixes = listOf(
+        "org/cubexmc/core/",
+        "org/cubexmc/config/",
+        "org/cubexmc/i18n/",
+        "org/cubexmc/scheduler/",
+    )
     // relocate 目标命名空间下的类是第三方库(字节码版本各异),不参与本仓库自有类的版本校验
     val shadedPaths = tasks.named<ShadowJar>("shadowJar").map { shadow ->
         shadow.relocators
@@ -113,7 +120,7 @@ tasks.register("jarGate") {
 
     doLast {
         val libsPrefix = CubexRelocations.libsNamespace(projectName).replace('.', '/')
-        val allowedMajors =
+        val pluginAllowedMajors =
             if (isKotlinPlugin) setOf(javaRelease.get() + 44, kotlinMajor) else setOf(javaRelease.get() + 44)
         val failures = mutableListOf<String>()
         val report = mutableListOf<String>()
@@ -158,9 +165,11 @@ tasks.register("jarGate") {
                     return@mapNotNull "${entry.name}(读不到字节码头)"
                 }
                 val major = ((header[6].toInt() and 0xFF) shl 8) or (header[7].toInt() and 0xFF)
-                if (major in allowedMajors) null else "${entry.name}(major=$major)"
+                val allowedMajors =
+                    if (sharedModulePrefixes.any(entry.name::startsWith)) setOf(kotlinMajor) else pluginAllowedMajors
+                if (major in allowedMajors) null else "${entry.name}(major=$major, allowed=${allowedMajors.sorted()})"
             }
-            report += "ownClasses=${ownClasses.size} allowedBytecodeMajors=${allowedMajors.sorted()}"
+            report += "ownClasses=${ownClasses.size} pluginBytecodeMajors=${pluginAllowedMajors.sorted()} sharedBytecodeMajor=$kotlinMajor"
             if (wrongBytecode.isNotEmpty()) {
                 failures += "字节码版本不符的类 ${wrongBytecode.size} 个:" + wrongBytecode.take(5).joinToString(", ")
             }
