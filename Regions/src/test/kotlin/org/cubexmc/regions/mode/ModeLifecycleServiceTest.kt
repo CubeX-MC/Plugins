@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.mock
@@ -220,11 +219,11 @@ class ModeLifecycleServiceTest {
             entityTasks += task
             if (runEntityTasksImmediately) task.run()
             null
-        }.`when`(scheduler).runAtEntity(any(Entity::class.java), any(Runnable::class.java))
+        }.`when`(scheduler).runAtEntity(anyK<Entity>(), anyK<Runnable>())
         doAnswer { invocation ->
             delayed += DelayedTask(invocation.getArgument(0), invocation.getArgument(1))
             null
-        }.`when`(scheduler).runGlobalLater(any(Runnable::class.java), anyLong())
+        }.`when`(scheduler).runGlobalLater(anyK<Runnable>(), anyLong())
 
         return Harness(plugin, server, registry, delayed, entityTasks)
     }
