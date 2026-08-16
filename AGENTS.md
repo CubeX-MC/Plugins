@@ -59,7 +59,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 进行中的工作
 
-- **Railway Kotlin 迁移**的已合并基线包含原 `kotlin/railway` 分支，当前 Kinematic physics 批次在 `codex/railway-physics-kinematic`；原始源码 117/167 已迁（当前 `51 Java / 117 Kotlin`，多出的 Java 是有意保留的 PlaceholderAPI 可空 shim）。manager、service、`train` 与 `physics` 的 Kinematic 簇已完成，下一批是 Railway 独有的 Reactive physics，再迁 bridge。接力点、细化后的批次顺序、共享能力审计规则，以及“能不能照抄 Metro 的 `.kt`”的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——语言迁移与公共模块抽取分轨提交；Railway 独有运行时必须从自身 Java 机械迁移，同源文件也要检查 Metro Kotlin 后续玩法提交。
+- **Railway Kotlin 迁移**的已合并基线包含原 `kotlin/railway` 分支，当前 physics 系列批次在 `codex/railway-physics-kinematic`；原始源码 120/167 已迁（当前 `48 Java / 120 Kotlin`，多出的 Java 是有意保留的 PlaceholderAPI 可空 shim）。manager、service、`train` 与 `physics` 的 Kinematic / Reactive 簇已完成，下一批用 bridge 4 文件收口 physics。接力点、细化后的批次顺序、共享能力审计规则，以及“能不能照抄 Metro 的 `.kt`”的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——语言迁移与公共模块抽取分轨提交；Railway 独有运行时必须从自身 Java 机械迁移，同源文件也要检查 Metro Kotlin 后续玩法提交。
 
 ## 已知脆弱点
 

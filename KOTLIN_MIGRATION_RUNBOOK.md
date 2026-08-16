@@ -28,13 +28,13 @@
 
 ### Railway 接力点
 
-已合并基线包含原 **`kotlin/railway`** 分支；当前 Kinematic physics 批次在
-**`codex/railway-physics-kinematic`**。原始源码 117/167 已迁；当前计数为 51 Java / 117 Kotlin，
+已合并基线包含原 **`kotlin/railway`** 分支；当前 physics 系列批次在
+**`codex/railway-physics-kinematic`**。原始源码 120/167 已迁；当前计数为 48 Java / 120 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-与 `train` 包已全部完成；`physics` 的 Kinematic 簇也已完成，下一批迁 Railway 独有的 Reactive
-physics，之后收口 bridge。
+与 `train` 包已全部完成；`physics` 的 Kinematic / Reactive 簇也已完成，下一批迁 4 个 bridge 文件
+收口 physics。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -46,7 +46,7 @@ physics，之后收口 bridge。
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | `physics` | 剩余 7 文件 / 1322 行 | **下一批**；Reactive 3 文件，再迁 bridge 4 文件 |
+| 1 | `physics` | 剩余 4 文件 / 717 行 | **下一批**；bridge 收口 |
 | 2 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
 | 3 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
 | 4 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
@@ -227,6 +227,19 @@ helper 保留真实 JVM static bridge，`BootstrapState` 保留 record 形状，
 共享能力审计结论：Kinematic helper 虽包含无状态数学，但其输入直接绑定 Bukkit `Location` / `Vector`、
 Railway rail type、minecart NMS snap、consist spacing 与插件配置，且其他插件目前没有同形实现；本批
 不新增 `cubex-*` 候选。现有 NMS 与调度边界继续通过插件内 utility 和 `cubex-scheduler` 承接。
+
+`physics` 的 Reactive 批次已完成，共 3 个 Java 文件 / 605 行。Metro 历史中同样没有对应实现，因此
+完全从 Railway 自身 Java 机械迁移；PD spacing 的 `KP` / `KD`、动态间距、lookahead 降速、逐车更新、
+powered ascending boost、NMS snap 与 Bukkit fallback 顺序均未改变。`ReactiveRailPhysics` 保持 public
+且可继承，剩余 Java `LeashedRailPhysics` 继续直接 extends；`ReactiveSpacingDecisions` 保留 JVM
+static bridge，`ReactiveCartStateStore` 继续克隆写入/读取的 Vector 与 Location，并按有效 UUID 清理。
+新增 `ReactivePhysicsMigrationTest` 覆盖 PD 数值、state clone/retain 语义与 Java 继承形状；定向测试、
+完整 `:Railway:build`、`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，当前为
+`48 Java / 120 Kotlin`。
+
+共享能力审计结论：Reactive controller 直接绑定 Railway consist 更新顺序、Bukkit minecart/rail、
+插件安全速度配置与 NMS snap；PD 决策虽是纯数学，但目前没有第二个插件的同形调用簇，单独下沉只会
+扩大公共 API 而不会简化调用点，因此不新增 `cubex-*` 候选。
 
 ---
 
