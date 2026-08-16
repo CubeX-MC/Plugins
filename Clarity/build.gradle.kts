@@ -7,6 +7,7 @@ dependencies {
     // 需要现代属性 API(NamespacedKey + Registry.ATTRIBUTE + AttributeModifier#getKey),仅 1.20.5/1.21 有,
     // 故对 Paper 1.21 编译(其余插件走 1.16.5 兼容线,本插件是例外)。
     compileOnly(CubexDeps.paperApi("1.21.11-R0.1-SNAPSHOT"))
+    implementation(project(":modules:cubex-core"))
     testImplementation(CubexDeps.junitJupiter)
 }
 

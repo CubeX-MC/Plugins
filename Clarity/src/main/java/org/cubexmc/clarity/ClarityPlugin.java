@@ -1,8 +1,7 @@
 package org.cubexmc.clarity;
 
-import org.bukkit.command.PluginCommand;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.cubexmc.clarity.metrics.Metrics;
+import org.cubexmc.core.CubexPlugin;
 
 /**
  * Clarity — 清理遗留 attribute modifier / 无限药水效果的工具插件。
@@ -11,7 +10,7 @@ import org.cubexmc.clarity.metrics.Metrics;
  * 默认关闭、默认 dry-run。走 Bukkit Attribute API(服务端负责持久化),不解析二进制 NBT。
  * 详见 {@link ClarityService}。</p>
  */
-public final class ClarityPlugin extends JavaPlugin {
+public final class ClarityPlugin extends CubexPlugin {
 
     private static final int BSTATS_PLUGIN_ID = 31800;
 
@@ -20,21 +19,17 @@ public final class ClarityPlugin extends JavaPlugin {
     private Metrics metrics;
 
     @Override
-    public void onEnable() {
+    protected void enablePlugin() {
         saveDefaultConfig();
         this.config = ClarityConfig.load(getConfig());
         this.service = new ClarityService(this);
 
-        PluginCommand cmd = getCommand("clarity");
-        if (cmd != null) {
-            ClarityCommand executor = new ClarityCommand(this, service);
-            cmd.setExecutor(executor);
-            cmd.setTabCompleter(executor);
-        } else {
+        ClarityCommand executor = new ClarityCommand(this, service);
+        if (!registerCommand("clarity", executor)) {
             getLogger().warning("Command 'clarity' missing from plugin.yml — commands unavailable.");
         }
 
-        getServer().getPluginManager().registerEvents(new JoinListener(this, service), this);
+        registerListener(new JoinListener(this, service));
 
         this.metrics = new Metrics(this, BSTATS_PLUGIN_ID);
 
