@@ -44,7 +44,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 具体含义：
 
 - 插件里**不留共享工具的本地副本**。Contract 已删掉自己的 `Text`，改用 `CubexText`（`plugin.text()`）。发现共享模块缺能力，**改 `modules/`，不要在插件里绕过**。
-- Kotlin 源码放 `src/main/kotlin`（Contract 已迁；其余插件仍在 `src/main/java`，迁移时一并改）。厂商 vendored 的 `Metrics.java` 留在 `src/main/java`。
+- 新 Kotlin 源码放 `src/main/kotlin`。部分早期迁移插件的 `.kt` 仍在 `src/main/java`，Gradle 已兼容；不要只为移动目录制造大范围无行为 diff。厂商 vendored 的 `Metrics.java` 留在 `src/main/java`。
 - 有状态的 store 实现 `Reloadable` + `Terminable`，直接 `bind(store)`，别再手写 `bind(Runnable { store.flush() })`。
 - reload 用 `ReloadChain`：分阶段命名、`addIf` 表达"上一步失败就别跑这几步"、`ReloadReport` 告诉服主是哪一段炸的。
 - 语言文件所有段（不只 `messages.*`）都走 `I18nService`，值用 MiniMessage。
@@ -57,9 +57,10 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 - **Reputations 的 3 个 `.java` 是故意的 Java API 面**（`org.cubexmc.reputations.api`），不要迁 Kotlin。
 - **Clarity 编译到 Java 21**（用 1.21 属性 API），全仓其余插件是 17；`jarGate` 已按各插件的 java release 分别校验。
 
-## 进行中的工作
+## 当前迁移基线
 
-- **Railway Kotlin 迁移统一以 `main` 为接力基线**；原 `kotlin/railway` 与 physics 系列提交均已合并。原始源码 124/167 已迁（当前 `44 Java / 124 Kotlin`，多出的 Java 是有意保留的 PlaceholderAPI 可空 shim）。manager、service、`train` 与 `physics` 已全部完成，下一批迁 GUI core，再按 view → controller 推进。接力点、细化后的批次顺序、共享能力审计规则，以及“能不能照抄 Metro 的 `.kt`”的两步判据都在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。**接手前先读那一节**——语言迁移与公共模块抽取分轨提交；Railway 独有运行时必须从自身 Java 机械迁移，同源文件也要检查 Metro Kotlin 后续玩法提交。
+- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；`cubex-core`、`cubex-config`、`cubex-i18n`、`cubex-scheduler` 的实现也已迁 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
+- Railway 的迁移批次、共享能力审计和“能不能复用 Metro `.kt`”的两步判据保留在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)，供后续同源维护使用；它们不再是待办清单。
 
 ## 已知脆弱点
 

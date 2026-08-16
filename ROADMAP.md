@@ -12,10 +12,11 @@
 
 ## 已确认的未来计划
 
-### 1. 全面 Kotlin 化
-- 新插件直接 Kotlin(`Reputations` 已是);老插件按"小文件→大文件"逐个 `.java → .kt`;`cubex-core` 最后迁。
+### 1. 全面 Kotlin 化 ✅（2026-08-16）
+- 全部插件与四个 `cubex-*` 共享模块已迁 Kotlin；`cubex-core` 按计划最后完成。
+- 保留的 Java 仅限 vendored bStats `Metrics.java`、Reputations 公开 Java API 与必要互操作 shim，不属于迁移欠账。
 - 遵循既有路线与风格:`CUBEX_KOTLIN_MIGRATION_DESIGN.md`、`KOTLIN_STYLE_GUIDE.md`(含 avoid kotlin-reflect 等约束)。
-- 目标:全仓统一语言,消除 Java/Kotlin 混编的样板与构建差异。
+- 后续新实现直接使用 Kotlin；精确状态用 `kotlinMigrationStatus` 检查。
 
 ### 2. EcoBalancer 基于自定义事件的税收
 - 让税收不止"定时/交易",而是可挂在**自定义游戏事件**上。示例:**死亡不掉落税**——`keepInventory` 生效、玩家死亡时按规则收税。

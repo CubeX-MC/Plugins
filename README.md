@@ -72,6 +72,7 @@ plugins/
 │  └─ src/main/kotlin/
 │     ├─ cubex-plugin.gradle.kts          # 通用约定(Java 插件:shadow/瘦身/runServer)
 │     ├─ cubex-kotlin-plugin.gradle.kts   # Kotlin 插件 opt-in(额外 kotlin("jvm") + stdlib relocate)
+│     ├─ cubex-kotlin-library.gradle.kts  # Kotlin 共享模块约定(Java 17/JUnit/互操作参数)
 │     ├─ CubexVersions.kt / CubexDependencies.kt / CubexRelocations.kt
 ├─ modules/                 # 共享模块(无 shadowJar,被各插件依赖后 shade 进去)
 │  ├─ cubex-core/  cubex-scheduler/  cubex-config/  cubex-i18n/
@@ -79,10 +80,11 @@ plugins/
                             # EcoBalancer RuleGems Metro Railway Clarity Reputations
 ```
 
-### Java vs Kotlin 插件
+### Kotlin 约定插件
 
-- 纯 Java 插件：`plugins { id("cubex-plugin") }`
-- 已迁 Kotlin 的插件：`plugins { id("cubex-kotlin-plugin") }`（逐插件 opt-in，纯 Java 插件零影响、不引入 stdlib）
+- 可部署插件：`plugins { id("cubex-kotlin-plugin") }`（在通用 shadow/runServer 约定上增加 Kotlin 与 stdlib relocation）。
+- `modules/cubex-*` 共享库：`plugins { id("cubex-kotlin-library") }`（不生成 shadowJar，由插件 shade）。
+- 仓库已完成 Kotlin opt-in；遗留 `.java` 是 vendored 源码、公开 Java API 或互操作 shim。
 
 ---
 

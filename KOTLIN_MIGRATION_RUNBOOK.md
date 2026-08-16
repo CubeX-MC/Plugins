@@ -14,42 +14,35 @@
 .\gradlew.bat kotlinMigrationStatus
 ```
 
-截至 2026-08-04：
+截至 2026-08-16：
 
 | 插件 | 状态 |
 |------|------|
-| BookLite / FAWEReplacer / MountLicense / Contract / EcoBalancer / RuleGems | ✅ main 源码全 Kotlin（仅留 vendored bStats `Metrics.java`） |
+| BookLite / FAWEReplacer / MountLicense / Contract / EcoBalancer / RuleGems / Clarity | ✅ 实现全 Kotlin（仅留 vendored bStats `Metrics.java`） |
 | Metro | ✅ 实现已全 Kotlin；保留 `Metrics.java` 与两个必要的 Java 互操作 shim |
 | Regions | ✅ 原生 Kotlin |
 | Reputations | ✅ 3 个 `.java` 是**故意**保留的 Java API 面（`org.cubexmc.reputations.api`），不要动 |
-| **Railway** | 🚧 **进行中**，见下节 |
-| **Clarity** | ⬜ 8 个 main `.java`，且是唯一零 `cubex-*` 模块接入的插件 |
-| **modules** | ⬜ cubex-config(16) / cubex-i18n(9) / cubex-scheduler(5)；**cubex-core(9) 按既定最后迁** |
+| Railway | ✅ 实现全 Kotlin；保留 `Metrics.java` 与 3 个必要的 Java 互操作 shim |
+| **modules** | ✅ cubex-core(9) / cubex-config(18) / cubex-i18n(9) / cubex-scheduler(5) 均为 Kotlin |
 
-### Railway 接力点
+全部插件均已 opt-in Kotlin 并接入 `CubexPlugin`。精确计数始终以
+`kotlinMigrationStatus` 为准；保留的 Java API、shim 和 vendored 源码不属于迁移欠账。
 
-当前统一以 **`main`** 为接力基线；原 `kotlin/railway` 与 physics 系列提交均已合并。
-原始源码 124/167 已迁；当前计数为 44 Java / 124 Kotlin，
-`:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
-`persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
-`service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-与 `train`、`physics` 包已全部完成；下一批迁 GUI core，再按 view → controller 推进。
+### Railway 迁移审计记录
+
+Railway 已全部完成；当前计数为 4 Java / 166 Kotlin，`:Railway:build` 与
+`:Railway:jarGate` 绿。4 个 Java 文件分别是 vendored `Metrics.java`、GUI 可空 holder shim、
+Paper command manager bootstrap 和 PlaceholderAPI 可空 shim，均有意保留。
+以下内容是各批次完成时留下的行为与互操作审计，供后续 Metro/Railway 同源维护使用，
+不是待办清单。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
 `RailwayPlaceholders` 因 PlaceholderAPI 把 `params` 标成非空、而旧实现明确容忍 null，新增了一个
-`NullablePlaceholderExpansion.java` 兼容 shim。它是有意保留的 Java 文件，因此当前 main 文件总数
-为 168；进度分母 167 仍指迁移开始时的原始源码数，不要为了让计数好看而删除这个 shim。
+`NullablePlaceholderExpansion.java` 兼容 shim。它是有意保留的 Java 文件，因此该批完成时 main
+文件总数为 168；进度分母 167 仍指迁移开始时的原始源码数，不要为了让计数好看而删除这个 shim。
 
-剩余（按建议顺序）：
-
-| 顺序 | 批次 | 文件 / 规模 | 边界说明 |
-|---|---|---:|---|
-| 1 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | **下一批**；core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
-| 2 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
-| 3 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
-
-这里的“行数”只用于控制审查面，计数仍以 `kotlinMigrationStatus` 为准。此前的外围 4 文件已按
+此前的外围 4 文件按
 `TravelTimeEstimator + RailwayPlaceholders` / `ConfigFacade` / `MetroAPI` 拆成三批，避免把 1939 行、
 配置与 API 两个兼容性面混进同一提交。
 
@@ -219,7 +212,7 @@ Railway 自己的 Java 为行为基线机械迁移；保留每 tick 强制位置
 helper 保留真实 JVM static bridge，`BootstrapState` 保留 record 形状，命令/状态对象继续提供原有
 字段访问，车厢列表元素和 rail direction 的防御性 null 守卫也未因 Kotlin 类型增强而删除。新增
 `KinematicPhysicsMigrationTest` 覆盖 JVM 形状、方向/间距、lookahead 速度规划和 trail 插值；定向测试、
-完整 `:Railway:build`、`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，当前为
+完整 `:Railway:build`、`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，该批完成时为
 `51 Java / 117 Kotlin`。
 
 共享能力审计结论：Kinematic helper 虽包含无状态数学，但其输入直接绑定 Bukkit `Location` / `Vector`、
@@ -232,7 +225,7 @@ powered ascending boost、NMS snap 与 Bukkit fallback 顺序均未改变。`Rea
 且可继承，剩余 Java `LeashedRailPhysics` 继续直接 extends；`ReactiveSpacingDecisions` 保留 JVM
 static bridge，`ReactiveCartStateStore` 继续克隆写入/读取的 Vector 与 Location，并按有效 UUID 清理。
 新增 `ReactivePhysicsMigrationTest` 覆盖 PD 数值、state clone/retain 语义与 Java 继承形状；定向测试、
-完整 `:Railway:build`、`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，当前为
+完整 `:Railway:build`、`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，该批完成时为
 `48 Java / 120 Kotlin`。
 
 共享能力审计结论：Reactive controller 直接绑定 Railway consist 更新顺序、Bukkit minecart/rail、
@@ -246,7 +239,7 @@ vanilla rail shape 缓存、方向选择、投影算法和 `project(null) == nul
 `LeashCoupler` / `LeashedRailPhysics` 保持 public 且可继承，默认 locale 的实体类型解析、dummy spawn、
 teleport、leash 恢复和 cleanup 顺序不变。新增 `PhysicsBridgeMigrationTest` 覆盖 rail 几何与 null/static
 契约、TrainCarts 缺席降级、leash JVM 继承形状；定向测试、完整 `:Railway:build`、
-`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，当前为 `44 Java / 124 Kotlin`。尚未在装有真实
+`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，该批完成时为 `44 Java / 124 Kotlin`。尚未在装有真实
 TrainCarts 的服务器执行手动冒烟。
 
 共享能力审计结论：rail path、TrainCarts MethodHandle 与 leash dummy 都围绕 Bukkit rail/minecart 和
@@ -385,7 +378,7 @@ class LineCommandService(lineManager: LineManager?) {
 
 ---
 
-## 下一轮（Railway）已知注意点
+## Railway 同源维护注意点
 
 - Railway 是 Metro 的同源 fork，Metro 这一轮的分批顺序、可空性模式、互操作坑**可整套复用**。对照 Metro 的同名文件改，通常八成能直接套。
 - **想直接抄 Metro 的 `.kt` 之前，先跑两步校验**，两步都过才可以照抄：

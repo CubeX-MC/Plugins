@@ -1,5 +1,9 @@
 # CubeX 插件体系架构改进方案
 
+> **实施状态（2026-08-16）**：本文记录的 B → C 路线已经落地；全部插件已接入
+> `CubexPlugin` 并迁 Kotlin，四个 `cubex-*` 共享模块也已迁 Kotlin。文中的 Java 文件数和
+> “`cubex-core` 保持 Java、最后再迁”是当时的决策背景，不是当前待办。
+
 > 状态:**决策已锁定(2026-05-31)** · 本文件是「为什么」的**决策依据**。
 > 「怎么做」的执行手册见 → [`REFACTOR_PLAYBOOK.md`](REFACTOR_PLAYBOOK.md)(执行 agent 读那份)。
 > 参考对象:[NewNanCity/Plugins](https://github.com/NewNanCity/Plugins)(已 clone 至 `../reference/NewNanCity-Plugins`,仅供学习)
