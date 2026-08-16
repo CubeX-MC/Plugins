@@ -28,8 +28,8 @@
 
 ### Railway 接力点
 
-已合并基线包含原 **`kotlin/railway`** 分支；physics 系列提交在
-**`codex/railway-physics-kinematic`**。原始源码 124/167 已迁；当前计数为 44 Java / 124 Kotlin，
+当前统一以 **`main`** 为接力基线；原 `kotlin/railway` 与 physics 系列提交均已合并。
+原始源码 124/167 已迁；当前计数为 44 Java / 124 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
