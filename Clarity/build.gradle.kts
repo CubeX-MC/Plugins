@@ -1,4 +1,4 @@
-plugins { id("cubex-plugin") }
+plugins { id("cubex-kotlin-plugin") }
 
 version = "1.0.0"
 description = "Clarity — scan and purge orphaned player state and item metadata left by removed plugins"
