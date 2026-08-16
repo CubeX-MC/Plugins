@@ -21,7 +21,7 @@ internal object KinematicFollowerController {
         carMaxSpeed: Double,
         baseSpeed: Double,
     ): FollowerCommand {
-        val projected = RailPathUtil.project(currentLocation)
+        val projected = RailPathUtil.projectRequired(currentLocation)
         val tangent = KinematicRailMotionMath.normalizeOr(existingVelocity, fallbackDirection)
         val corrected = KinematicSpacingMath.applySpacingUpdate(existingVelocity, null, carMaxSpeed)
         var aligned = KinematicRailMotionMath.alignVelocityToRail(
@@ -41,7 +41,7 @@ internal object KinematicFollowerController {
         fallbackDirection: Vector?,
         baseSpeed: Double,
     ): FollowerCommand {
-        val targetPosition = RailPathUtil.project(sample.location)
+        val targetPosition = RailPathUtil.projectRequired(sample.location)
         val motionDirection = KinematicRailMotionMath.normalizeOr(sample.tangent, fallbackDirection)
 
         val configuredMax = max(0.05, baseSpeed)

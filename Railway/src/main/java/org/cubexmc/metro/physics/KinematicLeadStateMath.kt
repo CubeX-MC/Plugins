@@ -35,7 +35,7 @@ internal object KinematicLeadStateMath {
             }
         }
 
-        nextLocation = RailPathUtil.project(nextLocation)
+        nextLocation = RailPathUtil.projectRequired(nextLocation)
         nextX = nextLocation.x
         nextY = nextLocation.y
         nextZ = nextLocation.z

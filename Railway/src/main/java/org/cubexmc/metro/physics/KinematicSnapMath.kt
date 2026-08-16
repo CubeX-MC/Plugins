@@ -25,7 +25,7 @@ internal object KinematicSnapMath {
         val velocityMagnitude = velocity?.length() ?: 0.0
         var motionDirection = resolveMotionDirection(velocity, facing, fallbackDirection)
 
-        val targetLocation = RailPathUtil.project(location.clone())
+        val targetLocation = RailPathUtil.projectRequired(location.clone())
         motionDirection = KinematicRailMotionMath.alignDirectionToRail(
             targetLocation,
             motionDirection,

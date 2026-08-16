@@ -110,7 +110,7 @@ open class KinematicRailPhysics : TrainPhysicsEngine {
         spacingCorrection: Vector,
     ) {
         var currentLocation = Location(lead.world, leadX, leadY, leadZ)
-        currentLocation = RailPathUtil.project(currentLocation)
+        currentLocation = RailPathUtil.projectRequired(currentLocation)
 
         val configuredMax = max(0.05, baseSpeed)
         lead.maxSpeed = configuredMax
