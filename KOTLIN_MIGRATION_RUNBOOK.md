@@ -28,12 +28,13 @@
 
 ### Railway 接力点
 
-**分支 `kotlin/railway`（origin 已有该分支）**，原始源码 106/167 已迁；当前计数为 62 Java / 106 Kotlin，
+已合并基线包含原 **`kotlin/railway`** 分支；当前 Kinematic physics 批次在
+**`codex/railway-physics-kinematic`**。原始源码 117/167 已迁；当前计数为 51 Java / 117 Kotlin，
 `:Railway:build` 与 `:Railway:jarGate` 绿。已整包完成：`util`、`update`、`event`、`spatial`、
 `persistence`、`model`、`estimation`、`config`、`api`；`placeholder` 的实现已迁，leaf 枚举/接口已清空。
 `service` 的叶子、命令域、virtual 和 dispatch runtime 批次也已完成，包内已无 Java；`manager`
-与 `train` 包已全部完成，下一批迁 Railway 独有的 `physics`，按 Kinematic / Reactive / bridge
-拆分。
+与 `train` 包已全部完成；`physics` 的 Kinematic 簇也已完成，下一批迁 Railway 独有的 Reactive
+physics，之后收口 bridge。
 `model` 最后完成的 `EntityDisplayConfig` / `EntityModelController` 是 Railway 独有实现，已从 Railway
 自己的 Java 机械迁移；其中 `DisplaySettings` 保留 JVM record 形状，供剩余 Java 调用方继续使用
 `spacing()` / `offsetY()` / `properties()`，静态 helper 也保留真正的 Java static bridge。
@@ -45,7 +46,7 @@
 
 | 顺序 | 批次 | 文件 / 规模 | 边界说明 |
 |---|---|---:|---|
-| 1 | `physics` | 18 文件 / 2451 行 | **下一批**；Railway 独有，Kinematic / Reactive / bridge 分批 |
+| 1 | `physics` | 剩余 7 文件 / 1322 行 | **下一批**；Reactive 3 文件，再迁 bridge 4 文件 |
 | 2 | GUI | core 5 + view 9 + controller 10，24 文件 / 3469 行 | core → view → controller；`GuiHolder` 沿用 Java shim 模式 |
 | 3 | 外围入口 | integration 3 → lifecycle 3 → command 7 → listener 4 | 每个包或调用簇独立验证 |
 | 4 | 主类 | `Metro.java` | 最后迁；`Metrics.java` 永远保留 Java |
@@ -213,6 +214,19 @@ Metro 迁移前 Java blob 完全一致，采用 `52feeee` 的迁移结构并补�
 `TrainConsist`、Bukkit entity/world/event、physics engine、chunk lifecycle 与虚拟列车回收，不下沉
 `cubex-*`。可独立复用的纯决策已经在此前拆到 `TrainNavigatorDecisions`、`TrainRuntimeDecisions`、
 `TrainStateMath`，调度走 `cubex-scheduler`；本批继续抽象只会把 Railway 运行时接口扩散到共享模块。
+
+`physics` 的 Kinematic 批次已完成，共 11 个 Java 文件。Metro 历史中没有对应实现，因此全部以
+Railway 自己的 Java 为行为基线机械迁移；保留每 tick 强制位置/速度、trail 采样与 follower 修正顺序，
+没有引入平滑、协程或物理参数调整。`KinematicRailPhysics` 继续是可继承的 public 类；包内 static
+helper 保留真实 JVM static bridge，`BootstrapState` 保留 record 形状，命令/状态对象继续提供原有
+字段访问，车厢列表元素和 rail direction 的防御性 null 守卫也未因 Kotlin 类型增强而删除。新增
+`KinematicPhysicsMigrationTest` 覆盖 JVM 形状、方向/间距、lookahead 速度规划和 trail 插值；定向测试、
+完整 `:Railway:build`、`:Railway:jarGate` 与 `kotlinMigrationStatus` 均通过，当前为
+`51 Java / 117 Kotlin`。
+
+共享能力审计结论：Kinematic helper 虽包含无状态数学，但其输入直接绑定 Bukkit `Location` / `Vector`、
+Railway rail type、minecart NMS snap、consist spacing 与插件配置，且其他插件目前没有同形实现；本批
+不新增 `cubex-*` 候选。现有 NMS 与调度边界继续通过插件内 utility 和 `cubex-scheduler` 承接。
 
 ---
 
