@@ -83,6 +83,7 @@ class VehicleListenerExtendedTest {
 
     private Minecart metroMinecart() {
         Minecart minecart = mock(Minecart.class);
+        when(minecart.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
         PersistentDataContainer pdc = mock(PersistentDataContainer.class);
         when(minecart.getPersistentDataContainer()).thenReturn(pdc);
         when(pdc.has(eq(MetroConstants.getMinecartKey()), eq(PersistentDataType.BYTE))).thenReturn(true);
@@ -309,7 +310,7 @@ class VehicleListenerExtendedTest {
         when(event.getTo()).thenReturn(to);
 
         try (MockedStatic<TrainMovementTask> taskRegistry = mockStatic(TrainMovementTask.class)) {
-            taskRegistry.when(() -> TrainMovementTask.getTaskFor(minecart)).thenReturn(task);
+            org.cubexmc.metro.train.TrainTaskRegistry.register(minecart, task);
             listener.onVehicleMove(event);
         }
 
@@ -348,7 +349,7 @@ class VehicleListenerExtendedTest {
         when(event.getTo()).thenReturn(to);
 
         try (MockedStatic<TrainMovementTask> taskRegistry = mockStatic(TrainMovementTask.class)) {
-            taskRegistry.when(() -> TrainMovementTask.getTaskFor(minecart)).thenReturn(null);
+            org.cubexmc.metro.train.TrainTaskRegistry.unregister(minecart);
             listener.onVehicleMove(event);
         }
 

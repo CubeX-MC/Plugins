@@ -90,7 +90,7 @@ class PlayerInteractListenerTest {
 
         invokeHandleStopPoint(fixtures.listener, fixtures.player, stop);
 
-        verify(fixtures.guiManager).openLineBoardingChoice(fixtures.player, stop, 0);
+        verify(fixtures.guiManager).openLineBoardingChoice(fixtures.player, stop, 0, null);
     }
 
     @Test

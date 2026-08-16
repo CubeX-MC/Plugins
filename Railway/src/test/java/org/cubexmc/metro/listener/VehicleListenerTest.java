@@ -311,7 +311,7 @@ class VehicleListenerTest {
         when(minecart.getMaxSpeed()).thenReturn(0.4);
 
         try (MockedStatic<TrainMovementTask> taskRegistry = org.mockito.Mockito.mockStatic(TrainMovementTask.class)) {
-            taskRegistry.when(() -> TrainMovementTask.getTaskFor(minecart)).thenReturn(task);
+            org.cubexmc.metro.train.TrainTaskRegistry.register(minecart, task);
             listener.onVehicleMove(event);
         }
 
@@ -345,7 +345,7 @@ class VehicleListenerTest {
         when(minecart.getMaxSpeed()).thenReturn(0.4);
 
         try (MockedStatic<TrainMovementTask> taskRegistry = org.mockito.Mockito.mockStatic(TrainMovementTask.class)) {
-            taskRegistry.when(() -> TrainMovementTask.getTaskFor(minecart)).thenReturn(task);
+            org.cubexmc.metro.train.TrainTaskRegistry.register(minecart, task);
             listener.onVehicleMove(event);
         }
 
@@ -397,6 +397,7 @@ class VehicleListenerTest {
 
     private Minecart metroMinecart() {
         Minecart minecart = mock(Minecart.class);
+        when(minecart.getUniqueId()).thenReturn(UUID.randomUUID());
         PersistentDataContainer pdc = mock(PersistentDataContainer.class);
         when(minecart.getPersistentDataContainer()).thenReturn(pdc);
         when(pdc.has(eq(MetroConstants.getMinecartKey()), eq(PersistentDataType.BYTE))).thenReturn(true);
