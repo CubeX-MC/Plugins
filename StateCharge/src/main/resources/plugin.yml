@@ -1,0 +1,52 @@
+name: StateCharge
+version: ${project.version}
+main: org.cubexmc.statecharge.StateChargePlugin
+api-version: '1.21'
+folia-supported: true
+author: CubeX-MC
+description: Paid timed player states (shrink, grow, fly) backed by Vault.
+# Vault is required for the economy API; soft-depend on common providers so StateCharge enables
+# AFTER the economy is registered (otherwise a load-order race can disable it until a reload).
+depend: [Vault]
+softdepend: [Essentials, CMI, EssentialsX]
+
+commands:
+  statecharge:
+    description: Buy and manage timed player states.
+    aliases: [sc]
+    usage: /statecharge help
+
+permissions:
+  statecharge.use:
+    description: Use the player commands (list, status, buy, help).
+    default: true
+  # The buy.<id> nodes below are only checked when a state's config sets its "permission" field to
+  # that node; they default to true so a server that opts into the check does not lock everyone out.
+  statecharge.buy.small:
+    description: Buy the small state (checked only when configured on that state).
+    default: true
+  statecharge.buy.giant:
+    description: Buy the giant state (checked only when configured on that state).
+    default: true
+  statecharge.buy.fly:
+    description: Buy the fly state (checked only when configured on that state).
+    default: true
+  statecharge.fly.keep:
+    description: Keep flight after the fly state expires.
+    default: false
+  statecharge.admin:
+    description: All StateCharge admin commands.
+    default: op
+    children:
+      statecharge.admin.give: true
+      statecharge.admin.clear: true
+      statecharge.admin.reload: true
+  statecharge.admin.give:
+    description: Grant a state for free. /statecharge admin give <player> <state> <seconds>
+    default: op
+  statecharge.admin.clear:
+    description: Clear active states. /statecharge admin clear <player> [state]
+    default: op
+  statecharge.admin.reload:
+    description: Reload config, language and stored state data.
+    default: op

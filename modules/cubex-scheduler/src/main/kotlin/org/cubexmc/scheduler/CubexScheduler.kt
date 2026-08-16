@@ -276,6 +276,8 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
     }
 
     companion object {
+        private val FOLIA: Boolean = probeFolia()
+
         @JvmStatic
         fun bindTo(plugin: CubexPlugin): CubexScheduler =
             CubexScheduler(plugin).also { scheduler -> plugin.bind(Runnable { scheduler.cancelAll() }) }
@@ -285,7 +287,9 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
             if (plugin is CubexPlugin) bindTo(plugin) else CubexScheduler(plugin)
 
         @JvmStatic
-        fun detectFolia(): Boolean = try {
+        fun detectFolia(): Boolean = FOLIA
+
+        private fun probeFolia(): Boolean = try {
             Class.forName("io.papermc.paper.threadedregions.RegionizedServer")
             true
         } catch (_: ClassNotFoundException) {

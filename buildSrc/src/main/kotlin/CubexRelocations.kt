@@ -11,6 +11,7 @@ object CubexRelocations {
         "Clarity" to "clarity",
         "Reputations" to "reputations",
         "Regions" to "regions",
+        "StateCharge" to "statecharge",
     )
 
     fun libsNamespace(projectName: String): String =

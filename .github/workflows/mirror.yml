@@ -45,7 +45,7 @@ jobs:
           # prefix(本地目录) 与 owner/repo 映射
           # 注意:新增插件前必须先建好目标 repo。本脚本是 set -euo pipefail,
           # 对不存在的 repo 执行 git ls-remote 会直接让整个 job 失败。
-          # 仍缺镜像 repo 的插件:Reputations。
+          # 仍缺镜像 repo 的插件:Reputations、StateCharge。
           prefixes=(BookLite FAWEReplacer MountLicense Contract EcoBalancer RuleGems Metro Railway Clarity Regions)
           repos=(CubeX-MC/BookLite CubeX-MC/FAWEReplace CubeX-MC/MountLicense CubeX-MC/Contract CubeX-MC/EcoBalancer CubeX-MC/RuleGems CubeX-MC/Metro CubeX-MC/Railway CubeX-MC/Clarity CubeX-MC/Regions)
 

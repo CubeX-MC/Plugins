@@ -1,5 +1,7 @@
 package org.cubexmc.scheduler;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,6 +20,30 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 class CubexSchedulerTest {
+
+    @Test
+    void foliaDetectionIsStableAcrossCalls() {
+        boolean first = CubexScheduler.detectFolia();
+
+        for (int i = 0; i < 1000; i++) {
+            assertEquals(first, CubexScheduler.detectFolia());
+        }
+    }
+
+    @Test
+    void foliaDetectionReportsFalseWithoutFoliaOnTheClasspath() {
+        assertFalse(CubexScheduler.detectFolia(),
+                "the test classpath has no Folia, so a correct probe must say so");
+    }
+
+    @Test
+    void legacyAdapterAgreesWithSchedulerFoliaDetection() {
+        Plugin plugin = mock(Plugin.class);
+
+        LegacySchedulerAdapter adapter = LegacySchedulerAdapter.builder(CubexScheduler.create(plugin)).build();
+
+        assertEquals(CubexScheduler.detectFolia(), adapter.isFolia());
+    }
 
     @Test
     void repeatingConsumerCanCancelItself() {
