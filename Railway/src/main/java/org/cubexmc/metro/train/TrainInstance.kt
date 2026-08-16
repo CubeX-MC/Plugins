@@ -468,7 +468,7 @@ class TrainInstance(
     private fun selectEngine(): TrainPhysicsEngine {
         val mode =
             line.controlMode
-                ?: TrainControlMode.from(service.plugin.config().getControlMode(), TrainControlMode.KINEMATIC)
+                ?: TrainControlMode.from(service.plugin.controlMode, TrainControlMode.KINEMATIC)
                 ?: throw NullPointerException("control mode")
         return when (mode) {
             TrainControlMode.REACTIVE -> ReactiveRailPhysics()
