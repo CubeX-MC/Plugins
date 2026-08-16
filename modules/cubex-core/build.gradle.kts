@@ -1,6 +1,4 @@
-plugins {
-    java
-}
+plugins { id("cubex-kotlin-library") }
 
 group = "org.cubexmc"
 version = "0.1.0"

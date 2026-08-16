@@ -32,7 +32,9 @@ tasks.register("kotlinMigrationStatus") {
         logger.lifecycle("%-26s %-8s %-18s %s".format("project", "kotlin", "main(java/kt)", "test(java/kt)"))
         rows.forEach { (path, dir) ->
             val optIn = File(dir, "build.gradle.kts").takeIf { it.isFile }
-                ?.readText()?.contains("cubex-kotlin-plugin") ?: false
+                ?.readText()?.let { buildScript ->
+                    buildScript.contains("cubex-kotlin-plugin") || buildScript.contains("cubex-kotlin-library")
+                } ?: false
             fun count(sourceSet: String, ext: String): Int {
                 val root = File(dir, "src/$sourceSet")
                 if (!root.isDirectory) return 0
