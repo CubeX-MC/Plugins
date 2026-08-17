@@ -74,20 +74,21 @@ plugins/
 │     ├─ cubex-kotlin-plugin.gradle.kts   # Kotlin 插件 opt-in(额外 kotlin("jvm") + stdlib relocate)
 │     ├─ cubex-kotlin-library.gradle.kts  # Kotlin 共享模块约定(Java 17/JUnit/互操作参数)
 │     ├─ CubexVersions.kt / CubexDependencies.kt / CubexRelocations.kt
-├─ modules/                 # 共享模块(无 shadowJar,被各插件依赖后 shade 进去)
-│  ├─ cubex-core/  cubex-scheduler/  cubex-config/  cubex-i18n/
-│  └─ cubex-integrations/           # 无状态的可选 Bukkit service 连接器
+├─ modules/                 # 9 个共享模块(无 shadowJar,被各插件依赖后 shade 进去)
+│  ├─ cubex-core/        cubex-config/      cubex-i18n/
+│  ├─ cubex-scheduler/   cubex-integrations/ cubex-database/
+│  └─ cubex-command/     cubex-gui/         cubex-spatial/
 └─ <各插件>/                # BookLite FAWEReplacer MountLicense Contract
                             # EcoBalancer RuleGems Metro Railway Clarity Reputations
                             # Regions StateCharge
 ```
 
-### Kotlin 约定插件
+### 架构与开发规范
 
-- 可部署插件：`plugins { id("cubex-kotlin-plugin") }`（在通用 shadow/runServer 约定上增加 Kotlin 与 stdlib relocation）。
-- `modules/cubex-*` 共享库：`plugins { id("cubex-kotlin-library") }`（不生成 shadowJar，由插件 shade）。
-- 仓库已完成 Kotlin opt-in；遗留 `.java` 是 vendored 源码、公开 Java API 或互操作 shim。
-- 可选插件连接使用 `cubex-integrations` 从**提供方 ClassLoader** 解析 Bukkit service；消费方不编译依赖或打包提供方 API，详见 `CUBEX_INTEGRATIONS_DESIGN.md`。
+- 架构设计与跨插件连接模型：详见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+- 共享模块 API 与使用方法：详见 [`MODULES.md`](MODULES.md)。
+- 演进规划与全仓待办：详见 [`PLAN.md`](PLAN.md)。
+- Kotlin 编码规范与门禁说明：详见 [`KOTLIN_STYLE_GUIDE.md`](KOTLIN_STYLE_GUIDE.md)。
 
 ---
 
@@ -95,5 +96,5 @@ plugins/
 
 - **`GradleWrapperMain not found`**：你在 git-bash 跑了 `./gradlew`。改用 PowerShell `.\gradlew.bat`。
 - **改了 `buildSrc` 后构建异常**：`buildSrc` 变更会触发全量重编，必要时 `.\gradlew.bat --stop` 后重试。
-- **验证 jar 内容**（Kotlin runtime relocate / 无 kotlin-reflect 实现 / 自有类字节码版本 / plugin.yml）：跑 `.\gradlew.bat :<Plugin>:jarGate`，不用再手工解包。门禁规则见 `KOTLIN_STYLE_GUIDE.md` 的 Jar Gate 一节；它**不查** plugin.yml 内容、bStats id、sqlite 平台数、adventure 是否单份，这些仍需人工确认。
-- **Kotlin 迁移怎么执行**：见 `KOTLIN_MIGRATION_RUNBOOK.md`（分批顺序、每批的验证循环、可空性处理模式、提交约定）。
+- **验证 jar 内容**（Kotlin runtime relocate / 无 kotlin-reflect 实现 / 自有类字节码版本 / plugin.yml）：跑 `.\gradlew.bat :<Plugin>:jarGate`，不用再手工解包。门禁规则见 `KOTLIN_STYLE_GUIDE.md` 的 Jar Gate 一节。
+
