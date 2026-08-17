@@ -2,9 +2,7 @@ package org.cubexmc.booklite.storage
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import java.io.File
 import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -15,6 +13,8 @@ import java.util.logging.Level
 import org.cubexmc.booklite.BookLitePlugin
 import org.cubexmc.booklite.config.ConfigManager
 import org.cubexmc.booklite.model.BookRecord
+import org.cubexmc.database.SQLiteDatabase
+import org.cubexmc.database.SQLitePragmas
 
 class BookRepository(
     private val plugin: BookLitePlugin,
@@ -25,19 +25,16 @@ class BookRepository(
     @Synchronized
     fun init() {
         try {
-            Class.forName("org.sqlite.JDBC")
             if (!plugin.dataFolder.exists() && !plugin.dataFolder.mkdirs()) {
                 plugin.logger.warning("Cannot create BookLite data folder.")
             }
-            val db = File(plugin.dataFolder, config.getSqliteFile())
-            connection = DriverManager.getConnection("jdbc:sqlite:${db.absolutePath}")
+            val pragmas = SQLitePragmas.builder()
+                .busyTimeoutMillis(5000)
+                .apply { if (config.isWal()) wal(true).synchronous("NORMAL") }
+                .foreignKeys(true)
+                .build()
+            connection = SQLiteDatabase(plugin, config.getSqliteFile(), pragmas).openConnection()
             requireConnection().createStatement().use { statement ->
-                statement.execute("PRAGMA busy_timeout = 5000")
-                if (config.isWal()) {
-                    statement.execute("PRAGMA journal_mode = WAL")
-                    statement.execute("PRAGMA synchronous = NORMAL")
-                }
-                statement.execute("PRAGMA foreign_keys = ON")
                 statement.execute(
                     """
                     CREATE TABLE IF NOT EXISTS books (

@@ -2,41 +2,39 @@ package org.cubexmc.ecobalancer.utils
 
 import org.bukkit.OfflinePlayer
 import org.bukkit.plugin.Plugin
-import java.io.File
 import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
 import java.util.Locale
 import java.util.logging.Logger
+import org.cubexmc.database.SQLiteDatabase
+import org.cubexmc.database.SQLitePragmas
 
 object DatabaseUtils {
-    private fun applyPragmas(connection: Connection) {
-        try {
-            connection.createStatement().use { statement ->
-                statement.execute("PRAGMA journal_mode=WAL")
-                statement.execute("PRAGMA synchronous=NORMAL")
-                statement.execute("PRAGMA foreign_keys=ON")
-                statement.execute("PRAGMA temp_store=MEMORY")
-                statement.execute("PRAGMA cache_size=-8192")
-                statement.execute("PRAGMA busy_timeout=10000")
-            }
-        } catch (_: SQLException) {
-        }
-    }
+    private val PRAGMAS = SQLitePragmas.builder()
+        .busyTimeoutMillis(10000)
+        .wal(true)
+        .synchronous("NORMAL")
+        .foreignKeys(true)
+        .tempStoreMemory(true)
+        .cacheSizeKb(8192)
+        .build()
 
-    private fun getDatabaseFile(plugin: Plugin): File = File(plugin.dataFolder, "records.db")
+    // ignorePragmaFailures keeps the pre-module behaviour: a PRAGMA that fails is not fatal here.
+    private fun database(plugin: Plugin): SQLiteDatabase =
+        SQLiteDatabase(
+            plugin,
+            "records.db",
+            PRAGMAS,
+            mirrorBusyTimeoutInUrl = true,
+            ignorePragmaFailures = true,
+        )
 
     @JvmStatic
     @Throws(SQLException::class)
-    fun getConnection(plugin: Plugin): Connection {
-        val databaseFile = getDatabaseFile(plugin)
-        val connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.absolutePath + "?busy_timeout=10000")
-        applyPragmas(connection)
-        return connection
-    }
+    fun getConnection(plugin: Plugin): Connection = database(plugin).openConnection()
 
     @JvmStatic
     fun initializeTables(plugin: Plugin, logger: Logger) {
