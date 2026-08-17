@@ -6,6 +6,28 @@ BookLite 是一个面向 Paper / Spigot 服务器的轻量化成书存储插件�
 
 它不会把每一本成书的完整页面都塞在物品数据里，而是把正文保存到本地 SQLite 数据库中，物品本身只保留极小的 BookLite 标记。玩家仍然可以通过接近原版的方式写书、读书、复制书，管理员也能审查、软删除、恢复和最终清理书籍数据。
 
+## 定位
+
+BookLite 的目标不是限制书本内容，而是把 Written Book 的大体积正文从物品数据里**剥离**出去，
+让实体物品只保留一个轻量标识。
+
+核心价值：
+
+- 允许玩家大量保存、复制、陈列书籍，降低箱子、潜影盒、讲台、图书馆区域的物品数据负担。
+- 保留接近原版的写书、读书、复制、讲台体验。
+- 降低大书、恶意书、书本数据溢出对区块加载、玩家登录、容器同步造成的风险。
+- 提供可审查、可删除、可恢复、**可退出**的图书内容治理能力，避免插件数据绑架。
+
+与同类方案的差异：PacketBooks 等插件也会把书内容外置，但定位更偏向修数据溢出与书本漏洞；
+BookExploitFix 偏向过滤危险点击事件；Paper 原生配置提供的是页数与体积上限。
+BookLite 更适合被当作**服务器图书馆基础设施**：可查询的 SQLite 数据库、内容去重、
+管理员可审查追踪、以及平滑的迁出路径。
+
+**不做什么**（避免误装）：
+
+- 不是"防禁人书插件"。它不过滤书页里的危险点击事件，那是 BookExploitFix 一类插件的职责。
+- 不设书本体积/页数硬上限来对抗漏洞——那用 Paper 原生配置更合适（本插件另有自己的 `limits` 用于存储保护）。
+
 ## 功能特性
 
 - 使用 SQLite 保存成书内容。
@@ -23,6 +45,23 @@ BookLite 是一个面向 Paper / Spigot 服务器的轻量化成书存储插件�
 - 基础讲台读取兼容：讲台上放置 BookLite 空壳书后，右键可打开数据库中的内容。
 - 卸载模式支持被动恢复玩家背包和打开过的容器，并提供 `/booklite restorecontainer` 恢复视线目标容器。
 - 管理命令支持 `/booklite list` 显示的短 ID，`info/read/get/delete/undelete` 可 Tab 补全完整 ID。
+
+## 运行要求
+
+| 项 | 要求 |
+|---|---|
+| 服务端 | Spigot / Paper 1.18+ |
+| Java | 17 |
+| 必需依赖 | 无（SQLite 已内置） |
+| Folia | 支持 |
+
+## 安装
+
+1. 把 `booklite-<version>.jar` 放进服务器 `plugins/`。
+2. 启动服务器生成默认配置与 `books.db`。
+3. 按需修改 `config.yml` 后 `/booklite reload`。
+
+> 部署用的是 `build/libs/booklite-<version>.jar`；同目录的 `*-plain.jar` **不要**部署。
 
 ## 命令
 
@@ -154,11 +193,23 @@ BookLite 当前基于 Bukkit / Spigot 的 `BookMeta` API，兼容面较广，但
 ## 构建
 
 ```powershell
-mvn verify
+.\gradlew.bat :BookLite:build      # 编译 + 测试 + 部署 jar
+.\gradlew.bat :BookLite:test       # 只跑测试
+.\gradlew.bat :BookLite:jarGate    # 部署 jar 门禁
 ```
 
-构建后的插件 jar 位于：
+Windows 必须用 PowerShell 跑 `.\gradlew.bat`（仓库路径含空格）。
+产物在 `BookLite/build/libs/booklite-<version>.jar`。
 
-```text
-target/booklite-0.1.0.jar
-```
+## 已知边界
+
+- 基于 Bukkit / Spigot `BookMeta` API，**不承诺保留 1.20.5+ 所有底层 data component 细节**。
+- 讲台是"读取兼容"：可以放 BookLite 空壳书并右键打开完整内容，但比较器输出、
+  原版讲台翻页状态与复杂红石装置行为不宣称完全一致。
+- 不会根据"当前存档里是否还扫得到物品"自动物理删除记录——离线玩家、未加载区块、
+  潜影盒、外部菜单与备份恢复都会让引用计数误判。清理请走软删除 + `purge` 确认式流程。
+
+## 相关文档
+
+- 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
+- 写入策略与权衡：[docs/build-notes.md](docs/build-notes.md)

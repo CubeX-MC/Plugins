@@ -118,7 +118,7 @@ Java 为唯一行为基线：保留双向 `linkPortals`、删除时解除反向�
 共享能力审计中，`StopManager` 本身包含 stops.yml 持久化、线路解绑、地图刷新和 `Stop` 领域语义，
 继续留在插件内；但 `spatial/Octree.kt`、`Point3D.kt`、`Range3D.kt` 在 Metro 与 Railway 当前树中
 blob 完全一致，且本身无状态、不了解线路/站点模型，满足 `cubex-spatial` 候选条件。候选已记入
-`ROADMAP.md`；实际抽取必须另开重构提交，先让一个插件改用模块并验证 shade/jarGate，再推广另一侧。
+`PLAN.md` §3；实际抽取必须另开重构提交，先让一个插件改用模块并验证 shade/jarGate，再推广另一侧。
 
 `LineManager` 已完成 manager 收口。Railway Java 与 Metro 迁移前 Java 的共同主体可复用 `36ab5dc`
 迁移结构，但 Railway 额外有约 140 行 service enabled/headway/dwell/train cars/control mode、实体类型、

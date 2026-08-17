@@ -4,6 +4,22 @@
 
 EcoBalancer 是一个智能的 Minecraft 经济插件，通过对不活跃玩家实施智能税收系统来优化服务器经济。它促进公平竞争，创造活跃的游戏环境，并为服务器经济提供智能管理解决方案。
 
+## 定位
+
+服务器跑久了会沉淀大量"死钱"——长期不上线玩家账户里锁着的货币。这些钱不参与流通，
+却实实在在推高了物价基准。EcoBalancer 的目标是**把死钱重新纳入调控**，
+而不是简单地惩罚离线玩家。
+
+它提供的是一套可解释的经济治理机制：服主用策略定义"哪些钱要处理、怎么处理"，
+执行过程有互斥保护与进度可查，每一笔扣税进账本，经济影响（基尼系数、集中度、中位数）
+在操作前后都有快照，玩家和公告系统能通过 PlaceholderAPI 看到税制状态。
+
+**不做什么**（避免误装）：
+
+- 不自己实现经济，只通过 Vault 操作余额。
+- 不做玩家间交易税以外的商业系统。
+- 不替服主决定税率——所有阈值与策略都在配置里。
+
 ## 主要特点
 
 - 自动化且可配置的税收设置
@@ -186,4 +202,29 @@ EcoBalancer 会把实际扣除的税款写入独立账本，用于 `/eb tax fund
 - 建议分批升级（先构建插件版本，再运行时依赖），便于定位回归和回滚。
 
 [![Forkers repo roster for @CubeX-MC/EcoBalancer](https://reporoster.com/forks/CubeX-MC/EcoBalancer)](https://github.com/CubeX-MC/EcoBalancer/network/members)
-[![Stargazers repo roster for @CubeX-MC/EcoBalancer](https://reporoster.com/stars/CubeX-MC/EcoBalancer)](https://github.com/CubeX-MC/EcoBalancer/stargazers) 
+[![Stargazers repo roster for @CubeX-MC/EcoBalancer](https://reporoster.com/stars/CubeX-MC/EcoBalancer)](https://github.com/CubeX-MC/EcoBalancer/stargazers)
+
+## 构建
+
+```powershell
+.\gradlew.bat :EcoBalancer:build      # 编译 + 测试 + 部署 jar
+.\gradlew.bat :EcoBalancer:test       # 只跑测试
+.\gradlew.bat :EcoBalancer:jarGate    # 部署 jar 门禁
+```
+
+Windows 必须用 PowerShell 跑 `.\gradlew.bat`（仓库路径含空格）。
+产物在 `EcoBalancer/build/libs/`；`*-plain.jar` **不要**部署。
+
+## 数据与安全
+
+税收记录、经济快照、税款账本保存在插件数据目录的 SQLite 数据库 `records.db`。
+执行中的税务操作有运行互斥，同一时刻不会有两个 checkall 并行。
+
+## 已知边界
+
+- 依赖 Vault 与一个经济 provider；没有 provider 时税收功能不可用。
+- 税收只作用于 Vault 可见的余额，不处理其他插件的私有货币。
+
+## 相关文档
+
+- 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)

@@ -6,6 +6,18 @@
 
 ## 中文文档
 
+### 定位
+
+大型服务器清世界时，常见做法是停服跑离线工具，或者用命令方块硬扫——前者要停机，后者会把主线程拖垮。
+FAWEReplace 借 FastAsyncWorldEdit 的异步能力，把**批量方块替换与实体清理**变成可以在线跑、
+可暂停、可断点续跑的长任务。
+
+**不做什么**（避免误装）：
+
+- 不是建筑/选区编辑工具，那是 WorldEdit/FAWE 本身的职责。
+- 不做地形生成或重置。
+- 没有 FAWE 就无法工作——它是硬依赖，不是可选加速。
+
 ### 简介
 
 **FAWEReplace** 是一个面向大型 Minecraft 世界清理任务的高性能 Paper 插件，基于 FastAsyncWorldEdit (FAWE) 的异步能力实现高效的批量方块替换与实体移除。
@@ -308,7 +320,6 @@ src/main/resources/
 **答**: 这是高度图损坏导致的。解决方法：
 1. 在配置中启用 `auto-fix-heightmap: true`（推荐）
 2. 或使用修复脚本：`scripts/fix_black_chunks.bat` (Windows) 或 `scripts/fix_black_chunks.sh` (Linux)
-3. 查看 `BLACK_CHUNKS_SOLUTION.md` 获取详细说明
 
 #### Q3: 服务器内存不足/卡顿怎么办？
 
@@ -317,7 +328,6 @@ src/main/resources/
 2. 增加 `delay-between-batches-ms`（建议 50-100）
 3. 设置 `min-free-memory-percent: 0.20` 或更高
 4. 启用 `gc-every-chunks: 50`
-5. 查看 `PERFORMANCE_GUIDE.md` 获取优化建议
 
 #### Q4: 如何只清理掉落物不清理方块？
 
@@ -333,10 +343,7 @@ entities:
 
 #### Q5: 支持分布式处理吗？
 
-**答**: 支持！查看以下文档：
-- `DISTRIBUTED_QUICKSTART.md` - 快速入门
-- `DISTRIBUTED_PROCESSING_GUIDE.md` - 详细指南
-- 使用 `scripts/split_world.sh` 和 `scripts/merge_worlds.sh` 工具
+**答**: 支持！使用 `scripts/split_world.sh` 和 `scripts/merge_worlds.sh` 工具。
 
 #### Q6: 会误删玩家建筑的区块吗？
 
@@ -344,7 +351,7 @@ entities:
 1. 只处理已生成的区块
 2. 跳过当前加载的区块
 3. 验证 TileEntity 兼容性
-详见 `CHUNK_SAFETY_ANALYSIS.md`
+区块安全策略见配置注释与 `### 🏗️ 技术架构` 一节
 
 #### Q7: 大范围清实体或清容器物品应该在线跑吗？
 
@@ -354,18 +361,11 @@ entities:
 3. 离线清容器物品使用 `tools/clean_entities_mca.py --mode containers`
 4. 详见 `tools/OFFLINE_CLEANING.md`
 
-### 📚 完整文档
+### 📚 相关文档
 
-- **[README.md](README.md)** - 本文档
-- **[tools/OFFLINE_CLEANING.md](tools/OFFLINE_CLEANING.md)** - 离线实体与容器清理说明
-- **[PERFORMANCE_GUIDE.md](PERFORMANCE_GUIDE.md)** - 性能优化完整指南
-- **[BLACK_CHUNKS_SOLUTION.md](BLACK_CHUNKS_SOLUTION.md)** - 黑色区块问题详解
-- **[LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md)** - 多语言功能说明
-- **[DISTRIBUTED_QUICKSTART.md](DISTRIBUTED_QUICKSTART.md)** - 分布式处理快速入门
-- **[DISTRIBUTED_PROCESSING_GUIDE.md](DISTRIBUTED_PROCESSING_GUIDE.md)** - 分布式处理详细指南
-- **[SAFETY_QUICK_REFERENCE.md](SAFETY_QUICK_REFERENCE.md)** - 安全性快速参考
-- **[CHUNK_SAFETY_ANALYSIS.md](CHUNK_SAFETY_ANALYSIS.md)** - 区块安全性详细分析
-- **[CONFIG_COMPARISON.md](CONFIG_COMPARISON.md)** - 配置对比说明
+- **[README_EN.md](README_EN.md)** - English version
+- 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
+- 离线实体与容器清理：[tools/OFFLINE_CLEANING.md](tools/OFFLINE_CLEANING.md)
 
 ### 📝 许可证
 
