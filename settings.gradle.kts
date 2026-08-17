@@ -6,6 +6,7 @@ include(":modules:cubex-core"); project(":modules:cubex-core").projectDir = file
 include(":modules:cubex-scheduler"); project(":modules:cubex-scheduler").projectDir = file("modules/cubex-scheduler")
 include(":modules:cubex-config"); project(":modules:cubex-config").projectDir = file("modules/cubex-config")
 include(":modules:cubex-i18n"); project(":modules:cubex-i18n").projectDir = file("modules/cubex-i18n")
+include(":modules:cubex-integrations"); project(":modules:cubex-integrations").projectDir = file("modules/cubex-integrations")
 
 // —— 插件子项目(目录原名,原地成为子项目)——
 // 第0阶段先只纳入 BookLite;第1阶段把其余插件逐个加进这个列表。

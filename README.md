@@ -76,6 +76,7 @@ plugins/
 │     ├─ CubexVersions.kt / CubexDependencies.kt / CubexRelocations.kt
 ├─ modules/                 # 共享模块(无 shadowJar,被各插件依赖后 shade 进去)
 │  ├─ cubex-core/  cubex-scheduler/  cubex-config/  cubex-i18n/
+│  └─ cubex-integrations/           # 无状态的可选 Bukkit service 连接器
 └─ <各插件>/                # BookLite FAWEReplacer MountLicense Contract
                             # EcoBalancer RuleGems Metro Railway Clarity Reputations
                             # Regions StateCharge
@@ -86,6 +87,7 @@ plugins/
 - 可部署插件：`plugins { id("cubex-kotlin-plugin") }`（在通用 shadow/runServer 约定上增加 Kotlin 与 stdlib relocation）。
 - `modules/cubex-*` 共享库：`plugins { id("cubex-kotlin-library") }`（不生成 shadowJar，由插件 shade）。
 - 仓库已完成 Kotlin opt-in；遗留 `.java` 是 vendored 源码、公开 Java API 或互操作 shim。
+- 可选插件连接使用 `cubex-integrations` 从**提供方 ClassLoader** 解析 Bukkit service；消费方不编译依赖或打包提供方 API，详见 `CUBEX_INTEGRATIONS_DESIGN.md`。
 
 ---
 

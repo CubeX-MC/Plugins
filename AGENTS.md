@@ -13,6 +13,7 @@ Minecraft 插件 monorepo（Gradle + `buildSrc` 约定插件）。产物是 **N 
 | 把某个插件迁到 Kotlin | [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)（流程）+ [`KOTLIN_STYLE_GUIDE.md`](KOTLIN_STYLE_GUIDE.md)（规则与互操作坑） |
 | 跨插件方向 / 优先级 | [`ROADMAP.md`](ROADMAP.md) |
 | 为什么是这套架构 | [`ARCHITECTURE_PROPOSAL.md`](ARCHITECTURE_PROPOSAL.md) §7/§8、各 `CUBEX_*_DESIGN.md` |
+| 做可选跨插件连接 | [`CUBEX_INTEGRATIONS_DESIGN.md`](CUBEX_INTEGRATIONS_DESIGN.md) |
 
 ## 常用命令
 
@@ -31,6 +32,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 ## 硬约束
 
 - **每个插件必须能单独安装**：不要引入插件间的编译期依赖；有状态的共享服务做成独立插件（如 Reputations），无状态共享代码走 `modules/cubex-*`。
+- **可选连接不是依赖**：通过 `cubex-integrations` 使用提供方插件 ClassLoader 解析 Bukkit service；消费方不 `implementation`/`compileOnly` 另一个插件，也不 shade 对方 API。`softdepend` 只用于可选加载顺序。
 - **新插件要加进 `buildSrc/src/main/kotlin/CubexRelocations.kt` 的 pluginIds**，否则 shadowJar 报 `Key X missing`。
 - **提交严格按插件 scope**（`git add -A -- <Plugin>`）：工作区经常有别的项目的并行 WIP，别卷进来。
 - **不要把重构和玩法/配置/文案改动混在一个提交里**。
@@ -48,6 +50,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 - 有状态的 store 实现 `Reloadable` + `Terminable`，直接 `bind(store)`，别再手写 `bind(Runnable { store.flush() })`。
 - reload 用 `ReloadChain`：分阶段命名、`addIf` 表达"上一步失败就别跑这几步"、`ReloadReport` 告诉服主是哪一段炸的。
 - 语言文件所有段（不只 `messages.*`）都走 `I18nService`，值用 MiniMessage。
+- 可选服务适配器按 Contract 的 Reputations bridge：本地行为先完成、桥失败只降级、不得缓存跨 reload 的 provider；事务型连接另做幂等领域 API。
 
 这一轮为此补的共享 API（都带测试）：`CubexPlugin.text()/log()/messager()` 放开为 public；`ReloadChain` 加 `ReloadFailurePolicy`/`addIf`/`ReloadReport`；`I18nService.rawOrNull`；`LegacyTextToMiniMessageStep.AngleBrackets.PRESERVE`。
 
@@ -59,7 +62,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 当前迁移基线
 
-- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；`cubex-core`、`cubex-config`、`cubex-i18n`、`cubex-scheduler` 的实现也已迁 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
+- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；五个 `cubex-*` 模块（含后续新增的 `cubex-integrations`）均使用 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
 - Railway 的迁移批次、共享能力审计和“能不能复用 Metro `.kt`”的两步判据保留在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)，供后续同源维护使用；它们不再是待办清单。
 
 ## 已知脆弱点

@@ -5,15 +5,17 @@
 
 ## 进行中 / 近期
 
-### R0 — Contract 接入 Reputations 并瘦身
+### R0 — Contract 接入 Reputations（第一阶段已完成）
 - 已新建独立插件 **`Reputations`**(Vault 模式 · ServicesManager `ReputationService` API · bStats 31877)。
-- 让 Contract 改为消费它:注册 `Contract:completed/cancelled/expired/disputed` 字段,结算/取消/争议钩子改调 `rep.add(...)`,详情读 `rep.get(...)`,删除 Contract 自带的 `ReputationStore`/`reputation.yml`/`/contract rep`。`softdepend` 缺席时优雅降级。
-- 详见 `Contracts/UI_REDESIGN_PLAN.md` 的 **P4**。待定:旧 `reputation.yml` 导入 vs 从零。
+- ✅ `cubex-integrations` 已提供不打包提供方 API 的可选 service 连接器；Contract 已注册 `Contract:completed/cancelled/expired/disputed`，并把**新发生的增量** best-effort 镜像到 Reputations。
+- 按“插件互不依赖”的新边界，Contract 保留 `ReputationStore`、`reputation.yml`、展示与命令；Reputations 缺席、禁用或不兼容时仍完整独立运行。旧方案中的“删除本地信誉”不再执行。
+- 待办：提供显式、幂等的历史数据导入工具；是否让展示优先读取聚合服务，需另做 UX/兼容设计。
+- 设计见 `CUBEX_INTEGRATIONS_DESIGN.md`；原 P4 记录见 `Contract/UI_REDESIGN_PLAN.md`。
 
 ## 已确认的未来计划
 
 ### 1. 全面 Kotlin 化 ✅（2026-08-16）
-- 全部插件与四个 `cubex-*` 共享模块已迁 Kotlin；`cubex-core` 按计划最后完成。
+- 全部插件与五个 `cubex-*` 共享模块均使用 Kotlin；`cubex-integrations` 在迁移收口后新增。
 - 保留的 Java 仅限 vendored bStats `Metrics.java`、Reputations 公开 Java API 与必要互操作 shim，不属于迁移欠账。
 - 遵循既有路线与风格:`CUBEX_KOTLIN_MIGRATION_DESIGN.md`、`KOTLIN_STYLE_GUIDE.md`(含 avoid kotlin-reflect 等约束)。
 - 后续新实现直接使用 Kotlin；精确状态用 `kotlinMigrationStatus` 检查。
@@ -30,7 +32,7 @@
 - 旧数据迁移工具(供 Contract 等首批接入方导入历史计数)。
 
 ### 4. 尽量模块化(沉淀可复用能力为 `cubex-*` 模块)
-- 候选:`cubex-i18n`(已存在,推广到所有插件)、**reputation 接入 helper 模块**(封装"取 ServicesManager 服务 + 注册字段 + 降级"的样板)、`cubex-scheduler`、`cubex-config`/迁移、把 Contract 的 `Menu`/`InventoryButton` 框架抽成 **`cubex-gui`**。
+- 已落地：`cubex-i18n`、`cubex-scheduler`、`cubex-config`，以及 **`cubex-integrations`**（提供方 ClassLoader + ServicesManager + 降级；不持有领域状态）。候选：把 Contract 的 `Menu`/`InventoryButton` 框架抽成 **`cubex-gui`**。
 - **`cubex-spatial` 候选（2026-08-02 审计）**：Metro/Railway 的 `Octree`、`Point3D`、`Range3D` 当前 blob 完全一致，且是无状态、领域无关的空间索引。另开重构提交先接入一个插件并过 shade/jarGate，再推广；不要把 `StopManager` 或 `Stop` 一并下沉。
 - **铁律(见架构讨论)**:**有状态的共享服务 = 独立插件**(单实例持有数据,如 Reputations);**无状态的共享代码 = shade 进各 jar 的模块**(如 `cubex-core`)。别把有状态服务做成 shade 模块(各插件会各持一份、互不共享)。
 - 配合 `ARCHITECTURE_PROPOSAL.md` 的 core API 边界设计,避免 god-module 与返工。
