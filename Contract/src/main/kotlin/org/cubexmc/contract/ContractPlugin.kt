@@ -1,6 +1,7 @@
 package org.cubexmc.contract
 
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.plugin.ServicePriority
 import org.cubexmc.config.ConfigReload
 import org.cubexmc.config.LegacyTextToMiniMessageStep
 import org.cubexmc.config.MigrationContext
@@ -20,6 +21,8 @@ import org.cubexmc.contract.config.LangV2ToV3Step
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.gui.ContractGui
 import org.cubexmc.contract.integration.reputation.ReputationsMirror
+import org.cubexmc.contract.api.escrow.ContractEscrowService
+import org.cubexmc.contract.integration.regions.ContractEscrowServiceImpl
 import org.cubexmc.contract.listener.ObjectiveListener
 import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.service.ContractService
@@ -48,6 +51,7 @@ class ContractPlugin : CubexPlugin() {
     private var pendingStore: PendingTransactionStore? = null
     private var eventLog: EventLog? = null
     private var contractService: ContractService? = null
+    private var contractEscrowService: ContractEscrowService? = null
     private var contractGui: ContractGui? = null
     private var resourceFiles: ResourceFiles? = null
     private var cubexScheduler: CubexScheduler? = null
@@ -109,6 +113,8 @@ class ContractPlugin : CubexPlugin() {
         eventLog = EventLog(this)
         contractService = ContractService(this, storage(), economy(), pending(), eventLog(), batchAcceptances())
         contracts().recoverPendingTransactions()
+        contractEscrowService = ContractEscrowServiceImpl(storage(), contracts(), log())
+        server.servicesManager.register(ContractEscrowService::class.java, contractEscrowService!!, this, ServicePriority.Normal)
         val overdue = contracts().activateScheduled()
         if (overdue > 0) log().info("Published $overdue overdue scheduled contracts during startup.")
         contractGui = bind(ContractGui(this))

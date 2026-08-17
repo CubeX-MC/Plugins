@@ -7,6 +7,8 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.contract.integration.regions.RegionFundingExecutor
+import org.cubexmc.contract.integration.regions.RegionFundingMetadata
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.model.Asset
 import org.cubexmc.contract.model.BatchRepeatPolicy
@@ -40,7 +42,7 @@ class ContractService(
     private val pending: PendingTransactionStore,
     private val eventLog: EventLog,
     private val batchAcceptances: BatchAcceptanceStore,
-) {
+) : RegionFundingExecutor {
     /**
      * Resolves a `ui.*` language key for a player-facing failure reason. Resolved per call rather
      * than cached, so `/contract admin reload` picks up a language change immediately.
@@ -1465,13 +1467,24 @@ class ContractService(
         if (contract.status().isFinal()) {
             return ServiceResult.fail(ui("err-contract-final"))
         }
-        return refund(contract, ContractStatus.CANCELLED, "ADMIN_REFUNDED", "$adminName forced refund")
+        val regionLocked = !contract.metadata[RegionFundingMetadata.REGION_ID].isNullOrBlank()
+        return settle(
+            contract,
+            if (regionLocked) PayoutCondition.TIMEOUT else PayoutCondition.FAILURE,
+            ContractStatus.CANCELLED,
+            "ADMIN_REFUNDED",
+            "$adminName forced refund",
+            allowRegionLocked = regionLocked,
+        )
     }
 
     @Synchronized
     fun adminClose(contract: Contract, adminName: String): ServiceResult {
         if (contract.status().isFinal()) {
             return ServiceResult.fail(ui("err-contract-final"))
+        }
+        if (!contract.metadata[RegionFundingMetadata.REGION_ID].isNullOrBlank()) {
+            return ServiceResult.fail(ui("err-auto-settle-blocked"))
         }
         val now = System.currentTimeMillis()
         contract.status(ContractStatus.CANCELLED)
@@ -1574,6 +1587,54 @@ class ContractService(
     fun allContracts(): List<Contract> = storage.all()
 
     @Synchronized
+    override fun recordLock(contract: Contract, regionId: String, operationId: String) {
+        logEvent(
+            contract,
+            System.currentTimeMillis(),
+            "REGION_FUNDING_LOCKED",
+            "Region $regionId locked WAGER funding with operation $operationId",
+        )
+    }
+
+    @Synchronized
+    override fun settle(
+        contract: Contract,
+        winnerId: UUID,
+        operationId: String,
+        regionId: String,
+    ): ServiceResult {
+        val partyA = contract.participant(ParticipantRole.PARTY_A).map { it.uuid() }.orElse(null)
+        val condition = if (winnerId == partyA) {
+            PayoutCondition.DISPUTE_RESOLVED_FOR_OWNER
+        } else {
+            PayoutCondition.DISPUTE_RESOLVED_FOR_CONTRACTOR
+        }
+        return settle(
+            contract,
+            condition,
+            ContractStatus.COMPLETED,
+            "REGION_FUNDING_SETTLED",
+            "Region $regionId settled WAGER funding for $winnerId with operation $operationId",
+            allowRegionLocked = true,
+        )
+    }
+
+    @Synchronized
+    override fun refund(
+        contract: Contract,
+        operationId: String,
+        regionId: String,
+        reason: String,
+    ): ServiceResult = settle(
+        contract,
+        PayoutCondition.TIMEOUT,
+        ContractStatus.CANCELLED,
+        "REGION_FUNDING_REFUNDED",
+        "Region $regionId refunded WAGER funding with operation $operationId: $reason",
+        allowRegionLocked = true,
+    )
+
+    @Synchronized
     @Throws(IOException::class)
     fun flushStores() {
         storage.flushIfDirty()
@@ -1631,7 +1692,16 @@ class ContractService(
         newStatus: ContractStatus,
         eventType: String,
         detail: String,
-    ): ServiceResult = settleWithRules(contract, contract.payoutsFor(condition), condition.name, newStatus, eventType, detail)
+        allowRegionLocked: Boolean = false,
+    ): ServiceResult = settleWithRules(
+        contract,
+        contract.payoutsFor(condition),
+        condition.name,
+        newStatus,
+        eventType,
+        detail,
+        allowRegionLocked,
+    )
 
     private fun settleWithRules(
         contract: Contract,
@@ -1640,7 +1710,11 @@ class ContractService(
         newStatus: ContractStatus,
         eventType: String,
         detail: String,
+        allowRegionLocked: Boolean = false,
     ): ServiceResult {
+        if (!allowRegionLocked && !contract.metadata[RegionFundingMetadata.REGION_ID].isNullOrBlank()) {
+            return ServiceResult.fail(ui("err-auto-settle-blocked"))
+        }
         if (rules.isEmpty()) {
             return ServiceResult.fail(ui("err-no-settlement-rule", mapOf("purpose" to purpose)))
         }

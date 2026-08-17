@@ -17,6 +17,7 @@ around in the plugin. What that means concretely:
 | `cubex-config` | `MigrationPlan`/`MigrationRunner` for config and lang schema, `ReloadChain` for `/contract admin reload`, `ResourceFiles` |
 | `cubex-i18n` | One `I18nService` for **every** locale section |
 | `cubex-scheduler` | `CubexScheduler` for all repeating and entity-bound tasks |
+| `cubex-integrations` | Provider-classloader discovery for optional services; Contract also publishes its provider-owned escrow API |
 
 Rules that follow from that status:
 

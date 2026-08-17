@@ -12,6 +12,8 @@
 
 运行时目标为 Paper，不依赖 QuickShop、Lands、RuleGems、Reputations 或数据库驱动。CMI、Essentials/EssentialsX 仅作为可选的 Vault 经济提供者和加载顺序提示，不是 Contract 的硬依赖。安装 Reputations 后，Contract 会通过可选 Bukkit service 注册四个 `Contract:*` 字段并镜像新发生的信誉增量；未安装或桥不可用时，本地 `reputation.yml`、命令与展示照常工作。历史本地值不会自动导入，避免重复计数。Paper 1.21.6+ 使用原生 Dialog 创建/确认界面；较旧 Paper 版本自动回退到库存 GUI 与聊天输入。插件不再打包 AnvilGUI，Adventure 由 Paper 提供。
 
+Contract 同时作为可选提供方发布 `ContractEscrowService`。Regions 安装时可把一个双方已接受、处于 `IN_PROGRESS` 的 WAGER 锁给 `dual_pvp`/`union_war` 场地；Contract 仍独占 Vault 付款、退款、争议与审计。Contract 不依赖 Regions，未安装 Regions 时原有 WAGER 流程不变。
+
 ## 构建
 
 ```powershell
@@ -172,6 +174,8 @@ GUI 合同大厅支持按全部/SERVICE/WAGER/PARTNERSHIP 筛选；“我的合�
 SERVICE 奖金进入插件托管记录。创建费直接作为经济回收。
 
 WAGER 创建时扣除甲方押注；乙方接受时扣除乙方押注。裁决后胜方获得双方押注扣除完成佣金后的金额，佣金作为经济回收。待接受超时或甲方取消时只退还甲方已托管押注，不会给未接受的乙方付款。
+
+WAGER 被 Regions 资金 lease 锁定后，普通仲裁、自动结算和无资金 `admin close` 会被阻止，避免与比赛结果竞争。Regions 正常提交胜者时按甲/乙方胜规则结算；强制结束、reload 或重启恢复走双方退款。`admin refund` 是紧急完整退款通道，但会让 Regions 的残留 lease 进入人工复核。
 
 PARTNERSHIP 创建时扣除甲方押注；乙方接受时扣除乙方押注。双方确认成功时各自取回自己的押注扣除完成佣金后的金额；取消、超时或管理员退款按当前状态退回已托管押注。
 

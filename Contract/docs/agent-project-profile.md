@@ -99,6 +99,9 @@ Keep platform and artifact claims synchronized across:
 - Local reputation state: `storage/ReputationStore` and `reputation.yml`.
 - Optional reputation delta adapter: `integration/reputation/ReputationsMirror`,
   connected through shaded `cubex-integrations` and the provider class loader.
+- Provider-owned optional API: `api/escrow/ContractEscrowService`; its Regions
+  implementation accepts only funded `IN_PROGRESS` WAGERs and persists lock/
+  terminal operation metadata inside `contract.yml`.
 - Models: `model/*`.
 - Localization: `config/LanguageManager`, `resources/lang/zh_CN.yml`, and
   `resources/lang/en_US.yml`.
@@ -126,6 +129,10 @@ Keep platform and artifact claims synchronized across:
   against or shade provider APIs, and must treat provider failures as
   best-effort degradation. Transactional integrations require a separate,
   idempotent domain contract.
+- A region-funded WAGER cannot use ordinary settlement paths. The external
+  transaction operation id owns both its lock and terminal call and is persisted
+  before payout; incomplete or conflicting terminal attempts fail closed as
+  manual review instead of paying twice.
 
 ## Current Batch Substrate
 
