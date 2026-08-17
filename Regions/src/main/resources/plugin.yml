@@ -5,7 +5,7 @@ api-version: '1.21.11'
 folia-supported: true
 author: CubeX-MC
 description: Region-powered venue framework for RuleGems rulers and server events.
-softdepend: [Lands, RuleGems]
+softdepend: [Lands, RuleGems, Contract]
 
 permissions:
   regions.use:

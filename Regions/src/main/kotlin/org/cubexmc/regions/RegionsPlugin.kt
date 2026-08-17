@@ -9,6 +9,7 @@ import org.cubexmc.config.ReloadReport
 import org.cubexmc.config.ResourceFiles
 import org.cubexmc.core.CubexPlugin
 import org.cubexmc.core.Reloadable
+import org.cubexmc.integrations.OptionalServiceConnector
 import org.cubexmc.regions.command.RegionsCommand
 import org.cubexmc.regions.capability.BuiltInRegionCapabilities
 import org.cubexmc.regions.capability.CapabilityCatalog
@@ -21,6 +22,7 @@ import org.cubexmc.regions.gui.RegionsGui
 import org.cubexmc.regions.integration.BuiltInRegionSources
 import org.cubexmc.regions.integration.FallbackUnionProvider
 import org.cubexmc.regions.integration.LandsUnionProvider
+import org.cubexmc.regions.integration.contract.ContractRewardFundingProvider
 import org.cubexmc.regions.integration.RegionSourceRegistry
 import org.cubexmc.regions.integration.UnionProviderRegistry
 import org.cubexmc.regions.listener.PlayerLifecycleListener
@@ -45,6 +47,9 @@ import org.cubexmc.regions.service.RegionTriggerService
 import org.cubexmc.regions.service.RegionTrialService
 import org.cubexmc.regions.service.RegionValidationService
 import org.cubexmc.regions.storage.RegionStorage
+import org.cubexmc.regions.storage.RewardFundingStore
+import org.cubexmc.regions.reward.RewardFundingService
+import org.cubexmc.regions.reward.RewardFundingRuntime
 import org.cubexmc.scheduler.CubexScheduler
 import java.io.File
 import kotlin.math.max
@@ -79,6 +84,8 @@ class RegionsPlugin : CubexPlugin() {
     private var templateService: RegionTemplateService? = null
     private var trialService: RegionTrialService? = null
     private var cubexScheduler: CubexScheduler? = null
+    private var rewardFundingStore: RewardFundingStore? = null
+    private var rewardFundingService: RewardFundingRuntime? = null
 
     override fun enablePlugin() {
         cubexScheduler = CubexScheduler.bindTo(this)
@@ -103,6 +110,19 @@ class RegionsPlugin : CubexPlugin() {
         unions().register(LandsUnionProvider(this))
         unions().register(FallbackUnionProvider())
         unions().setPreferred(config.getString("integrations.union-provider", "lands") ?: "lands")
+
+        rewardFundingStore = bind(RewardFundingStore(File(dataFolder, "reward-funding.yml"), log()))
+        fundingStore().reload()
+        rewardFundingService = RewardFundingService(
+            ContractRewardFundingProvider(OptionalServiceConnector(server), log()),
+            fundingStore(),
+            { playerId -> unions().active()?.getUnion(playerId)?.id },
+            log(),
+        )
+        val fundingRecovery = rewards().reconcile()
+        fundingRecovery.filterNot { it.successful }.forEach {
+            log().warn("Reward funding recovery remains pending (${it.code}): ${it.detail}")
+        }
 
         modeRegistry = RegionModeRegistry()
         modes().register("free_event")
@@ -144,7 +164,17 @@ class RegionsPlugin : CubexPlugin() {
         regionStorage = bind(RegionStorage(this))
         storage().load()
         overlapResolver = RegionOverlapResolver()
-        validationService = RegionValidationService(sources(), modes(), flags(), effects(), actions(), conditions(), capabilities(), overlaps())
+        validationService = RegionValidationService(
+            sources(),
+            modes(),
+            flags(),
+            effects(),
+            actions(),
+            conditions(),
+            capabilities(),
+            overlaps(),
+            rewards(),
+        )
         regionRegistry = RegionRegistry(storage(), validation())
         auditService = bind(RegionAuditService(this))
         audit().load()
@@ -207,6 +237,11 @@ class RegionsPlugin : CubexPlugin() {
             .addIf("templates", { flushed }, templates())
             .addIf("regions", { flushed }, storage())
             .addIf("lifecycle", { flushed }, Reloadable { lifecycle().reconcile() })
+            .addIf("reward-funding", { flushed }, Reloadable {
+                rewards().reconcile().filterNot { it.successful }.forEach {
+                    log().warn("Reward funding recovery remains pending (${it.code}): ${it.detail}")
+                }
+            })
             .addIf("validate", { flushed }, Reloadable { warnOnValidationIssues() })
             .run()
 
@@ -292,6 +327,10 @@ class RegionsPlugin : CubexPlugin() {
     fun trials(): RegionTrialService = trialService ?: throw IllegalStateException("trialService not initialized")
 
     fun regionScheduler(): CubexScheduler = cubexScheduler ?: throw IllegalStateException("cubexScheduler not initialized")
+
+    fun rewards(): RewardFundingRuntime = rewardFundingService ?: throw IllegalStateException("rewardFundingService not initialized")
+
+    private fun fundingStore(): RewardFundingStore = rewardFundingStore ?: throw IllegalStateException("rewardFundingStore not initialized")
 
     private fun registerCommand() {
         val command = RegionsCommand(this)

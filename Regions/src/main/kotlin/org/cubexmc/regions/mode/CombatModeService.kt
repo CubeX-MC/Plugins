@@ -164,6 +164,12 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         if (state.active) {
             return
         }
+        val funding = plugin.rewards().reserve(region)
+        if (!funding.successful) {
+            plugin.log().warn("Could not reserve Contract funding for ${region.id} (${funding.code}): ${funding.detail}")
+            broadcast(state, plugin.gameText("game.combat.not-ready"))
+            return
+        }
         state.active = true
         state.ready.clear()
         state.prompted = false
@@ -198,12 +204,23 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         reason: String,
         immediate: Boolean = !plugin.regionScheduler().isFolia,
         restorePlayers: Boolean = true,
+        winnerCandidates: Set<UUID> = emptySet(),
     ) {
         val state = states[regionId] ?: return
         state.active = false
         endingRegions.add(regionId)
         states.remove(regionId, state)
         val region = plugin.regions().find(regionId)
+        if (region != null) {
+            val funding = if (winnerCandidates.isEmpty()) {
+                plugin.rewards().refund(region, reason)
+            } else {
+                plugin.rewards().settle(region, winnerCandidates)
+            }
+            if (!funding.successful) {
+                plugin.log().severe("Contract funding for $regionId was not finalized (${funding.code}): ${funding.detail}")
+            }
+        }
         plugin.audit().record(
             null,
             regionId,
@@ -352,7 +369,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
             return
         }
         if (state.players.size < minPlayers(region)) {
-            end(state.regionId, reason)
+            end(state.regionId, reason, winnerCandidates = state.players.toSet())
             return
         }
         if (region.mode?.type.equals("union_war", ignoreCase = true)) {
@@ -362,7 +379,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                 if (winner != null) {
                     broadcast(state, plugin.gameText("game.combat.union-winner", mapOf("union" to winner)))
                 }
-                end(state.regionId, reason)
+                end(state.regionId, reason, winnerCandidates = state.players.toSet())
             }
         }
     }

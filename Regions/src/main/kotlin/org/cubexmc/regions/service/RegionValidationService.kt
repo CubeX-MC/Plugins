@@ -13,6 +13,7 @@ import org.cubexmc.regions.mode.RegionModeRegistry
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.model.ValidationIssue
 import org.cubexmc.regions.model.ValidationSeverity
+import org.cubexmc.regions.reward.RewardFundingValidator
 import java.util.Locale
 
 class RegionValidationService(
@@ -24,6 +25,7 @@ class RegionValidationService(
     private val conditions: RegionConditionRegistry,
     private val capabilities: CapabilityCatalog,
     private val overlaps: RegionOverlapResolver = RegionOverlapResolver(),
+    private val rewardFunding: RewardFundingValidator? = null,
 ) {
     fun validateAll(regions: Collection<RegionDefinition>): List<ValidationIssue> {
         val definitions = regions.toList()
@@ -137,10 +139,14 @@ class RegionValidationService(
         val mode = region.mode ?: return
         val values = mode.values
         if (!values["reward-source"].isNullOrBlank() || !values["reward-contract"].isNullOrBlank()) {
-            issues.add(error(
-                region.id,
-                "Mode rewards are not available in the first release. Remove reward-source/reward-contract before publishing.",
-            ))
+            val funding = rewardFunding?.check(region)
+                ?: org.cubexmc.regions.reward.FundingResult.fail("PROVIDER_UNAVAILABLE")
+            if (!funding.successful) {
+                issues.add(error(
+                    region.id,
+                    "Contract reward funding is unavailable (${funding.code}): ${funding.detail}",
+                ))
+            }
         }
         val minPlayers = values["min-players"]?.toIntOrNull()
         val maxPlayers = values["max-players"]?.toIntOrNull()

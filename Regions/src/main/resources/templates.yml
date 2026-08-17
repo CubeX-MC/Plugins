@@ -195,10 +195,8 @@ templates:
       armor: "IRON_BOOTS:1,IRON_LEGGINGS:1,IRON_CHESTPLATE:1,IRON_HELMET:1"
       offhand: "SHIELD:1"
       respawn: "${respawn}"
-      # 不要在这里写 reward-source / reward-contract：Contract 集成还没落地，
-      # RegionValidationService 会把带奖励字段的场地判成 ERROR 并拒绝发布，
-      # 套用本模板的人就只能自己回 Mode 页面把它们删掉才能发布。
-      # 等 Contract 集成完成、验证器那条拦截撤掉之后再加回来（见 PLAN.md 5.3 / 奖励来源一节）。
+      # 可选奖励请在套用模板后设置 reward-source: contract 与 reward-contract: <WAGER id>。
+      # 模板不预填合同 id，避免把同一个资金凭证复制到多个场地。
     flags:
       pvp:
         value: allow

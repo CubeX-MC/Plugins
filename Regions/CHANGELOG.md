@@ -10,6 +10,8 @@
 - GUI、命令与 Mode 运行时文案的完整 zh_CN / en_US 语言键（`lang-version: 6`）。
 - 语言文件回归测试：键集一致、基线版本一致、en_US 无源语言残留、全部值为合法 MiniMessage 且无遗留 `&` 颜色码。
 - `/regions reload` 失败时报出失败阶段（`reload-failed`），不再一律回报成功。
+- 可选 Contract WAGER 奖励：`dual_pvp` / `union_war` 发布前校验、开赛锁定、唯一胜者结算和中断退款。
+- `reward-funding.yml` 持久化 operation lease；启动/reload 重放相同操作，避免跨插件重试造成重复付款。
 
 ### Fixed
 

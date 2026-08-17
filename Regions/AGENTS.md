@@ -15,6 +15,7 @@
 
 - 玩家临时效果必须通过 `ScopedEffectService` 持有和恢复，不能只在 Mode 内保存内存快照。
 - 会替换装备的 Mode 必须先成功持久化 escrow，再修改装备；恢复成功后才能删除 escrow。
+- Contract 奖励必须先持久化 `reward-funding.yml` lease 再 lock/settle/refund；重试沿用同一 operation id，`REVIEW_REQUIRED` 时保留 lease，不得换 id 自动重付。
 - 延迟/实体任务必须校验当前 state 实例、active 状态和玩家成员关系。
 - Paper 与 Folia 的实体访问必须走 `CubexScheduler`；停服时不能依赖新调度任务执行。
 - 发布验证必须递归检查 Action 中嵌套的 Effect/Action 参数。

@@ -1,6 +1,14 @@
 # Regions 真人验证清单
 
-本文用于首个公开版本前的真人验收。测试服使用 Java 21、Paper 1.21.11，并安装与正式服一致版本的 Lands、RuleGems 及其依赖。开始前备份世界、玩家数据和 `plugins/Regions`。
+本文用于首个公开版本前的真人验收。测试服使用 Java 21、Paper 1.21.11，并安装与正式服一致版本的 Lands、RuleGems、可选 Contract/Vault 及其依赖。开始前备份世界、玩家数据、`plugins/Regions` 和 `plugins/Contract`。
+
+## Contract 奖励托管
+
+1. 创建并双方接受一个 WAGER，把完整合同 id 配到 `dual_pvp` 的 `reward-contract`，确认发布和开赛成功。
+2. 让甲方获胜，核对双方押注只向甲方支付一次，Contract 事件包含 region funding 记录，Regions lease 已清除。
+3. 新建 WAGER 后强制结束比赛，核对双方完整退款且没有胜者付款。
+4. 在锁定后临时停用 Contract，结束比赛并确认 `reward-funding.yml` 保留；恢复 Contract 后 reload/restart，核对同一 operation 被重放且没有双付。
+5. 在结算故障场景确认 Contract 进入 DISPUTED/人工复核，Regions 不生成新的 operation id。
 
 ## 1. 测试角色
 

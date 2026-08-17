@@ -16,6 +16,8 @@ import org.cubexmc.regions.service.RegionRegistry
 import org.cubexmc.regions.service.RegionSessionService
 import org.cubexmc.regions.service.RegionTriggerService
 import org.cubexmc.regions.service.ServiceResult
+import org.cubexmc.regions.reward.FundingResult
+import org.cubexmc.regions.reward.RewardFundingRuntime
 import org.cubexmc.scheduler.CubexScheduler
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -194,6 +196,13 @@ class ModeLifecycleServiceTest {
         val triggers = mock(RegionTriggerService::class.java)
         val effects = mock(ScopedEffectService::class.java)
         val audit = mock(RegionAuditService::class.java)
+        val rewards = object : RewardFundingRuntime {
+            override fun check(region: RegionDefinition) = FundingResult.ok()
+            override fun reserve(region: RegionDefinition) = FundingResult.ok()
+            override fun settle(region: RegionDefinition, winnerCandidates: Set<UUID>) = FundingResult.ok()
+            override fun refund(region: RegionDefinition, reason: String) = FundingResult.ok()
+            override fun reconcile(): List<FundingResult> = emptyList()
+        }
         val delayed = mutableListOf<DelayedTask>()
         val entityTasks = mutableListOf<Runnable>()
 
@@ -206,6 +215,7 @@ class ModeLifecycleServiceTest {
         `when`(plugin.triggers()).thenReturn(triggers)
         `when`(plugin.effects()).thenReturn(effects)
         `when`(plugin.audit()).thenReturn(audit)
+        `when`(plugin.rewards()).thenReturn(rewards)
         // Mode services resolve every player-facing string through the language file; echoing the
         // key back keeps these lifecycle tests about state transitions rather than wording.
         val lang = mock(LanguageManager::class.java)

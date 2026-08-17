@@ -22,6 +22,7 @@
 - Effect escrow 批量写入的原子性与恢复后清空。
 - 检测按来源分组、已发布集合缓存失效与不可用来源短路。
 - zh_CN/en_US 键集一致性、基线版本一致性与 en_US 无源语言残留。
+- Contract API 反射 ABI、WAGER 参与方/工会胜者映射、operation 冲突、lease 重启重放与终态清理。
 
 自动化不能替代真实服务端线程模型、外部插件行为、GUI 交互和多人体验；这些由 `REAL_PLAYER_TEST.md` 覆盖。任何失败测试、测试报告中的 skipped、启动栈追踪、线程违规或无法恢复的 escrow 都是测试环境准入阻断项。
 

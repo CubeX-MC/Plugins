@@ -6,9 +6,11 @@ Regions 是 CubeX-MC 的可发布场地与小游戏框架。它将 Lands/Cuboid 
 
 - Java 21
 - Paper 1.21.11 或兼容 Folia 版本
-- 可选：Lands（区域和工会来源）、RuleGems（治理侧集成）
+- 可选：Lands（区域和工会来源）、RuleGems（治理侧集成）、Contract（WAGER 奖励托管）
 
 Lands 被配置为可选集成；插件不存在或未启用时，Lands Source 不会被宣告为可用。是否要求它在启动时存在由 `integrations.lands.required-for-startup` 控制。
+
+Contract 同样只是可选连接。`dual_pvp` 和 `union_war` 可在 Mode 中设置 `reward-source: contract` 与 `reward-contract: <WAGER id>`；发布及开赛前会确认该 WAGER 已由双方接受且仍在进行。Contract 缺席或状态不符时只阻止这个有奖励的场地发布/开赛，Regions 其他场地照常运行。
 
 ## 构建与自动检查
 
@@ -39,6 +41,8 @@ Lands 被配置为可选集成；插件不存在或未启用时，Lands Source �
 ## 状态安全
 
 临时效果使用持久化 lease（`effect-escrow.yml`），战斗和回合装备分别使用装备托管文件。正常退出、死亡、reload、停服和下次启动/登录都会尝试恢复。Folia 停服阶段不会提交无法保证执行的实体任务，而是保留托管数据供下次安全恢复。
+
+Contract 奖励操作另存于 `reward-funding.yml`。一局比赛的 lock、自然胜者 settle、强制结束/reload/崩溃恢复 refund 共用同一个 transaction operation id，只有持有该锁的交易才能终结资金。无法确认的部分结算保留 lease 并要求人工复核，不会生成第二次付款。删除该文件会破坏恢复链，禁止把它当作清理手段。
 
 比赛默认 300 秒超时，可用 `timeout-seconds` 配置。所有延迟任务都绑定具体局实例；旧局计时器不能结束或修改新局。上一局恢复完成前，同一区域不会启动下一局。
 

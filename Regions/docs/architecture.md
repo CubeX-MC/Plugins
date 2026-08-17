@@ -17,6 +17,9 @@
 - `CombatModeService` 与 `RoundModeService` 在修改装备前把快照原子写入各自 escrow。死亡、退出、强制结束、reload、停服后重启/登录都可恢复。
 - `RaceModeService`、`RoundModeService` 和 `CombatModeService` 的任务闭包持有具体 state 实例。任务执行时重新核对实例，避免旧任务污染新局。
 - 模式结束时区域进入 ending 状态；在线玩家的结束恢复完成后才允许下一局。
+- `RewardFundingService` 是 Regions 的跨插件资金协调边界。它只持有
+  `reward-funding.yml` operation lease，不持有钱；Contract 通过 provider-owned
+  `ContractEscrowService` 独占 WAGER、Vault、退款和争议状态。
 
 ## 线程模型
 
@@ -25,4 +28,6 @@
 ## 故障模型
 
 磁盘写入采用临时文件加原子替换（不支持时安全降级）。持久化失败会回滚对应内存变更或玩家变更。Effect 组合只在整组成功后缓存签名，失败组会清理并在下一次刷新重试。审计保存发布、强制操作、模式结束和比赛结果等关键事件。
+
+资金 lease 在调用 Contract 前写入 PREPARING/SETTLING/REFUNDING；重启后使用同一 operation id 重放。Contract 返回 `REVIEW_REQUIRED` 时 lease 保留，禁止自动换 operation id 重试。
 

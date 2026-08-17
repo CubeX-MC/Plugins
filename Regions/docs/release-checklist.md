@@ -15,6 +15,7 @@
 - [ ] 记录 Lands、RuleGems、Paper/Folia 和 Java 的实际版本。
 - [ ] 只部署 `regions-<version>.jar`，清除同目录旧 Regions JAR，避免重复加载。
 - [ ] 启动后确认没有 schema、Source、registry、线程或 escrow 恢复错误。
+- [ ] 若启用 Contract 奖励，确认 Contract/Vault 先启用且 `reward-funding.yml` 没有待人工复核 lease。
 - [ ] 执行 `/regions validate`，检查 Lands Source 与已发布 revision。
 
 ## 真人验收
@@ -23,6 +24,7 @@
 - [ ] 在真实 Folia 完成关键线程与恢复流程。
 - [ ] 完成一次正常停服恢复和一次可控异常终止恢复。
 - [ ] 完成 dual/union、race、hide-and-seek 各一轮并检查审计。
+- [ ] 用真实 Vault 完成一次 WAGER 胜者结算、强制结束退款、Contract 暂停后恢复重试，核对没有双付。
 - [ ] 验证失败记录包含 Region id、revision、角色、日志和恢复结果。
 
 所有阻断项修复并回归后，才使用 `regions-v<version>` 标签创建发布。

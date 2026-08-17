@@ -1333,18 +1333,18 @@ Contract 集成原则：
 - 如果 Contract 不可用或合同状态不满足要求，Region mode 不允许开始。
 - 工会战奖励最好用“赞助合同”或“对赌合同”，这样奖励来源、出资者和争议处理都有记录。
 
-推荐在 Contract 插件后续暴露一个小 API：
+已落地的 Contract provider API：
 
 ```kotlin
-interface ContractEscrowApi {
-    fun canUseAsRegionFunding(contractId: String, regionId: String): FundingCheck
-    fun lockForRegion(contractId: String, regionId: String): FundingResult
-    fun settleRegion(contractId: String, outcome: RegionOutcome): FundingResult
-    fun refundRegion(contractId: String, reason: String): FundingResult
+interface ContractEscrowService {
+    fun check(contractId: String, regionId: String): ContractEscrowResult
+    fun lock(operationId: String, contractId: String, regionId: String): ContractEscrowResult
+    fun settle(operationId: String, contractId: String, regionId: String, winnerId: UUID): ContractEscrowResult
+    fun refund(operationId: String, contractId: String, regionId: String, reason: String): ContractEscrowResult
 }
 ```
 
-在 API 完成前，Regions 只保留 `reward-source=contract` / `reward-contract=<id>` 配置和校验提示，不执行真实付款。
+第一阶段已接入 `dual_pvp` / `union_war` 与已接受 WAGER。Regions 的 `reward-funding.yml` 保存调用方 operation lease；Contract 的 `contract.yml` 保存锁和终态 operation，任一方重启都重放同一请求。race、hide-and-seek、赞助与多人分成仍未定义，因此继续 fail closed。
 
 ## 11.2 发布、审计与所有权变更
 
@@ -1772,7 +1772,7 @@ Regions 尚未公开发布，因此当前格式直接作为首个公开版本基
 - 普通领主或非统治者管理 Region。
 - 协作者角色系统；当前坚持 owner 本人管理。
 - 模板公开市场和 Web 管理。
-- 未完成 Contract API 前的真实资金结算。
+- race、hide-and-seek、赞助与多人分成的真实资金结算。
 - 脚本语言。
 - 普通统治者可发布的控制台或玩家 OP 提权 action。
 
