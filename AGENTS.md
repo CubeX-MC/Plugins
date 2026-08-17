@@ -58,6 +58,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 - **Railway 的源码包就是 `org.cubexmc.metro`，主类 `org.cubexmc.metro.Metro`，与 Metro 完全同名——这是有意保留的**（2026-08-02 用户确认）。理由：Metro 的线路控制等功能更新可以直接搬到 Railway；Metro 与 Railway **本就不支持同时安装**。同理 Railway 的 `build.gradle.kts` 把 cloud / scoreboardlibrary / geantyref relocate 到 `org.cubexmc.metro.lib.*` 也**不要改**。
 - **Reputations 的 3 个 `.java` 是故意的 Java API 面**（`org.cubexmc.reputations.api`），不要迁 Kotlin。
+- **Contract 的 Regions escrow API 是 provider-owned Kotlin API 面**：Regions 只能经 `cubex-integrations` 反射连接，不能增加 Contract 项目依赖；资金 operation id 和两边 lease/metadata 不得绕过。
 - **Clarity 编译到 Java 21**（用 1.21 属性 API），全仓其余插件是 17；`jarGate` 已按各插件的 java release 分别校验。
 
 ## 当前迁移基线

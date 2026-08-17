@@ -12,6 +12,12 @@
 - 待办：提供显式、幂等的历史数据导入工具；是否让展示优先读取聚合服务，需另做 UX/兼容设计。
 - 设计见 `CUBEX_INTEGRATIONS_DESIGN.md`；原 P4 记录见 `Contract/UI_REDESIGN_PLAN.md`。
 
+### R1 — Regions 接入 Contract WAGER 托管 ✅（第一阶段）
+- Contract 通过 Bukkit ServicesManager 暴露窄接口 `ContractEscrowService`；Regions 仍不编译依赖或打包 Contract API。
+- `dual_pvp` / `union_war` 可配置 `reward-source: contract` 与 `reward-contract: <id>`。只接受双方已入金、状态为 `IN_PROGRESS` 的 WAGER。
+- Regions 用 `reward-funding.yml` 保存操作 lease；重启/reload 以同一 operation id 重放 lock/settle/refund，部分付款或状态不明进入人工复核，不再次付款。
+- 后续：真实 Paper/Folia + Vault 双插件故障注入；race、hide-and-seek、赞助和多人分成仍需单独定义结果语义。
+
 ## 已确认的未来计划
 
 ### 1. 全面 Kotlin 化 ✅（2026-08-16）

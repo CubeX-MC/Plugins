@@ -44,6 +44,12 @@ Financial or ownership transfer is different. A future Regions → Contract escr
 narrow, idempotent domain API with explicit operation IDs and recovery semantics. It must be designed
 as a separate transactional integration, not layered onto the best-effort delta mirror.
 
+That bridge is now the second adopter: Contract owns `ContractEscrowService`, WAGER state and Vault
+movement; Regions owns a durable `reward-funding.yml` lease containing its caller operation id.
+`lock`, `settle` and `refund` share that one stable transaction id; Contract rejects a terminal call
+that does not own the lock, and a restart replays the same request instead of issuing another payout.
+A partial/ambiguous result becomes `REVIEW_REQUIRED`.
+
 ## First adopter: Contract → Reputations
 
 When Reputations is present, Contract registers four fields and mirrors new deltas:
@@ -56,3 +62,11 @@ When Reputations is present, Contract registers four fields and mirrors new delt
 Contract remains fully functional without Reputations and retains its own commands, rendering, and
 `reputation.yml`. Existing historical values are not imported automatically; a deliberate,
 idempotent migration tool remains future work.
+
+## Second adopter: Regions → Contract
+
+The first transactional slice supports `dual_pvp` and `union_war` backed by an accepted,
+`IN_PROGRESS` Contract WAGER. Regions validates the provider before publication, locks before the
+match becomes active, submits only the winning funded party, and refunds forced/aborted matches.
+Other modes and sponsor/multi-party payout shapes remain unavailable until their outcome semantics
+are designed explicitly.
