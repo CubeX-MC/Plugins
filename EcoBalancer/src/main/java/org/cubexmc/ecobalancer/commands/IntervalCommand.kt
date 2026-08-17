@@ -4,7 +4,7 @@ import org.bukkit.OfflinePlayer
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabExecutor
-import org.bukkit.util.StringUtil
+import org.cubexmc.core.CubexCommandSuggestions
 import org.cubexmc.ecobalancer.EcoBalancer
 import org.cubexmc.ecobalancer.utils.AnalysisFilters
 import org.cubexmc.ecobalancer.utils.MessageUtils
@@ -101,13 +101,6 @@ class IntervalCommand(private val plugin: EcoBalancer) : TabExecutor {
     }
 
     override fun onTabComplete(commandSender: CommandSender, command: Command, s: String, strings: Array<String>): List<String> {
-        val size = 2
-        val ret: MutableCollection<String> = ArrayList(size)
-        if (strings.size == 1) {
-            ret.add("alphabet")
-            ret.add("balance")
-        }
-        val lowerCase = strings[0].lowercase(Locale.ROOT)
-        return StringUtil.copyPartialMatches(lowerCase, ret, ArrayList(size))
+        return CubexCommandSuggestions.root(strings, listOf("alphabet", "balance")) ?: emptyList()
     }
 }
