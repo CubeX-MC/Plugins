@@ -15,6 +15,7 @@
 
 ### Fixed
 
+- Paper/Purpur 在根命令补全时传入空参数数组会令 `/regions` 读取 `args[0]` 并抛出 `ArrayIndexOutOfBoundsException`；现改用共享的安全根补全门禁，并覆盖普通玩家与管理补全。
 - `/regions reload` 会丢弃只存在于内存中的草稿：`regions.yml` 仅在关服或显式 flush 时落盘，而 reload 直接 `load()` 覆盖内存。现在 reload 走 `ReloadChain`，数据阶段以 flush 成功为前提。
 
 ### Changed

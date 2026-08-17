@@ -5,6 +5,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import org.cubexmc.core.CubexCommandSuggestions
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.capability.CapabilityKind
 import org.cubexmc.regions.capability.CapabilityRisk
@@ -879,15 +880,9 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         suggestions(commandSourceStack.sender, args)
 
     private fun suggestions(sender: CommandSender, args: Array<String>): List<String> {
-        if (args.size == 1) {
-            val commands = if (canEnterManagementSilent(sender)) {
-                listOf("gui", "list", "create", "remove", "enable", "disable", "bind", "mode", "flag", "effect", "trial", "preview", "publish", "withdraw", "history", "rollback", "archive", "freeze", "unfreeze", "audit", "game", "reload", "validate", "inspect", "cleanup", "doctor", "help")
-            } else {
-                listOf("game", "help")
-            }
-            return startsWith(commands, args[0])
-        }
-        if (!canEnterManagementSilent(sender) && !args[0].equals("game", ignoreCase = true)) {
+        val canManage = canEnterManagementSilent(sender)
+        regionRootSuggestions(canManage, args)?.let { return it }
+        if (!canManage && !args[0].equals("game", ignoreCase = true)) {
             return emptyList()
         }
         if (args.size == 2 && listOf("validate", "remove", "enable", "disable", "bind", "trial", "preview", "publish", "withdraw", "unpublish", "history", "rollback", "archive", "freeze", "unfreeze", "audit", "game").contains(args[0].lowercase(Locale.ROOT))) {
@@ -945,3 +940,15 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
             .withZone(ZoneId.systemDefault())
     }
 }
+
+internal fun regionRootSuggestions(canManage: Boolean, args: Array<out String>): List<String>? {
+    val commands = if (canManage) MANAGEMENT_ROOT_COMMANDS else PLAYER_ROOT_COMMANDS
+    return CubexCommandSuggestions.root(args, commands)?.sorted()?.take(20)
+}
+
+private val MANAGEMENT_ROOT_COMMANDS = listOf(
+    "gui", "list", "create", "remove", "enable", "disable", "bind", "mode", "flag", "effect",
+    "trial", "preview", "publish", "withdraw", "history", "rollback", "archive", "freeze",
+    "unfreeze", "audit", "game", "reload", "validate", "inspect", "cleanup", "doctor", "help",
+)
+private val PLAYER_ROOT_COMMANDS = listOf("game", "help")
