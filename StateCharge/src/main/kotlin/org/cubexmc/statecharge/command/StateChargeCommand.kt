@@ -6,6 +6,7 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import org.cubexmc.core.CubexCommandSuggestions
 import org.cubexmc.statecharge.StateChargePlugin
 import org.cubexmc.statecharge.model.StateSpec
 import org.cubexmc.statecharge.service.BuyResult
@@ -251,11 +252,9 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
         alias: String,
         args: Array<String>,
     ): List<String> {
-        if (args.size == 1) {
-            return listOf("list", "status", "buy", "help", "admin")
-                .filter { sender.hasPermission(permissionFor(it)) }
-                .filter { it.startsWith(args[0].lowercase()) }
-        }
+        val rootCommands = listOf("list", "status", "buy", "help", "admin")
+            .filter { sender.hasPermission(permissionFor(it)) }
+        CubexCommandSuggestions.root(args, rootCommands)?.let { return it }
         if (args.size == 2 && args[0].equals("buy", ignoreCase = true)) {
             return plugin.definitions().purchasable().map { it.id() }.filter { it.startsWith(args[1].lowercase()) }
         }
