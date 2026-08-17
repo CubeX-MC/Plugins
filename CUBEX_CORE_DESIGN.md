@@ -185,6 +185,7 @@
 - `CubexLogger`: 轻量日志包装,默认代理 Bukkit logger,提供一致的 `info/warn/severe/debug`。
 - `CubexText`: legacy `&`、hex `&#RRGGBB`、空值策略、控制字符清理。
 - `Messager`: 向 `CommandSender` 按行发送字符串;不持有语言文件。
+- `CubexCommandSuggestions`: 归一化 Paper `BasicCommand` 的零参数与 Bukkit 的空首参数补全形态，并提供大小写无关的根参数过滤；不依赖 Paper API。
 - `SchedulerHandle`/`SchedulerFacade`: 当前只承接 Folia/Bukkit task handle 的取消绑定;完整调度 DSL 可在 Metro/Railway 接入时再扩。
 
 不纳入:
@@ -332,6 +333,12 @@ public final class Messager {
     public void send(CommandSender target, String message);
     public void sendLines(CommandSender target, Iterable<String> messages);
 }
+
+public final class CubexCommandSuggestions {
+    // 零/一个参数时返回过滤结果；已有更深参数时返回 null，由插件继续路由。
+    public static List<String> root(String[] arguments, Iterable<String> candidates);
+    public static List<String> matching(Iterable<String> candidates, String prefix);
+}
 ```
 
 行为契约:
@@ -341,6 +348,7 @@ public final class Messager {
 - `registerListener(listener)` 只是 `PluginManager.registerEvents(listener, this)` 的薄包装;Bukkit 原生 listener 自动解绑语义不变。
 - `saveResourcesIfMissing(...)` 只在目标文件不存在时 `saveResource(path, false)`,不覆盖用户文件。
 - `CubexText.color` 保持现有 legacy `&` 和 `&#RRGGBB` 语义;不引入 MiniMessage。
+- `CubexCommandSuggestions.root` 同时接受 Paper 根补全的空数组与 Bukkit 常见的 `arrayOf("")`，调用方不得在它返回 `null` 前读取 `args[0]`。
 
 ### 3.2 `cubex-config`
 

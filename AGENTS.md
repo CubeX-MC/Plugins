@@ -50,6 +50,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 - 有状态的 store 实现 `Reloadable` + `Terminable`，直接 `bind(store)`，别再手写 `bind(Runnable { store.flush() })`。
 - reload 用 `ReloadChain`：分阶段命名、`addIf` 表达"上一步失败就别跑这几步"、`ReloadReport` 告诉服主是哪一段炸的。
 - 语言文件所有段（不只 `messages.*`）都走 `I18nService`，值用 MiniMessage。
+- 根命令补全走 `CubexCommandSuggestions.root(...)`；它统一处理 Paper `BasicCommand` 的空参数数组与 Bukkit 的空首参数形态，调用方不要在根补全门禁前读取 `args[0]`。
 - 可选服务适配器按 Contract 的 Reputations bridge：本地行为先完成、桥失败只降级、不得缓存跨 reload 的 provider；事务型连接另做幂等领域 API。
 
 这一轮为此补的共享 API（都带测试）：`CubexPlugin.text()/log()/messager()` 放开为 public；`ReloadChain` 加 `ReloadFailurePolicy`/`addIf`/`ReloadReport`；`I18nService.rawOrNull`；`LegacyTextToMiniMessageStep.AngleBrackets.PRESERVE`。
