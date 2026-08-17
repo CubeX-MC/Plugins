@@ -137,7 +137,6 @@ class Contract(
         firstParticipant(
             ParticipantRole.OWNER,
             ParticipantRole.PARTY_A,
-            ParticipantRole.POSTER,
             ParticipantRole.CREDITOR,
         )
 
@@ -146,7 +145,6 @@ class Contract(
             ParticipantRole.CONTRACTOR,
             ParticipantRole.PARTY_B,
             ParticipantRole.PARTNER,
-            ParticipantRole.CLAIMER,
             ParticipantRole.DEBTOR,
         )
 
@@ -399,7 +397,7 @@ class Contract(
                 ownerStake.add(Asset.money(reward))
             }
             for (item in rewardItems) {
-                ownerStake.add(Asset.item("${item.type.name} x ${item.amount}"))
+                ownerStake.add(Asset.item(item))
             }
             val owner = Participant(ParticipantRole.OWNER, ownerUuid, ownerName, ownerStake)
             val contractor = Participant(ParticipantRole.CONTRACTOR, null, null, emptyList())

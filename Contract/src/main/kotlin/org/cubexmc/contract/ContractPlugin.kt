@@ -20,6 +20,7 @@ import org.cubexmc.contract.config.ContractsConfigMigrations
 import org.cubexmc.contract.config.LangV2ToV3Step
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.gui.ContractGui
+import org.cubexmc.contract.integrations.ContractPlaceholderExpansion
 import org.cubexmc.contract.integration.reputation.ReputationsMirror
 import org.cubexmc.contract.api.escrow.ContractEscrowService
 import org.cubexmc.contract.integration.regions.ContractEscrowServiceImpl
@@ -125,6 +126,8 @@ class ContractPlugin : CubexPlugin() {
 
         registerCommand("contract", ContractCommand(this))
 
+        registerPlaceholders()
+
         scheduleCleanup()
         schedulePublication()
         scheduleFlush()
@@ -186,6 +189,20 @@ class ContractPlugin : CubexPlugin() {
 
     private fun rebuildTemplateService() {
         templateService = ContractTemplateService(templates(), config.getInt("limits.max-templates-per-player", 32))
+    }
+
+    /**
+     * PlaceholderAPI is optional: an absent, disabled or incompatible install must never stop
+     * Contract from enabling, so the expansion is only class-loaded once the plugin is present.
+     */
+    private fun registerPlaceholders() {
+        if (server.pluginManager.getPlugin("PlaceholderAPI") == null) return
+        try {
+            ContractPlaceholderExpansion(this).register()
+            log().info("PlaceholderAPI expansion registered.")
+        } catch (throwable: Throwable) {
+            log().warn("Failed to register the PlaceholderAPI expansion; placeholders are unavailable.", throwable)
+        }
     }
 
     fun lang(): LanguageManager = languageManager ?: throw IllegalStateException("languageManager not initialized")

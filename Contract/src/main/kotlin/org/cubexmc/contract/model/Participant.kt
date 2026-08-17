@@ -45,6 +45,12 @@ class Participant(
 
     fun itemStakeCount(): Int = stake.count { it.kind() == AssetKind.ITEM }
 
+    /** Total physical items staked. Legacy display-only records contribute 0. */
+    fun itemStakeAmount(): Int = stake.filter { it.kind() == AssetKind.ITEM }.sumOf { it.itemCount() }
+
+    /** The real stacks staked by this participant, where the record carries them. */
+    fun itemStake(): List<org.bukkit.inventory.ItemStack> = stake.mapNotNull { it.itemStack() }
+
     fun toMap(): Map<String, Any?> {
         val map = LinkedHashMap<String, Any?>()
         map["role"] = role.name

@@ -7,8 +7,7 @@ enum class ParticipantRole {
     ALLY,
     PARTY_A,
     PARTY_B,
-    POSTER,
-    CLAIMER,
+    // POSTER/CLAIMER were removed with BOUNTY; SERVICE's OWNER/CONTRACTOR cover that shape.
     DEBTOR,
     CREDITOR,
     MEDIATOR,

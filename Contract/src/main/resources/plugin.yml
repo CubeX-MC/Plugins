@@ -9,7 +9,7 @@ description: Player-to-player contract board with Vault-backed escrow.
 # economy is registered (otherwise a load-order race can disable Contract until a manual reload).
 # Reputations is optional: when present it receives mirrored deltas; Contract still owns local data.
 depend: [Vault]
-softdepend: [Essentials, CMI, EssentialsX, Reputations]
+softdepend: [Essentials, CMI, EssentialsX, Reputations, PlaceholderAPI]
 
 commands:
   contract:

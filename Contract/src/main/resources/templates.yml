@@ -45,7 +45,7 @@ templates:
     created-at: 0
     updated-at: 0
     spec:
-      type: BOUNTY
+      type: SERVICE
       title: "悬赏：取其首级"
       description: "在 objective-target 里填被悬赏玩家的 ID。击杀后自动结算。"
       days: 14

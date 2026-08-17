@@ -17,7 +17,6 @@ types:
   wager: "Wager"
   partnership: "Partnership"
   alliance: "Alliance"
-  bounty: "Bounty"
   sale: "Sale"
   loan: "Loan"
 
@@ -28,8 +27,6 @@ roles:
   ally: "Ally"
   party_a: "Party A"
   party_b: "Party B"
-  poster: "Poster"
-  claimer: "Claimer"
   debtor: "Debtor"
   creditor: "Creditor"
   mediator: "Mediator"
