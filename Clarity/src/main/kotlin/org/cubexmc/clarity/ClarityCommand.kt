@@ -6,6 +6,7 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabExecutor
 import org.bukkit.entity.Player
+import org.cubexmc.core.CubexCommandSuggestions
 
 /** /clarity 命令:player / item / reload。目标支持玩家名或原版选择器(@a/@s/@p/@r)。 */
 class ClarityCommand(
@@ -235,7 +236,7 @@ class ClarityCommand(
     }
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<String>): List<String> {
-        if (args.size == 1) return filter(ROOT_SUBS, args[0])
+        CubexCommandSuggestions.root(args, ROOT_SUBS)?.let { return it }
         val root = args[0].lowercase(Locale.ROOT)
         if (root == "player") return completePlayer(args)
         if (root == "item") return completeItem(args)
