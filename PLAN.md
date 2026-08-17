@@ -489,9 +489,74 @@ Vault 模式共享信誉服务，bStats 31877。
 
 ---
 
-## 7. 维护约定
+## 7. 开发者体验与 Vibe Coding 生态计划（DX & Vibe Tooling）
 
-- 完成一项就标 ✅ 并指向落地的提交/设计文档；新方向先进 §4 再细化。
+> **目标**：在 9 大共享模块与安全门禁完备的基础上，面向未来玩家开发者与 AI 辅助（Vibe Coding）时代，
+> 将 CubeX 打造为**零认知负担、极速原型验证、AI 零幻觉**的 Minecraft 插件生产力放大器。
+
+```mermaid
+graph TD
+    DX1["DX-1: 脚手架任务 (一键生成插件)"] --> DX2["DX-2: 声明式 Kotlin DSL (极简事件/指令/GUI)"]
+    DX2 --> DX3["DX-3: AI Agent 规则协议 (.cursorrules / Context)"]
+    DX2 --> DX4["DX-4: 高频玩法工具包 (冷却/临时状态/计分板)"]
+    DX3 --> DX5["DX-5: 互动式 Cookbook 食谱库 (真实迷你示例)"]
+```
+
+### 7.1 DX-1: 一键脚手架生成任务 (`createPlugin`)
+消除手动配置多文件与目录的繁琐步骤，让玩家/AI 在 30 秒内从 idea 直达本地测试服。
+
+- [ ] **在 `buildSrc` 中实现 `createPlugin` Gradle 任务**：
+  - 支持参数：`--name=<PluginName>`、`--modules=<core,config,i18n,gui...>`、`--package=<org.cubexmc.xxx>`。
+  - 自动化创建规范目录（`src/main/kotlin`、`src/main/resources`、`src/test/kotlin`）。
+  - 自动生成标准 `build.gradle.kts` 并按参数填入所选 `modules/cubex-*` 依赖。
+  - 自动生成符合规范的 `plugin.yml`（含 api-version、author、所选软依赖）。
+  - 自动在 [`settings.gradle.kts`](file:///c:/Users/Angus/Desktop/MC%20server/plugins/settings.gradle.kts) 注册子项目，并在 `CubexRelocations.kt` 中自动登记 `pluginId`。
+  - 自动生成继承 `CubexPlugin` 的主类入口与基础单元测试骨架。
+
+### 7.2 DX-2: 极简 Kotlin 声明式 DSL（Declarative Extensions）
+借助 Kotlin Type-safe Builders，让写简单业务像写现代 UI 或轻量脚本一样流畅直观。
+
+- [ ] **事件监听 DSL（`cubex-core` 扩展）**：
+  - 提供 `onEvent<T : Event>(priority, ignoreCancelled) { event -> ... }` 顶层扩展。
+  - 内部自动构造 `Listener`、完成 Bukkit 注册，并自动将其 `bind()` 到 `CubexPlugin` 资源栈（插件卸载时自动注销）。
+- [ ] **极简指令 DSL（`cubex-command` 增强）**：
+  - 补充类似 `command("mycmd") { permission = "..."; executes { sender, args -> ... }; sub("reload") { ... } }` 的声明式语法糖。
+- [ ] **GUI 声明式语法糖（`cubex-gui` 扩展）**：
+  - 增强 `gui(title, rows) { slot(x, y, item) { onClick { ... } } }` 的内联构建体验，省去冗长的 Builder 嵌套。
+
+### 7.3 DX-3: AI Agent 协作规则协议（Agent-Ready Context）
+固化上下文工程，让 Cursor、Claude Code、GitHub Copilot 等 AI 助手在进入仓库的第一秒即掌握全套 CubeX 约定。
+
+- [ ] **项目级 Agent 规范文件**：
+  - 创建 `.cursorrules` 与 `.github/copilot-instructions.md`，提炼 [`ARCHITECTURE.md`](file:///c:/Users/Angus/Desktop/MC%20server/plugins/ARCHITECTURE.md) 与 [`MODULES.md`](file:///c:/Users/Angus/Desktop/MC%20server/plugins/MODULES.md) 核心铁律（`bind()` 资源管理、MiniMessage 优先、禁止硬依赖、反射跨插件连接）。
+- [ ] **AI Few-shot 提示词模板库**：
+  - 在 `docs/ai-prompts/` 沉淀典型开发指令（如“基于 SQLite + GUI + i18n 编写一个领地传送插件”的标准提示词与预期输出结构）。
+
+### 7.4 DX-4: 高频玩法开箱工具包（Gameplay Helpers）
+提炼大型服务器开发中最频繁手写的核心玩法轮子，避免重复造轮子。
+
+- [ ] **冷却时间管理（`Cooldown`）**：
+  - 支持内存基于时间戳与持久化冷却判断，内置剩余时长文字渲染（如 `3分20秒`）。
+- [ ] **玩家临时会话状态（`PlayerSessionState`）**：
+  - 沉淀 Regions 中的优秀实践：支持玩家离线自动暂存、死亡/断线自动清理与状态重施机制。
+- [ ] **快速侧边栏（`FastScoreboard`）**：
+  - 封装多版本兼容的轻量行更新侧边栏，支持 PAPI 动态变量定时刷新。
+
+### 7.5 DX-5: 互动式 Cookbook 食谱库
+提供 10+ 个 30~50 行代码级别的极简完整插件范例（带自动化单测）。
+
+- [ ] 在 `docs/cookbook/` 建立食谱专栏：
+  1. *“20 行代码实现每日签到奖励插件”*（Core + Config + i18n）
+  2. *“击杀悬赏金币与全服通告”*（Core + Vault 适配）
+  3. *“带翻页与点击音效的箱子菜单”*（Core + GUI + i18n）
+  4. *“SQLite 玩家击杀统计与排行榜”*（Core + Database + PAPI）
+  5. *“跨插件信誉查询与条件执行”*（Core + Integrations）
+
+---
+
+## 8. 维护约定
+
+- 完成一项就标 ✅ 并指向落地的提交/设计文档；新方向先进 §4 或 §7 再细化。
 - **不要新建 `PLAN.md` / `IMPROVEMENT_PLAN.md` / `ROADMAP.md` 之类的并行计划文件**——写进本文件。
 - 单插件的**设计依据**（为什么这么设计）留在该插件的 `DESIGN.md`；本文件只写"要做什么、为什么、注意什么"。
 - 声称某项已完成前**先核对源码**。本轮合并与复审共发现 6 处过期记录：
