@@ -552,6 +552,38 @@ graph TD
   4. *“SQLite 玩家击杀统计与排行榜”*（Core + Database + PAPI）
   5. *“跨插件信誉查询与条件执行”*（Core + Integrations）
 
+### 7.6 DX-6: 现有成熟功能下沉（下沉至现有 9 大模块）
+将各插件中已实测成熟、高频重复的基础逻辑提炼并下沉至已有模块，消除重复造轮子。
+
+- [ ] **聊天输入捕获会话器（下沉至 `cubex-gui`）**：
+  - 提取自 Contract (`ChatInputService`) / Metro (`ChatInputManager`) / EcoBalancer。
+  - 统一封装 Paper `AsyncChatEvent` 与 Legacy `AsyncPlayerChatEvent` 双事件监听，提供带超时、提示词与回调闭包的极简静态入口 `ChatInput.request(...)`。
+- [ ] **配置化音符序列播放器（下沉至 `cubex-gui`）**：
+  - 提取自 Metro / Railway 的 `SoundUtil.playNoteSequence`。
+  - 支持 `tone,volume,instrument,delay` 字符串驱动的多段 UI 反馈音效。
+- [ ] **类型安全 PDC 读写工具类（下沉至 `cubex-core`）**：
+  - 提取自 BookLite / MountLicense / Contract / RuleGems 的 `PdcKeys`。
+  - 提供 `item.pdc.getUuid(...)`、`item.pdc.set(...)` 等零样板扩展函数。
+- [ ] **时长解析与格式化工具（下沉至 `cubex-core`）**：
+  - 提取自 StateCharge / EcoBalancer / Metro。
+  - 提供 `DurationUtil.format(seconds)`（如 `2天5小时`）与 `DurationUtil.parse("1d12h")` 双向解析。
+- [ ] **容器/背包递归遍历修改器（下沉至 `cubex-core`）**：
+  - 提取自 Clarity 的 `ClarityService`。
+  - 提供单行递归扫描玩家背包、装备栏、末影箱与世界容器的原子遍历修改工具 `InventoryWalker`。
+
+### 7.7 DX-7: 3 个高价值通用新模块孵化计划
+针对生态中完全无合适第三方库、且跨插件强需求的领域能力，孵化独立的无状态共享模块。
+
+- [ ] **🌟 `cubex-effect`：玩家临时属性与租约框架**：
+  - **来源**：Regions (`ScopedEffectService`) + StateCharge (`EffectConfig`)。
+  - **核心**：管理玩家限时/定界的属性修改（Scale 缩放、飞行、移速、发光、药水等）；赋予前记录 `PlayerStateSnapshot` 快照；离开区域/到期/断线/关服自动持久化并精准回滚，**彻底杜绝属性与飞行残留 Bug**。
+- [ ] **🌟 `cubex-quest`：行为目标追踪引擎**：
+  - **来源**：Contract (`ObjectiveListener`) + EcoBalancer (事件税)。
+  - **核心**：18 种原生行为（杀怪、特定击杀、挖矿、钓鱼、合成、驯服等）的纯领域事件监听与进度累加回调器，让任务与悬赏类插件无需手写大批 `@EventHandler`。
+- [ ] **🌟 `cubex-economy`：事务经济与审计流水账本**：
+  - **来源**：EcoBalancer (`TaxLedgerService`/`TaxRunService`) + Contract (`EconomyEngine`)。
+  - **核心**：Vault 异步调用防崩溃保护、原子转账与回滚、自动落盘 `events.log` / SQLite 结构化流水账本与批处理运行状态互斥锁。
+
 ---
 
 ## 8. 维护约定
