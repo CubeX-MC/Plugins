@@ -6,6 +6,7 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import org.cubexmc.core.CubexCommandSuggestions
 import org.cubexmc.reputations.ReputationsPlugin
 import org.cubexmc.reputations.gui.ReputationGui
 import org.cubexmc.reputations.service.ReputationServiceImpl
@@ -170,12 +171,10 @@ class ReputationCommand(
     }
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<String>): List<String> {
-        if (args.size == 1) {
-            val options = ArrayList<String>()
-            options.addAll(listOf("fields", "set", "add", "reset", "reload"))
-            Bukkit.getOnlinePlayers().forEach { options.add(it.name) }
-            return options.filter { it.lowercase(Locale.ROOT).startsWith(args[0].lowercase(Locale.ROOT)) }
-        }
+        val rootOptions = ArrayList<String>()
+        rootOptions.addAll(listOf("fields", "set", "add", "reset", "reload"))
+        Bukkit.getOnlinePlayers().forEach { rootOptions.add(it.name) }
+        CubexCommandSuggestions.root(args, rootOptions)?.let { return it }
         val sub = args[0].lowercase(Locale.ROOT)
         if (args.size == 2 && sub in listOf("set", "add", "reset")) {
             return Bukkit.getOnlinePlayers().map { it.name }.filter { it.lowercase(Locale.ROOT).startsWith(args[1].lowercase(Locale.ROOT)) }
