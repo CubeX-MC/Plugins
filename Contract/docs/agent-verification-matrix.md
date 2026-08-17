@@ -18,6 +18,7 @@ runtime-critical behavior.
 | Economy/escrow/items | R3 | Service/recovery tests, `:Contract:build`, `:Contract:jarGate` | Vault success/failure, insufficient funds, inventory rollback |
 | Scheduler/shutdown/restart | R3 | Lifecycle/storage tests, `:Contract:build`, `:Contract:jarGate` | Paper restart/reload and, when relevant, Folia smoke |
 | Dependency/shading/artifact | R3/R4 | `:Contract:build`, `:Contract:jarGate` | Clean server startup and jar inspection beyond jarGate coverage |
+| Optional plugin integration | R3 | Connector/adapter/degradation tests, provider tests, `:Contract:build`, `:Contract:jarGate` | Start with provider absent and present; provider reload/disable when practical |
 | Version/platform/release claim | R4 | Clean `:Contract:build`, `:Contract:jarGate` | Install/start/reload smoke plus rollback notes |
 
 ## Active Artifact Matrix

@@ -19,6 +19,7 @@ import org.cubexmc.contract.config.ContractsConfigMigrations
 import org.cubexmc.contract.config.LangV2ToV3Step
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.gui.ContractGui
+import org.cubexmc.contract.integration.reputation.ReputationsMirror
 import org.cubexmc.contract.listener.ObjectiveListener
 import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.service.ContractService
@@ -31,6 +32,7 @@ import org.cubexmc.contract.storage.PendingTransactionStore
 import org.cubexmc.contract.storage.ReputationStore
 import org.cubexmc.core.CubexPlugin
 import org.cubexmc.core.Reloadable
+import org.cubexmc.integrations.OptionalServiceConnector
 import org.cubexmc.scheduler.CubexScheduler
 import java.io.IOException
 import kotlin.math.max
@@ -83,7 +85,13 @@ class ContractPlugin : CubexPlugin() {
             }
         })
 
-        reputationStore = bind(ReputationStore(this))
+        val reputationsMirror = ReputationsMirror(OptionalServiceConnector(server), log())
+        if (reputationsMirror.available()) {
+            log().info("Optional Reputations bridge connected; new Contract reputation deltas will be mirrored.")
+        } else {
+            log().info("Reputations bridge unavailable; Contract reputation remains local.")
+        }
+        reputationStore = bind(ReputationStore(this, reputationsMirror))
         reputation().load()
 
         batchAcceptanceStore = bind(BatchAcceptanceStore(this))

@@ -2,6 +2,7 @@ package org.cubexmc.contract.storage
 
 import org.bukkit.configuration.file.YamlConfiguration
 import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.contract.integration.reputation.ReputationDeltaSink
 import org.cubexmc.core.Reloadable
 import org.cubexmc.core.Terminable
 import org.cubexmc.contract.model.Contract
@@ -24,14 +25,21 @@ import org.cubexmc.core.CubexLogger
 class ReputationStore : Reloadable, Terminable {
     private val file: File
     private val logger: CubexLogger
+    private val deltaSink: ReputationDeltaSink
     private val records: MutableMap<UUID, Record> = HashMap()
     private var dirty = false
 
-    constructor(plugin: ContractPlugin) : this(File(plugin.dataFolder, "reputation.yml"), plugin.log())
+    constructor(plugin: ContractPlugin) : this(plugin, ReputationDeltaSink.NONE)
 
-    constructor(file: File, logger: CubexLogger) {
+    constructor(plugin: ContractPlugin, deltaSink: ReputationDeltaSink) :
+        this(File(plugin.dataFolder, "reputation.yml"), plugin.log(), deltaSink)
+
+    constructor(file: File, logger: CubexLogger) : this(file, logger, ReputationDeltaSink.NONE)
+
+    constructor(file: File, logger: CubexLogger, deltaSink: ReputationDeltaSink) {
         this.file = file
         this.logger = logger
+        this.deltaSink = deltaSink
     }
 
     class Record {
@@ -51,15 +59,20 @@ class ReputationStore : Reloadable, Terminable {
 
     fun recordCancelled(uuid: UUID, name: String?) {
         mutate(uuid, name).cancelled++
+        mirror(uuid, "cancelled", 1.0)
     }
 
     fun recordDisputed(uuid: UUID, name: String?) {
         mutate(uuid, name).disputed++
+        mirror(uuid, "disputed", 1.0)
     }
 
     fun recordDisputeWithdrawn(uuid: UUID, name: String?) {
         val record = mutate(uuid, name)
-        record.disputed = maxOf(0, record.disputed - 1)
+        if (record.disputed > 0) {
+            record.disputed--
+            mirror(uuid, "disputed", -1.0)
+        }
     }
 
     /** Updates each human party when a contract reaches a terminal state. */
@@ -72,10 +85,12 @@ class ReputationStore : Reloadable, Terminable {
                         continue
                     }
                     mutate(uuid, participant.displayName()).completed++
+                    mirror(uuid, "completed", 1.0)
                 }
             ContractStatus.EXPIRED -> {
                 val uuid = contract.contractorUuid() ?: return
                 mutate(uuid, contract.contractorName()).expired++
+                mirror(uuid, "expired", 1.0)
             }
             else -> {}
         }
@@ -89,6 +104,16 @@ class ReputationStore : Reloadable, Terminable {
         record.lastActive = System.currentTimeMillis()
         dirty = true
         return record
+    }
+
+    private fun mirror(uuid: UUID, fieldId: String, delta: Double) {
+        try {
+            deltaSink.add(uuid, fieldId, delta)
+        } catch (ex: Exception) {
+            logger.warn("Optional reputation mirror failed; the local Contract record was preserved.", ex)
+        } catch (ex: LinkageError) {
+            logger.warn("Optional reputation mirror became incompatible; the local Contract record was preserved.", ex)
+        }
     }
 
     fun load() {

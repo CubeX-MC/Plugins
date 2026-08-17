@@ -141,17 +141,14 @@ interface InputService {
   - `ContractGui` 拆分(899→**747 行**,<800):抽出 `GuiItems.kt`(共享 item 构造)、`ContractRenderer.kt`(item 图标 / 条款预览,单向依赖、零回指)、`PendingAction.kt`。
   - 验证:`test`(16 个测试类全跑)/ `shadowJar` 均 BUILD SUCCESSFUL。
   - 备注:进一步拆成 `HallGui`/`DetailGui`/`CreateFlow` 三控制器需回指或重复;747 行已达标,暂不强拆以免伤内聚。
-- **P4 — 接入 Reputations + 拆掉 Contract 自带信誉(计划中)**
-  - 背景:已新建独立插件 **`Reputations`**(Vault 模式,ServicesManager `ReputationService` API,bStats 31877)。Contract 不再自带一套信誉逻辑,改为消费它。
-  - 构建/清单:Contract 加 `compileOnly(project(":Reputations"))` + `plugin.yml` `softdepend: [Reputations]`。
-  - 启动:若 `servicesManager.load(ReputationService)` 非空,注册 4 个字段
-    `Contract:completed` / `Contract:cancelled` / `Contract:expired` / `Contract:disputed`(带 displayName/icon)。服务缺席则**优雅降级**(只是不记录)。
-  - 钩子替换:`ContractService` 现有 `reputation().recordSettlement/recordCancelled/recordDisputed`
-    → 改调 `rep.add(uuid, "Contract:<field>", 1.0)`(同样的三个单点:结算 funnel / cancel 包装 / dispute)。
-  - 展示:`ContractRenderer` 的 `repSummary` 改读 `rep.get(uuid, "Contract:*")`;无服务时省略信誉行。
-  - 删除:Contract 自带的 `storage/ReputationStore.kt`、`reputation.yml` 接线、`ContractPlugin` 的 reputation flush/bind、`/contract rep` 子命令(由 `/reputation` 取代;或保留为薄转发)。
-  - **待定**:Contract 已有的 `reputation.yml` 旧数据是**一次性导入 Reputations** 还是**从零开始**。
-  - 验证口径同前:`compileKotlin`/`test`/`shadowJar`;并核对两插件装/不装组合下的降级行为。
+- **P4 — 接入 Reputations，同时保持插件独立 ✅ 第一阶段已完成**
+  - 边界更新：跨插件 API 只负责连接，不构成编译期或安装依赖。Contract 保留 `ReputationStore`、`reputation.yml`、命令与展示。
+  - 构建/清单：Contract shade 无状态 `cubex-integrations`，不 `compileOnly`/打包 Reputations API；`softdepend: [Reputations]` 只保证可选加载顺序。
+  - 启动：连接器从 Reputations 的 ClassLoader 解析 `ReputationService`，注册
+    `Contract:completed` / `Contract:cancelled` / `Contract:expired` / `Contract:disputed`。
+  - 钩子：本地信誉先落账，再 best-effort 镜像增量；服务缺席、禁用、reload 或不兼容都不会让 Contract 操作失败。
+  - 历史 `reputation.yml` 不自动导入，避免重复计数；后续如需迁移，提供带幂等标记的显式工具。
+  - 详细契约见根目录 `CUBEX_INTEGRATIONS_DESIGN.md`。
 
 每阶段独立可编译、可回归测试。P0 先落地即已显著减负(去铁砧)。
 

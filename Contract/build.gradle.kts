@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":modules:cubex-scheduler"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
+    implementation(project(":modules:cubex-integrations"))
     implementation("com.tcoded:FoliaLib:0.5.1")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation(CubexDeps.mockitoCore)

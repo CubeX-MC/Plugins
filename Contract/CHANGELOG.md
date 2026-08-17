@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Optional integration**: mirror new completed, cancelled, expired, and disputed reputation deltas into Reputations when its Bukkit service is available.
+- **Standalone contract**: retain Contract's local reputation store and behavior; an absent, disabled, reloaded, or incompatible Reputations provider cannot block local updates. Historical values are not imported automatically.
+- **Packaging**: use the shaded, stateless `cubex-integrations` connector without compiling against or bundling the Reputations public API.
+
 ## 0.1.0 (2026-07-10)
 
 - **Initial release**: add the Contract plugin as a first-class subproject in

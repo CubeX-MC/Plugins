@@ -8,8 +8,9 @@
 
 - Vault
 - 任意 Vault 经济插件，例如 CMI Economy
+- Reputations（可选，只镜像 Contract 信誉增量）
 
-运行时目标为 Paper，不依赖 QuickShop、Lands、RuleGems 或数据库驱动。CMI、Essentials/EssentialsX 仅作为可选的 Vault 经济提供者和加载顺序提示，不是 Contract 的硬依赖。Paper 1.21.6+ 使用原生 Dialog 创建/确认界面；较旧 Paper 版本自动回退到库存 GUI 与聊天输入。插件不再打包 AnvilGUI，Adventure 由 Paper 提供。
+运行时目标为 Paper，不依赖 QuickShop、Lands、RuleGems、Reputations 或数据库驱动。CMI、Essentials/EssentialsX 仅作为可选的 Vault 经济提供者和加载顺序提示，不是 Contract 的硬依赖。安装 Reputations 后，Contract 会通过可选 Bukkit service 注册四个 `Contract:*` 字段并镜像新发生的信誉增量；未安装或桥不可用时，本地 `reputation.yml`、命令与展示照常工作。历史本地值不会自动导入，避免重复计数。Paper 1.21.6+ 使用原生 Dialog 创建/确认界面；较旧 Paper 版本自动回退到库存 GUI 与聊天输入。插件不再打包 AnvilGUI，Adventure 由 Paper 提供。
 
 ## 构建
 
@@ -281,6 +282,7 @@ plugins/Contract/contract.yml
 plugins/Contract/templates.yml
 plugins/Contract/batch-acceptance.yml
 plugins/Contract/pending-transactions.yml
+plugins/Contract/reputation.yml
 plugins/Contract/events.log
 ```
 
