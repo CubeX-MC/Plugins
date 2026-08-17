@@ -7,8 +7,9 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.contract.ContractPlugin
-import org.cubexmc.contract.gui.framework.Menu
-import org.cubexmc.contract.gui.framework.MenuRegistry
+import org.cubexmc.gui.Menu
+import org.cubexmc.gui.Pagination
+import org.cubexmc.gui.MenuRegistry
 import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.BatchSummary
 import org.cubexmc.contract.model.ContractTemplate
@@ -1336,7 +1337,9 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
 
     private fun isDisputeInitiator(contract: Contract, uuid: UUID): Boolean = contract.metadata["dispute-by"] == uuid.toString()
 
-    private fun pageCount(size: Int): Int = max(1, ceil(size.toDouble() / BOARD_SLOTS.size).toInt())
+    private fun pagination(size: Int): Pagination = Pagination(size, BOARD_SLOTS.size)
+
+    private fun pageCount(size: Int): Int = pagination(size).pageCount()
 
     private fun clampPage(page: Int, pages: Int): Int = min(max(1, page), pages)
 

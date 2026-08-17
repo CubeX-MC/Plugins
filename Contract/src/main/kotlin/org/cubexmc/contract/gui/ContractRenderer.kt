@@ -282,7 +282,6 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
                 ContractType.WAGER -> Material.TARGET
                 ContractType.PARTNERSHIP -> Material.AMETHYST_CLUSTER
                 ContractType.ALLIANCE -> Material.SHIELD
-                ContractType.BOUNTY -> Material.CROSSBOW
                 ContractType.SALE -> Material.CHEST
                 ContractType.LOAN -> Material.GOLD_INGOT
             }

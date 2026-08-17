@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
     implementation(project(":modules:cubex-scheduler"))
+    implementation(project(":modules:cubex-database"))
     implementation(platform("net.kyori:adventure-bom:4.25.0"))
     implementation("net.kyori:adventure-api")
     implementation("net.kyori:adventure-text-minimessage")

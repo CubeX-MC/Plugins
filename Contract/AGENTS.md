@@ -57,9 +57,10 @@ Read these in order before non-trivial Contract work:
 5. Task-specific artifacts and product docs:
    - Active batch/template/scheduling work:
      `docs/batch-template-scheduling-artifact.md`
-   - Cross-feature roadmap: `PLAN.md`
+   - Cross-feature roadmap and open work: `../PLAN.md` (repo-wide, single plan
+     file; Contract items live in its per-plugin section)
    - Existing architecture and implementation history: `DESIGN.md`,
-     `IMPROVEMENT_PLAN.md`, `UI_REDESIGN_PLAN.md`
+     `CHANGELOG.md`
    - Current operator-facing behavior: `README.md`
 
 When an active artifact conflicts with an older plan for the same feature, the

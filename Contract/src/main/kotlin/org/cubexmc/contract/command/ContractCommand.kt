@@ -6,6 +6,7 @@ import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
 import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.gui.Pagination
 import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.BatchRepeatPolicy
 import org.cubexmc.contract.model.ContractObjective
@@ -538,10 +539,11 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             return
         }
         val pageSize = kotlin.math.max(1, plugin.config.getInt("display.page-size", 8))
-        val pages = kotlin.math.max(1, kotlin.math.ceil(contracts.size.toDouble() / pageSize).toInt())
-        val currentPage = kotlin.math.min(kotlin.math.max(1, page), pages)
-        val start = (currentPage - 1) * pageSize
-        val end = kotlin.math.min(start + pageSize, contracts.size)
+        val pagination = Pagination.of(contracts, pageSize)
+        val pages = pagination.pageCount()
+        val currentPage = pagination.clamp(page)
+        val start = pagination.firstIndex(currentPage)
+        val end = pagination.lastIndexExclusive(currentPage)
         send(sender, plugin.lang().message("list-header", mapOf("page" to currentPage.toString(), "pages" to pages.toString())))
         for (index in start until end) {
             val contract = contracts[index]
@@ -661,7 +663,6 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             org.cubexmc.contract.model.ParticipantRole.CONTRACTOR,
             org.cubexmc.contract.model.ParticipantRole.PARTY_B,
             org.cubexmc.contract.model.ParticipantRole.PARTNER,
-            org.cubexmc.contract.model.ParticipantRole.CLAIMER,
             org.cubexmc.contract.model.ParticipantRole.DEBTOR,
             -> plugin.lang().term("assigned", "Assigned")
             else -> displayName

@@ -17,7 +17,6 @@ types:
   wager: "对赌"
   partnership: "合作"
   alliance: "联盟"
-  bounty: "悬赏"
   sale: "交易"
   loan: "借贷"
 
@@ -28,8 +27,6 @@ roles:
   ally: "盟友"
   party_a: "甲方"
   party_b: "乙方"
-  poster: "发布者"
-  claimer: "领取者"
   debtor: "债务人"
   creditor: "债权人"
   mediator: "仲裁者"

@@ -11,7 +11,8 @@ Minecraft 插件 monorepo（Gradle + `buildSrc` 约定插件）。产物是 **N 
 |---|---|
 | 构建 / 跑测试 / 出 jar | [`README.md`](README.md) |
 | 把某个插件迁到 Kotlin | [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)（流程）+ [`KOTLIN_STYLE_GUIDE.md`](KOTLIN_STYLE_GUIDE.md)（规则与互操作坑） |
-| 跨插件方向 / 优先级 | [`ROADMAP.md`](ROADMAP.md) |
+| 计划 / 待办 / 跨插件方向 | [`PLAN.md`](PLAN.md)（**全仓唯一计划文件**，含 `modules/` 能力清单） |
+| 写 / 改某个插件的 README | [`README_TEMPLATE.md`](README_TEMPLATE.md)（章节顺序固定；README 只写已实现的行为） |
 | 为什么是这套架构 | [`ARCHITECTURE_PROPOSAL.md`](ARCHITECTURE_PROPOSAL.md) §7/§8、各 `CUBEX_*_DESIGN.md` |
 | 做可选跨插件连接 | [`CUBEX_INTEGRATIONS_DESIGN.md`](CUBEX_INTEGRATIONS_DESIGN.md) |
 

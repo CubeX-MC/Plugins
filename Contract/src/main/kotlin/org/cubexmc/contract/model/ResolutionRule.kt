@@ -6,5 +6,5 @@ enum class ResolutionRule {
     ARBITER,
     SYSTEM_OBJECTIVE,
     TIMEOUT,
-    EVENT,
+    // EVENT was removed with BOUNTY: SYSTEM_OBJECTIVE already covers automatic settlement.
 }

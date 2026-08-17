@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":modules:cubex-core"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
+    implementation(project(":modules:cubex-command"))
     implementation("org.bstats:bstats-bukkit:3.1.0")
     testImplementation(CubexDeps.junitJupiter)
     testImplementation(CubexDeps.mockitoCore)

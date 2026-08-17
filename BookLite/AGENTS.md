@@ -13,7 +13,8 @@ Read these in order before making non-trivial changes:
    risk, and documentation rules.
 3. `docs/agent-verification-matrix.md` to select tests and manual checks.
 4. Task-specific docs when present:
-   - Current plan or implementation notes: `PLAN.md`, `DESIGN.md`
+   - Current plan and open work: `../PLAN.md` (repo-wide, single plan file;
+     BookLite items live in its per-plugin section)
    - Operator-facing behavior: `README.md`
    - Architecture, API, compatibility, regression, or release docs under
      `docs/`

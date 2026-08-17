@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":modules:cubex-core"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
+    implementation(project(":modules:cubex-database"))
     implementation("org.xerial:sqlite-jdbc:3.45.3.0")
     implementation(CubexDeps.gson)
     implementation("org.slf4j:slf4j-nop:1.7.36")

@@ -19,11 +19,15 @@ listOf("compileClasspath", "testCompileClasspath", "testRuntimeClasspath").forEa
 dependencies {
     compileOnly(CubexDeps.paperApi("1.21.11-R0.1-SNAPSHOT"))
     compileOnly(CubexDeps.vault)
+    // PlaceholderAPI ships its own Adventure, which would outrank the one paper-api pins and change
+    // the version resolved on the test classpath. Contract takes Adventure from the server only.
+    compileOnly(CubexDeps.placeholderApi) { exclude(group = "net.kyori") }
     implementation(project(":modules:cubex-core"))
     implementation(project(":modules:cubex-scheduler"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
     implementation(project(":modules:cubex-integrations"))
+    implementation(project(":modules:cubex-gui"))
     implementation("com.tcoded:FoliaLib:0.5.1")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation(CubexDeps.mockitoCore)

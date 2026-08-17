@@ -14,6 +14,7 @@ import org.bukkit.command.CommandSender
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.EntityType
+import org.cubexmc.command.CommandRegistrar
 import org.cubexmc.config.MigrationException
 import org.cubexmc.config.MigrationPlan
 import org.cubexmc.config.MigrationRunner
@@ -124,7 +125,9 @@ class FAWEReplace : CubexPlugin() {
             fawereplaceCommand.permission = "fawereplace.use"
             fawereplaceCommand.aliases = Arrays.asList("fawerl", "frl")
 
-            server.commandMap.register("fawereplace", fawereplaceCommand)
+            // The returned handle is bound to the plugin's terminable stack, so the command is
+            // removed from the server command map on disable instead of lingering as a dead entry.
+            CommandRegistrar(this, this).registerDynamicCommand("fawereplace", fawereplaceCommand)
             logger.info(languageManager.getMessage("plugin.command_registered"))
         } catch (exception: Exception) {
             logger.severe(languageManager.getMessage("plugin.command_register_failed", "error", exception.message))

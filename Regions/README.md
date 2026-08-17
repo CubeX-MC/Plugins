@@ -2,6 +2,23 @@
 
 Regions 是 CubeX-MC 的可发布场地与小游戏框架。它将 Lands/Cuboid 区域来源、RuleGems 管理权限、可组合 Flag/Effect/Trigger，以及战斗、赛跑和捉迷藏 Mode 统一在带 revision 的发布流程中。
 
+## 定位
+
+外部领地插件负责"哪里是区域、谁拥有区域"；Regions 负责"这个区域在服务器规则中**变成什么场地**"。
+
+它不重新实现领地、选区和所有权，而是把 Lands、Cuboid（以及未来的 Residence、WorldGuard）统一成
+可配置的 Region，再允许 RuleGems 的统治者为这些区域安装玩法、规则、效果和 IF/THEN 行为。
+
+日常场地管理者不是普通玩家，也不是仅凭领地主身份就能操作的人，而是**同时满足**两个条件的场地主：
+持有 `regions.admin`（由 RuleGems 统治者身份授予）**且**是该 Region 所绑定外部区域的实际主人。
+服务器管理员只负责紧急接管与事故恢复，走独立的 `regions.superadmin`。
+
+**不做什么**（避免误装）：
+
+- 不是领地插件，不提供圈地与所有权本身。
+- 不做脚本语言；复杂玩法写成 Mode，而不是塞进 YAML。
+- 未实现或校验不通过的能力**不会**在 GUI 里伪装成可用（fail closed）。
+
 ## 运行要求
 
 - Java 21
@@ -46,8 +63,18 @@ Contract 奖励操作另存于 `reward-funding.yml`。一局比赛的 lock、自
 
 比赛默认 300 秒超时，可用 `timeout-seconds` 配置。所有延迟任务都绑定具体局实例；旧局计时器不能结束或修改新局。上一局恢复完成前，同一区域不会启动下一局。
 
-## 上线资料
 
+
+## 已知边界
+
+- 尚未公开发布；当前数据格式将作为首个公开版本基线，内部开发期的旧格式不在兼容范围内。
+- 未知或未实现的 Capability / Condition 一律**校验失败**而不是默认放行——这是有意的安全默认。
+- 校验器与第三方依赖的错误正文目前仍是英文常量，尚未全部拆成翻译键。
+- race / hide-and-seek / 赞助 / 多人分成的**真实资金结算**尚未实现（见 `PLAN.md` §5.2 阶段 D）。
+
+## 相关文档
+
+- 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
 - [架构](docs/architecture.md)
 - [兼容性](docs/compatibility.md)
 - [自动回归基线](docs/regression-baseline.md)

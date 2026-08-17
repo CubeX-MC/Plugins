@@ -4,9 +4,28 @@
 
 载具牌照插件。把马、驴、骡、猪、炽足兽、羊驼、骆驼、乐魂、鹦鹉螺、船、矿车等可骑乘实体注册为玩家的私有交通资产，并提供基础的所有权与索引管理。
 
-## 当前状态：Phase 0 / 1 / 2 / 3 / 5a
+## 定位
 
-按 [PLAN.md](PLAN.md) 的阶段划分，本仓库目前完成：
+MountLicense 把动物与载具变成**已登记的交通资产**：可停放、受保护、可定位、可在合理范围内召回、
+可选择共享。它不跟重度养马 RPG、宠物升级或虚拟马厩竞争——价值更接近公共基础设施：
+
+- 玩家继续使用世界里**真实存在**的实体，而不是只存在于菜单里的宠物。
+- 服务器可以围绕载具建道路、码头、马厩与场站。
+- 保护玩家的投入，但不取代原版出行方式。
+- 默认行为小、事件驱动、易于审计——不做全局实体轮询。
+
+设计上按**能力**而非物种处理实体：船、运输船、矿车、骆驼、猪、炽足兽和配置中的动物走同一套
+注册模型，各自适配 API 能力，而不是把所有实体都硬塞进"马"的流程。
+
+**不做什么**（避免误装）：
+
+- 不是养马 RPG、不做等级与属性成长、不做虚拟仓储。
+- 不硬依赖经济、地图、模型或领地插件。
+- **不承诺找回未加载的实体**，除非显式开启区块加载模式（当前未提供）。
+
+## 当前实现状态
+
+按阶段划分，本仓库目前完成（剩余待办见仓库根 [PLAN.md](../PLAN.md)）：
 
 - **Phase 0** — 项目骨架、配置、本地化资源（中英双语）。
 - **Phase 1** — 注册系统：License 物品、PDC 写入、YAML 索引、玩家命令与管理命令。
@@ -201,18 +220,20 @@ recall:
 
 - **离线/远方载具无法召回**：必须在 100 格内且实体已加载。这是有意设计——不开 chunk-load 召回，保证服务端性能和 Folia 兼容。要找回远方的马，用 `/ml locate <牌照>` 看坐标自己走过去。
 - **trust/untrust 只支持在线玩家**：这是 0.1.x 的明确取舍，不做离线 UUID 猜测。
-- **PDC 写入主线程同步**，大量并发注册无优化。MVP 使用场景不会触发瓶颈。
-- **真实服务器回归仍需执行**。当前已有 Maven 单元测试覆盖核心纯逻辑；Bukkit 事件、实体 AI、Inventory、PDC 与 Vault provider 行为仍需要实服检查。
+- **PDC 写入主线程同步**，大量并发注册无优化；MVP 使用场景不会触发瓶颈。
 
 ## 构建
 
-```bash
-mvn clean package
+```powershell
+.\gradlew.bat :MountLicense:build      # 编译 + 测试 + 部署 jar
+.\gradlew.bat :MountLicense:test       # 只跑测试
+.\gradlew.bat :MountLicense:jarGate    # 部署 jar 门禁
 ```
 
-产物：`target/mountlicense-0.1.0.jar`
+Windows 必须用 PowerShell 跑 `.\gradlew.bat`（仓库路径含空格）。
+产物在 `MountLicense/build/libs/mountlicense-<version>.jar`；同目录的 `*-plain.jar` **不要**部署。
 
-## 安装测试
+## 安装
 
 回归记录表见 [docs/manual-regression.md](docs/manual-regression.md)。发布前应在真实 Spigot/Paper 服务器把结果填入该文件，尤其是实体交互、重启持久化和 Vault 收费路径。
 
@@ -259,3 +280,8 @@ mvn clean package
 29. 玩家 B 试 `/ml release` 看着 A 的马 → 应被拒绝
 30. A `/ml info <牌照>` → 末尾应列出 B 的名字；`/ml untrust B` 后再 info → 应显示"无"
 31. 把 `trust.max_trustees_per_vehicle` 设为 1，A 已 trust 了 B，再 trust C → 应提示已满
+
+## 相关文档
+
+- 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
+- 手动回归记录：[docs/manual-regression.md](docs/manual-regression.md)
