@@ -5,6 +5,7 @@ import org.bukkit.entity.Player
 import org.bukkit.persistence.PersistentDataType
 import org.cubexmc.mountlicense.persistence.VehicleIndex
 import java.util.UUID
+import org.cubexmc.core.getUuid
 
 class OwnershipService(
     private val keys: PdcKeys,
@@ -12,22 +13,12 @@ class OwnershipService(
 ) {
     fun readOwner(entity: Entity?): UUID? {
         if (entity == null) return null
-        val raw = entity.persistentDataContainer.get(keys.ownerUuid(), PersistentDataType.STRING) ?: return null
-        return try {
-            UUID.fromString(raw)
-        } catch (ex: IllegalArgumentException) {
-            null
-        }
+        return entity.persistentDataContainer.getUuid(keys.ownerUuid())
     }
 
     fun readVehicleId(entity: Entity?): UUID? {
         if (entity == null) return null
-        val raw = entity.persistentDataContainer.get(keys.vehicleId(), PersistentDataType.STRING) ?: return null
-        return try {
-            UUID.fromString(raw)
-        } catch (ex: IllegalArgumentException) {
-            null
-        }
+        return entity.persistentDataContainer.getUuid(keys.vehicleId())
     }
 
     fun isRegistered(entity: Entity?): Boolean = readVehicleId(entity) != null
