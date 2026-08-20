@@ -4,8 +4,12 @@
 > 原始全文保留在 git 历史（合并前最后一次提交 `2783844`）。
 >
 > 分工：约定与硬约束看 [`AGENTS.md`](AGENTS.md)，构建看 [`README.md`](README.md)，
-> 架构依据看各 `CUBEX_*_DESIGN.md` / [`ARCHITECTURE_PROPOSAL.md`](ARCHITECTURE_PROPOSAL.md)，
+> 架构看 [`ARCHITECTURE.md`](ARCHITECTURE.md)，共享模块用法看 [`MODULES.md`](MODULES.md)，
 > 发布记录看各插件 `CHANGELOG.md`。**新的待办只写进本文件**。
+>
+> **本文下方提到的 `CUBEX_*_DESIGN.md` / `ARCHITECTURE_PROPOSAL.md` / `ROADMAP.md` /
+> `KOTLIN_MIGRATION_RUNBOOK.md` / 各插件 `IMPROVE_PLAN.md` 都已在 `484c1f6` 删除**，
+> 保留它们只是为了标注结论的出处。要看原文用 `git show 2783844:<文件名>`，不要当成现存文件去找。
 
 ---
 
@@ -63,7 +67,8 @@
 `PlaceholderStyle` = `%n%` / `{n}` / `%1` / `<n>`(MiniMessage tag)。
 
 > **设计文档已过期**：`CUBEX_CONFIG_I18N_DESIGN.md` §7 的"阶段 A/B 逐插件现代化"**已经走完**。
-> 12 个 `LanguageManager` 全部引用 `ColorMode.MINIMESSAGE`，10 个插件用 `MigrationRunner`。
+> 有 i18n 的 10 个插件全部引用 `ColorMode.MINIMESSAGE`（Clarity/Reputations 无语言文件），
+> 9 个插件用 `MigrationRunner`（Regions 走自己的 `RegionBaseline`）。
 > 以本节为准，不要再把它当待办。
 
 ### 2.4 `cubex-scheduler` — 7/12
@@ -79,7 +84,8 @@ FoliaLib 不向插件泄漏原 API。
 `ServiceUnavailableReason` 覆盖 `PLUGIN_MISSING`/`PLUGIN_DISABLED`/`API_CLASS_MISSING`/
 `SERVICE_NOT_REGISTERED`/`SERVICE_TYPE_MISMATCH`。
 从**提供方 ClassLoader** 加载 API class 再查 `ServicesManager`；**故意不缓存连接**；无状态。
-**改动前先读 `CUBEX_INTEGRATIONS_DESIGN.md`。**
+**改动前先读 [`AGENTS.md`](AGENTS.md) 硬约束里“跨插件 API 面不得出现任何 Kotlin 类型”那条**——
+它决定了这层能表达什么形状的 API（原 `CUBEX_INTEGRATIONS_DESIGN.md` 已删除，见本文开头）。
 
 ### 2.6 `cubex-database` — 3/12（BookLite · EcoBalancer · RuleGems）· 2026-08-17 新建
 
@@ -194,8 +200,22 @@ stdlib。我们的 `jarGate` 强制 `unrelocatedKotlin=0` 且测试随每次构�
 无状态的共享代码 = **shade 进各 jar 的模块**。把有状态服务做成 shade 模块会让各插件各持一份、互不共享。
 新模块要加进 `settings.gradle.kts`；新**插件**才需要加进 `CubexRelocations.kt` 的 pluginIds。
 
-后续若再要新模块，先满足两个条件再动手：**(a) 至少两个真实使用方**，
-**(b) 抽取提交只做搬迁、先让一个插件切过去并过 `shadowJar`/`jarGate`，再推广另一侧。**
+### 3.2 新增共享能力的准入门槛（2026-08-19 修订）
+
+原门槛只有“**(a)** 至少两个真实使用方 + **(b)** 抽取提交只做搬迁”。它是为**收敛 monorepo**
+设计的，判据是“我们自己重复了几次”。定位改成“团队 + AI agent 共用的插件开发框架”之后
+（见 §7），这把尺子量不出框架该有的东西，因此替换为四条，**必须同时满足**：
+
+- **(a)** 两个真实使用方（**同源代码算一个**——Metro/Railway 是同一份代码），
+  **或**明确是下一个新插件会用到的通用能力；
+- **(b)** 没有维护良好的第三方库做得更好。有就**依赖或封装它，不重造**——
+  Cloud（已 shade 进 Metro/Railway/RuleGems）、Adventure、scoreboardlibrary 已在此列；
+- **(c)** **无状态**才能做 shade 模块。需要持有跨插件共享的运行时状态 → 进 CubeXLib（§7.1），
+  不得下沉成 shade 模块；
+- **(d)** 落地时**同时**进 cookbook 一个可编译可测试的范例。没有范例的能力，对 agent 等于不存在。
+
+外加原 (b) 的施工纪律仍然有效：**抽取提交只做搬迁，先让一个插件切过去并过
+`shadowJar`/`jarGate`，再推广另一侧。**
 
 ---
 
@@ -322,6 +342,9 @@ GUI 有完整领取流程。过期的是 `Asset`：`Asset.item()` 只存 `"DIAMO
 
 - [ ] **声望/评价系统**（`DESIGN.md` §8.4）：合同完成后双方互评，reputation 影响
       `max-open-contracts` 上限。与 R3 一并设计，**别在 Contract 内另起一套**
+- [ ] **首发前冻结数据基线**（合同存档、`events.log`、escrow lease、`config-version`/`lang-version`）：
+      与 Regions §5.2 同一条纪律——公开版本之后任何格式变化必须提供单向迁移 + 自动化测试
+- [ ] 补 `Contract/docs/release-checklist.md`（Metro/Railway/Regions 已有），内容用 §6 那四项 jarGate 不查的人工确认
 - [ ] 首发前实服验证
 
 **跨阶段不变量（底线，每阶段都必须维持）**
@@ -405,7 +428,7 @@ schedule 不退化成"固定时间 + 秒级频率"，保留策略系统表达 da
 ### 5.5 BookLite（已公开）
 
 核心闭环已具备：SQLite 存储、PDC 空壳书、签书转换、右键阅读、工作台复制、软删除、恢复、
-卸载模式、讲台读取兼容；33 个单测。
+卸载模式、讲台读取兼容；核心路径有单测覆盖（计数随构建变化，不在此登记）。
 
 - [x] **讲台放置/读取/取下三段流程实服验证已完成**（2026-08-17）
 - [x] **卸载模式在玩家背包与容器中的实服验证已完成**（2026-08-17）
@@ -416,7 +439,7 @@ schedule 不退化成"固定时间 + 秒级频率"，保留策略系统表达 da
 
 ### 5.6 MountLicense（已公开）
 
-注册、PDC 标识、YAML 索引、保护、停车/锁定、钥匙召回、定位、Phase 5a trust 已实现；12 个单测。
+注册、PDC 标识、YAML 索引、保护、停车/锁定、钥匙召回、定位、Phase 5a trust 已实现；核心路径有单测覆盖。
 
 - [x] **真实 Spigot/Paper 服务器回归已完成**（2026-08-17）——这是此前不能标稳定版的唯一原因
 - [ ] 记录本轮实服验证结果**和仍未覆盖的事件路径**
@@ -434,7 +457,8 @@ Railway 的源码包**就是** `org.cubexmc.metro`，主类 `org.cubexmc.metro.M
 **这是有意保留的**。理由：Metro 的线路控制等功能更新可直接搬到 Railway；两者**本就不支持同时安装**。
 同理 `Railway/build.gradle.kts` 把 cloud / scoreboardlibrary / geantyref relocate 到
 `org.cubexmc.metro.lib.*` 也**不要改**。上游同步：`git fetch upstream` → merge，历史上仅 11 个文件有差异。
-"能不能直接复用 Metro 的 `.kt`"的两步判据见 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)。
+"能不能直接复用 Metro 的 `.kt`"的两步判据原在 `KOTLIN_MIGRATION_RUNBOOK.md`（已删除，
+`git show 2783844:KOTLIN_MIGRATION_RUNBOOK.md` 可取回）。
 
 ### 5.8 StateCharge（未公开首发）
 
@@ -444,6 +468,8 @@ Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线�
 
 - [ ] **v1 范围外，后续可加**：GUI 商店 · BossBar 倒计时 · PlaceholderAPI · MySQL ·
       现实时间倒计时模式 · bStats（**需先注册服务 ID**）· 跨服(BungeeCord)同步
+- [ ] **首发前冻结数据基线**（`StateStorage` 存档格式、`config-version`/`lang-version`）：同 §5.2 纪律
+- [ ] 补 `StateCharge/docs/release-checklist.md`
 - [ ] 首发前实服验证
 
 ### 5.9 Clarity（未公开首发）
@@ -451,6 +477,7 @@ Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线�
 清理 Adapt 遗留 attribute modifier。仅接入 `cubex-core`。
 
 - [ ] 首发前实服验证；确认是否需要 i18n（目前无语言文件）
+- [ ] 补 `Clarity/docs/release-checklist.md`
 - [ ] **保持编译到 Java 21**（用 1.21 属性 API），这是全仓唯一例外，`jarGate` 已按插件分别校验
 
 ### 5.10 Reputations（未公开首发）
@@ -474,6 +501,15 @@ Vault 模式共享信誉服务，bStats 31877。
       这是工具链工作，不是任何插件的运行能力缺口
 - [ ] 命令/权限规范文档（R4 收窄后的内容，见 §4）
 - [ ] `jarGate` **不查**的项仍需人工确认：`plugin.yml` 内容、bStats id、sqlite 平台数、adventure 是否单份
+- [x] **修 `jarGate` 的 `sharedModulePrefixes`**（2026-08-19）：原先只列了 9 个模块里的 4 个
+      （core/config/i18n/scheduler），缺 integrations/database/command/gui/spatial。缺失的模块类会被拿
+      **插件自己的 java release** 去校验字节码——Clarity 是 release 21（major 65），一旦接入其中任何一个
+      就会被误判失败。已补全并加注释；`:Clarity:jarGate` / `:Contract:jarGate` 验证通过
+- [ ] 给 Contract / StateCharge / Clarity / Reputations 补 `docs/release-checklist.md`
+      （Metro/Railway/Regions 已有），内容就是上面那四项人工确认
+- [ ] 明确“未公开”的口径：[`mirror.yml`](.github/workflows/mirror.yml) 每次推 main 都会把 Contract /
+      Regions / Clarity 一并 subtree-split 推到公开镜像仓，与 §1 “未公开首发”的措辞冲突。
+      若指的是“未发 release 而非源码未公开”，把 §1 的说法改掉
 - [x] 删除历史残留目录 `Contracts/`（`Contract/` 的旧副本，含 169M 未跟踪的 build/run 产物）
 - [ ] `Railway/.claude/worktrees/` 有历史 agent worktree 副本（已 gitignore、未跟踪），
       会污染全目录 grep 与文件计数；统计以 `kotlinMigrationStatus` 或 `<Plugin>/src` 为准
@@ -489,100 +525,150 @@ Vault 模式共享信誉服务，bStats 31877。
 
 ---
 
-## 7. 开发者体验与 Vibe Coding 生态计划（DX & Vibe Tooling）
+## 7. 框架化路线（2026-08-19 定位确认后重写）
 
-> **目标**：在 9 大共享模块与安全门禁完备的基础上，面向未来玩家开发者与 AI 辅助（Vibe Coding）时代，
-> 将 CubeX 打造为**零认知负担、极速原型验证、AI 零幻觉**的 Minecraft 插件生产力放大器。
+> **定位：对内框架。** 使用者是**我们团队的成员 + AI agent**，产物只跑在我们自己的服务器上。
+> 因此**不做**：`maven-publish`、语义化版本承诺、API 冻结期、对外文档站——那是对外框架的成本。
+> 所有消费方都在同一个 monorepo 里，破坏性变更可以一个提交原子改完所有调用点，
+> 这是唯一真正要用上的 monorepo 优势。
+>
+> 成功标准不是"别人能不能用"，而是：**写下一个插件时，有多少步是不用想的、有多少步会写错。**
+
+上一版本节（`e8b34df` 追加）是在 §3/§4 复审**之后**补进来的，没过同一把尺子，
+其中数条与 §3.1 已经否决的条目直接冲突。本次按 §3.2 的新门槛整体重写。
 
 ```mermaid
 graph TD
-    DX1["DX-1: 脚手架任务 (一键生成插件)"] --> DX2["DX-2: 声明式 Kotlin DSL (极简事件/指令/GUI)"]
-    DX2 --> DX3["DX-3: AI Agent 规则协议 (.cursorrules / Context)"]
-    DX2 --> DX4["DX-4: 高频玩法工具包 (冷却/临时状态/计分板)"]
-    DX3 --> DX5["DX-5: 互动式 Cookbook 食谱库 (真实迷你示例)"]
+    L["§7.1 CubeXLib + 双模式打包"] --> S["§7.3 脚手架 + cookbook"]
+    L --> ST["§7.5 有状态能力进 CubeXLib"]
+    R["§4 R1 + 首发验证<br/>(参考实现可信度)"] --> ST
+    G["§7.2 薄糖层"] --> T["§7.4 无状态能力下沉"]
+    S --> T
 ```
 
-### 7.1 DX-1: 一键脚手架生成任务 (`createPlugin`)
-消除手动配置多文件与目录的繁琐步骤，让玩家/AI 在 30 秒内从 idea 直达本地测试服。
+### 7.1 CubeXLib —— 有状态共享服务的运行时之家 + 双模式打包
 
-- [ ] **在 `buildSrc` 中实现 `createPlugin` Gradle 任务**：
-  - 支持参数：`--name=<PluginName>`、`--modules=<core,config,i18n,gui...>`、`--package=<org.cubexmc.xxx>`。
-  - 自动化创建规范目录（`src/main/kotlin`、`src/main/resources`、`src/test/kotlin`）。
-  - 自动生成标准 `build.gradle.kts` 并按参数填入所选 `modules/cubex-*` 依赖。
-  - 自动生成符合规范的 `plugin.yml`（含 api-version、author、所选软依赖）。
-  - 自动在 [`settings.gradle.kts`](file:///c:/Users/Angus/Desktop/MC%20server/plugins/settings.gradle.kts) 注册子项目，并在 `CubexRelocations.kt` 中自动登记 `pluginId`。
-  - 自动生成继承 `CubexPlugin` 的主类入口与基础单元测试骨架。
+**背景**：`effect` / `quest` / `economy` 这类能力持有跨插件共享的运行时状态。做成 shade 模块时
+各插件各持一份——**relocate 隔离的是类，不是游戏状态**：两个插件对同一个玩家的
+`AttributeModifier` / `allowFlight` 各存一份快照、各自回滚，必然互相覆盖。
+（Clarity 这个插件的存在就是属性残留事故的实物证据。）
 
-### 7.2 DX-2: 极简 Kotlin 声明式 DSL（Declarative Extensions）
-借助 Kotlin Type-safe Builders，让写简单业务像写现代 UI 或轻量脚本一样流畅直观。
+**方案**：新建 `CubeXLib` 插件作为**所有有状态共享服务的唯一运行时实例**，并对两种接入方式开放。
+同一套 `modules/cubex-*` 源码不用改，只是多一种打包目标。
 
-- [ ] **事件监听 DSL（`cubex-core` 扩展）**：
-  - 提供 `onEvent<T : Event>(priority, ignoreCancelled) { event -> ... }` 顶层扩展。
-  - 内部自动构造 `Listener`、完成 Bukkit 注册，并自动将其 `bind()` 到 `CubexPlugin` 资源栈（插件卸载时自动注销）。
-- [ ] **极简指令 DSL（`cubex-command` 增强）**：
-  - 补充类似 `command("mycmd") { permission = "..."; executes { sender, args -> ... }; sub("reload") { ... } }` 的声明式语法糖。
-- [ ] **GUI 声明式语法糖（`cubex-gui` 扩展）**：
-  - 增强 `gui(title, rows) { slot(x, y, item) { onClick { ... } } }` 的内联构建体验，省去冗长的 Builder 嵌套。
+| | 内嵌模式（默认） | 外置模式（opt-in） |
+|---|---|---|
+| 无状态模块 | shade + relocate 进自己的 jar | CubeXLib 提供，不 shade |
+| 有状态能力 | CubeXLib 作**可选**服务，经 `cubex-integrations` 反射连接，缺席时降级 | `depend: [CubeXLib]`，直接类型调用 |
+| jar 能否单独安装 | ✅ 能 | ❌ 不能 |
+| 用于 | 7 个公开插件 + 任何要对外发的 | 自服 / 团队内部插件 |
 
-### 7.3 DX-3: AI Agent 协作规则协议（Agent-Ready Context）
-固化上下文工程，让 Cursor、Claude Code、GitHub Copilot 等 AI 助手在进入仓库的第一秒即掌握全套 CubeX 约定。
+两条路径背后是**同一个运行时实例**。判断规则一句话：
+**这插件会不会发给我们服务器以外的人？会 → 内嵌；不会 → 外置。**
 
-- [ ] **项目级 Agent 规范文件**：
-  - 创建 `.cursorrules` 与 `.github/copilot-instructions.md`，提炼 [`ARCHITECTURE.md`](file:///c:/Users/Angus/Desktop/MC%20server/plugins/ARCHITECTURE.md) 与 [`MODULES.md`](file:///c:/Users/Angus/Desktop/MC%20server/plugins/MODULES.md) 核心铁律（`bind()` 资源管理、MiniMessage 优先、禁止硬依赖、反射跨插件连接）。
-- [ ] **AI Few-shot 提示词模板库**：
-  - 在 `docs/ai-prompts/` 沉淀典型开发指令（如“基于 SQLite + GUI + i18n 编写一个领地传送插件”的标准提示词与预期输出结构）。
+- [ ] 建 `CubeXLib` 子项目，把 9 个 `cubex-*` 不 relocate 打包进去
+- [ ] 约定插件加打包模式开关（编译期代码两边完全一致，只有打包不同）
+- [ ] **`depend: [CubeXLib]` 由构建按模式注入/去掉**，不能手写——手写必然与实际打包模式漂移，
+      而且症状是启动期报错，不是编译期
+- [ ] **jarGate 按模式分支**：内嵌验 `relocatedKotlin > 0` 且 jar 内无 CubeXLib 类；
+      外置验 jar 内 `org/cubexmc/{core,config,i18n,scheduler,integrations,database,command,gui,spatial}/**`
+      条目数为 0
+- [ ] **CubeXLib 是全仓唯一允许携带未 relocate `kotlin/**` 的 jar，且必须是唯一的**——
+      它提供那一份规范的 stdlib；其余插件继续强制 `unrelocatedKotlin=0`
 
-### 7.4 DX-4: 高频玩法开箱工具包（Gameplay Helpers）
-提炼大型服务器开发中最频繁手写的核心玩法轮子，避免重复造轮子。
+**已定决策**
 
-- [ ] **冷却时间管理（`Cooldown`）**：
-  - 支持内存基于时间戳与持久化冷却判断，内置剩余时长文字渲染（如 `3分20秒`）。
-- [ ] **玩家临时会话状态（`PlayerSessionState`）**：
-  - 沉淀 Regions 中的优秀实践：支持玩家离线自动暂存、死亡/断线自动清理与状态重施机制。
-- [ ] **快速侧边栏（`FastScoreboard`）**：
-  - 封装多版本兼容的轻量行更新侧边栏，支持 PAPI 动态变量定时刷新。
+- **不要让每个有状态能力各自成为一个服务插件**（effect 一个、quest 一个、economy 一个）：
+  那样队友要装三个前置、我们要维护三套 API 面、写三份反射桥。收敛成一个 CubeXLib。
+- **Reputations 维持独立**：它持有的是**玩法状态**（信誉分），不是基础设施。
+  CubeXLib 装基础设施，Reputations 装领域服务，这条线要保持清楚。
+- 跨插件 API 面的 **Kotlin 类型禁令**见 [`AGENTS.md`](AGENTS.md) 硬约束——**回调式 API 跨不过这条边界**，
+  需要通知就用 Bukkit 事件或轮询。**设计 API 之前先读**，否则会设计完才发现要推倒。
 
-### 7.5 DX-5: 互动式 Cookbook 食谱库
-提供 10+ 个 30~50 行代码级别的极简完整插件范例（带自动化单测）。
+### 7.2 薄糖层（原 DX-2 收窄）
 
-- [ ] 在 `docs/cookbook/` 建立食谱专栏：
-  1. *“20 行代码实现每日签到奖励插件”*（Core + Config + i18n）
-  2. *“击杀悬赏金币与全服通告”*（Core + Vault 适配）
-  3. *“带翻页与点击音效的箱子菜单”*（Core + GUI + i18n）
-  4. *“SQLite 玩家击杀统计与排行榜”*（Core + Database + PAPI）
-  5. *“跨插件信誉查询与条件执行”*（Core + Integrations）
+原条目要建事件 / 命令 / GUI 三套 DSL。**收窄理由**：模型见过几百万行 Bukkit `@EventHandler`
+和 Cloud 注解，见过**零行**我们自创的语法——厚 DSL 会把 agent 从"有充分先验"的路径推到
+"完全依赖我们文档"的路径上，**幻觉率是升的，不是降的**。
 
-### 7.6 DX-6: 现有成熟功能下沉（下沉至现有 9 大模块）
-将各插件中已实测成熟、高频重复的基础逻辑提炼并下沉至已有模块，消除重复造轮子。
+判据：**这层糖明天删掉，队友能不能靠 Bukkit 文档自己写回来？** 能就做。
 
-- [ ] **聊天输入捕获会话器（下沉至 `cubex-gui`）**：
-  - 提取自 Contract (`ChatInputService`) / Metro (`ChatInputManager`) / EcoBalancer。
-  - 统一封装 Paper `AsyncChatEvent` 与 Legacy `AsyncPlayerChatEvent` 双事件监听，提供带超时、提示词与回调闭包的极简静态入口 `ChatInput.request(...)`。
-- [ ] **配置化音符序列播放器（下沉至 `cubex-gui`）**：
-  - 提取自 Metro / Railway 的 `SoundUtil.playNoteSequence`。
-  - 支持 `tone,volume,instrument,delay` 字符串驱动的多段 UI 反馈音效。
-- [ ] **类型安全 PDC 读写工具类（下沉至 `cubex-core`）**：
-  - 提取自 BookLite / MountLicense / Contract / RuleGems 的 `PdcKeys`。
-  - 提供 `item.pdc.getUuid(...)`、`item.pdc.set(...)` 等零样板扩展函数。
-- [ ] **时长解析与格式化工具（下沉至 `cubex-core`）**：
-  - 提取自 StateCharge / EcoBalancer / Metro。
-  - 提供 `DurationUtil.format(seconds)`（如 `2天5小时`）与 `DurationUtil.parse("1d12h")` 双向解析。
-- [ ] **容器/背包递归遍历修改器（下沉至 `cubex-core`）**：
-  - 提取自 Clarity 的 `ClarityService`。
-  - 提供单行递归扫描玩家背包、装备栏、末影箱与世界容器的原子遍历修改工具 `InventoryWalker`。
+- [ ] **`onEvent<T> { }`（`cubex-core`）**——保留，但理由不是简洁，是**消灭一整类 bug**：
+      忘记把监听器绑进 `Terminable` 栈，reload/disable 后监听器还活着，而且**不会立刻报错**；
+      自动 `bind()` 让它不可能发生。§3.1 当初"纯投机抽象"的判断在只有我们自己写代码时成立，
+      加了队友之后不成立
+- [ ] **GUI 构建糖（`cubex-gui`）**——`cubex-gui` 是我们自己的东西，没有现成标准可收敛，值得做
+- ❌ ~~自研命令 DSL~~ —— **收敛到 Cloud**。Metro / Railway / RuleGems 已经 shade 了 Cloud（incendo，
+      含 annotations），再造第三套是跟自己已经发货的依赖竞争。当前"三家 Cloud + 两家 `cubex-command`
+      + 其余裸 Bukkit"的分裂本身才是要消灭的东西
 
-### 7.7 DX-7: 3 个高价值通用新模块孵化计划
-针对生态中完全无合适第三方库、且跨插件强需求的领域能力，孵化独立的无状态共享模块。
+### 7.3 脚手架与 cookbook（原 DX-1 + DX-5，优先级上调）
 
-- [ ] **🌟 `cubex-effect`：玩家临时属性与租约框架**：
-  - **来源**：Regions (`ScopedEffectService`) + StateCharge (`EffectConfig`)。
-  - **核心**：管理玩家限时/定界的属性修改（Scale 缩放、飞行、移速、发光、药水等）；赋予前记录 `PlayerStateSnapshot` 快照；离开区域/到期/断线/关服自动持久化并精准回滚，**彻底杜绝属性与飞行残留 Bug**。
-- [ ] **🌟 `cubex-quest`：行为目标追踪引擎**：
-  - **来源**：Contract (`ObjectiveListener`) + EcoBalancer (事件税)。
-  - **核心**：18 种原生行为（杀怪、特定击杀、挖矿、钓鱼、合成、驯服等）的纯领域事件监听与进度累加回调器，让任务与悬赏类插件无需手写大批 `@EventHandler`。
-- [ ] **🌟 `cubex-economy`：事务经济与审计流水账本**：
-  - **来源**：EcoBalancer (`TaxLedgerService`/`TaxRunService`) + Contract (`EconomyEngine`)。
-  - **核心**：Vault 异步调用防崩溃保护、原子转账与回滚、自动落盘 `events.log` / SQLite 结构化流水账本与批处理运行状态互斥锁。
+对内 + AI 定位下这两项**杠杆最高**，而且互相验证——脚手架生成的骨架就是 cookbook 的第一篇。
+
+- [ ] **`createPlugin` Gradle 任务**：参数 `--name` / `--package` / `--mode=embedded|external` / `--modules`。
+      要自动完成的正是最容易漏、漏了就炸的几步：`settings.gradle.kts` 注册、
+      `CubexRelocations.kt` 的 pluginId（漏了 shadowJar 报 `Key X missing`）、按模式生成 `plugin.yml`、
+      目录与主类骨架、基础单测。**外置模式下根本不需要 relocation 登记**——这本身就是外置模式的好处之一
+- [ ] **脚手架必须处理 [`mirror.yml`](.github/workflows/mirror.yml) 的 `repos` 数组**：该脚本是
+      `set -euo pipefail`，对不存在的目标 repo 执行 `git ls-remote` 会让整个 job 失败。
+      内部插件通常**不该**进镜像列表，脚手架要默认按"不进"处理并明确告知
+- [ ] **`docs/cookbook/`**：每篇 30–50 行，**可编译、带单测、随 `gradlew build` 一起跑**。
+      这是唯一不会腐烂的 grounding 数据——过期立刻变红。§3.2 (d) 已把它写成新能力的准入条件
+- [ ] 首批范例跟着 §7.4 的下沉项走，一项能力配一篇
+
+### 7.4 无状态能力下沉（原 DX-6 + DX-4，按 §3.2 重新筛过）
+
+下表"实测使用方"是 2026-08-19 按源码数出来的，**同源代码算一个**。
+
+| 能力 | 实测使用方 | 结论 |
+|---|---|---|
+| **ChatInput**（Paper `AsyncChatEvent` + legacy 双监听、去重、超时、提示词） | Contract · EcoBalancer · Regions · Metro/Railway(同源=1) = **4** | ✅ 最该做的一条 |
+| **PDC 读写扩展** | BookLite · MountLicense · RuleGems · Clarity · Metro/Railway = **5** | ✅ |
+| **`Cooldown`**（含剩余时长渲染） | Contract · RuleGems · MountLicense · Metro/Railway 均有冷却逻辑 | ✅ |
+| **时长解析 / 格式化** | StateCharge `TimeFormat` · Contract `formatRemainingTime` = **2** | ✅ 但原条目写的来源不对：EcoBalancer 那处是 `formatTimestamp`（时间戳≠时长），Metro 没有 |
+| **`InventoryWalker`**（递归背包 / 装备 / 末影箱 / 容器） | Clarity = 1，但属通用能力 | ⚠️ 低优先级保留，走 §3.2 (a) 的"下一个插件会用到"分支 |
+| ~~`SoundUtil.playNoteSequence`~~ | **只有 Metro/Railway，同源同一份代码 = 1** | ❌ 与 §3.1 否决 `MinecraftVersion` 同一条理由 |
+| ~~`FastScoreboard`~~ | Metro/Railway 已 shade **scoreboardlibrary** | ❌ §3.2 (b)：封装已有库，不重造 |
+
+- [ ] 做 ChatInput 时顺手修掉一个实测到的问题：
+      [`EcoBalancer/GuiManager.kt`](EcoBalancer/src/main/java/org/cubexmc/ecobalancer/gui/GuiManager.kt)
+      只监听 legacy `AsyncPlayerChatEvent`，没监听 Paper `AsyncChatEvent`。只要它装着，
+      Paper 就对**全服**走 legacy 聊天链路——这正是 §5.2 决策 11 描述的坑的另一半
+
+### 7.5 有状态能力（原 DX-7，改形态并推后）
+
+三项都**不做成 shade 模块**，全部落进 CubeXLib（§7.1），且**排在 §5.1/§5.2 参考实现首发验证之后**。
+
+- [ ] **effect**：玩家限时属性与租约（来源：Regions `ScopedEffectService` + StateCharge `EffectConfig`）。
+      跨插件 API 面不能有回调，到期通知走 Bukkit 事件
+- [ ] **quest**：行为目标追踪（来源：Contract `ObjectiveListener`）。
+      ⚠️ **目前只有 1 个真实使用方**——EcoBalancer 事件税（§4 R2）还没开工，
+      在 R2 落地前不满足 §3.2 (a)，先不动
+- [ ] **economy**：事务经济与审计流水（来源：EcoBalancer `TaxLedgerService` + Contract `EconomyEngine`）。
+      **必须排在 §4 R1 真钱故障注入验证之后**——`EconomyEngine` 承载 §5.1 那四条跨阶段不变量，
+      在唯一的正确性证据到位之前把它抽出来重构，等于把风险最高的代码放在验证最少的时刻动
+
+### 7.6 AI 协作上下文（原 DX-3 改形态）
+
+- [ ] 若要加 `.cursorrules` / `.github/copilot-instructions.md`，**只放一行指向 [`AGENTS.md`](AGENTS.md)
+      的指针**，按 [`CLAUDE.md`](CLAUDE.md) 的先例。三份会漂移的规则副本对 agent 是**反效果**——
+      读到互相矛盾的规则比没有规则更糟
+- [ ] 给 `modules/` 的约定插件加 `explicitApi()`。理由不是对外契约（对内不需要），
+      而是**显式返回类型让 agent 少猜**
+- ❌ ~~`docs/ai-prompts/` few-shot 提示词模板库~~ —— 可编译可测试的 cookbook（§7.3）是更好的
+      grounding 数据；提示词模板没有任何机制阻止它腐烂
+
+### 7.7 执行顺序
+
+1. **§7.1 CubeXLib + 双模式**（解锁其余一切）
+2. **§4 R1 + §5.1/§5.2/§5.8 首发验证**——框架的可信度就是参考实现的可信度；
+   样板不对，agent 的幻觉就是系统性的
+3. **§7.3 脚手架 + cookbook**
+4. **§7.2 薄糖层 + §7.4 无状态下沉**（每项配一篇范例）
+5. **§7.5 有状态能力进 CubeXLib**
+
+§6 的 Gradle 8.14.3+ 升级可以插在 1 和 2 之间：它解锁的 run-paper 3.x 正是第 2 步那批实服验证的提速前置。
 
 ---
 

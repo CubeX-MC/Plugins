@@ -32,12 +32,25 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 硬约束
 
-- **每个插件必须能单独安装**：不要引入插件间的编译期依赖；有状态的共享服务做成独立插件（如 Reputations），无状态共享代码走 `modules/cubex-*`。
+- **两种打包模式，由插件自己声明**（`CubeXLib` 尚未实现，见 [`PLAN.md`](PLAN.md) §7；**在它落地前全部插件都是内嵌模式**）：
+  - **内嵌（默认）**——无状态 `modules/cubex-*` shade + relocate 进自己的 jar，jar 可单独安装。**所有对外发布的插件必须用这个模式**。
+  - **外置（opt-in）**——`depend: [CubeXLib]`，不 shade 任何 `cubex-*`，直接类型调用。只给自服 / 团队内部插件用。
+  - 判断规则一句话：**这插件会不会发给我们服务器以外的人？会 → 内嵌；不会 → 外置。**
+- **内嵌模式的插件必须能单独安装**：不引入插件间的编译期依赖；CubeXLib 对它们是**可选**服务，缺席时降级并完整运行。
+- **有状态的共享能力只放 CubeXLib**（单实例持数据）；无状态共享代码才走 `modules/cubex-*` shade。把有状态服务做成 shade 模块会让各插件各持一份、互不共享。
+  Reputations 维持独立插件——它持有的是**玩法状态**（信誉分），不是基础设施。
+- **跨插件 API 面不得出现任何 Kotlin 类型**：jarGate 强制每个插件把 `kotlin/**` relocate 进自己的命名空间，
+  因此 `kotlin.Unit`、Kotlin 函数类型（**所有 lambda / 回调**）、`Result` 在两侧是**不同的类**，连接必然失败。
+  只能用 `String`/`double`/`UUID`/`java.util.*`/Bukkit 类型/provider 自己包里的接口与 data class——
+  这就是 `org.cubexmc.reputations.api` 那 3 个文件是 Java 的原因。
+  **回调式 API 跨不过这条边界**；需要通知就用 Bukkit 事件或轮询。
 - **可选连接不是依赖**：通过 `cubex-integrations` 使用提供方插件 ClassLoader 解析 Bukkit service；消费方不 `implementation`/`compileOnly` 另一个插件，也不 shade 对方 API。`softdepend` 只用于可选加载顺序。
 - **新插件要加进 `buildSrc/src/main/kotlin/CubexRelocations.kt` 的 pluginIds**，否则 shadowJar 报 `Key X missing`。
+- **新增 `modules/cubex-*` 要同时改两处**：`settings.gradle.kts` 与 `cubex-plugin.gradle.kts` 的 `sharedModulePrefixes`。
+  漏了后者，该模块的类会被拿插件自己的 java release 去校验字节码（Clarity 是 release 21，一接入就误判失败）。
 - **提交严格按插件 scope**（`git add -A -- <Plugin>`）：工作区经常有别的项目的并行 WIP，别卷进来。
 - **不要把重构和玩法/配置/文案改动混在一个提交里**。
-- 推 `main` 会触发 CI 与 9 个公开镜像仓同步 —— **推送前先跟用户确认**。
+- 推 `main` 会触发 CI 与 **10** 个公开镜像仓同步（[`.github/workflows/mirror.yml`](.github/workflows/mirror.yml) 的 `repos` 数组；Reputations、StateCharge 尚无镜像 repo）—— **推送前先跟用户确认**。
 - 改了 `buildSrc` 会触发全量重编；异常时 `.\gradlew.bat --stop` 后重试。
 
 ## 共享模块的参考实现
@@ -65,8 +78,8 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 当前迁移基线
 
-- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；五个 `cubex-*` 模块（含后续新增的 `cubex-integrations`）均使用 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
-- Railway 的迁移批次、共享能力审计和“能不能复用 Metro `.kt`”的两步判据保留在 [`KOTLIN_MIGRATION_RUNBOOK.md`](KOTLIN_MIGRATION_RUNBOOK.md)，供后续同源维护使用；它们不再是待办清单。
+- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；**9 个** `cubex-*` 模块均使用 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
+- Railway 的迁移批次、共享能力审计和“能不能复用 Metro `.kt`”的两步判据原在 `KOTLIN_MIGRATION_RUNBOOK.md`，该文件已于 `484c1f6` 随 13 份计划文件一并删除；**需要时从 git 历史取**（`git show 2783844:KOTLIN_MIGRATION_RUNBOOK.md`）。它们不是待办清单。
 
 ## 已知脆弱点
 

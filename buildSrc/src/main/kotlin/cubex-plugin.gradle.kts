@@ -103,11 +103,18 @@ tasks.register("jarGate") {
     // cubex-* 共享模块保持全仓 Java 17 基线,shade 进 Java 21 的 Clarity 时仍是兼容字节码。
     val javaRelease = tasks.named<JavaCompile>("compileJava").map { it.options.release.orNull ?: CubexVersions.targetJdk }
     val sharedModuleMajor = CubexVersions.targetJdk + 44
+    // 与 modules/cubex-* 一一对应：新增共享模块时必须同步这里。漏掉的模块会被拿"插件自己的
+    // java release"去校验字节码：Clarity(release 21) 一旦接入其中任何一个就会被误判为失败。
     val sharedModulePrefixes = listOf(
         "org/cubexmc/core/",
         "org/cubexmc/config/",
         "org/cubexmc/i18n/",
         "org/cubexmc/scheduler/",
+        "org/cubexmc/integrations/",
+        "org/cubexmc/database/",
+        "org/cubexmc/command/",
+        "org/cubexmc/gui/",
+        "org/cubexmc/spatial/",
     )
     // relocate 目标命名空间下的类是第三方库(字节码版本各异),不参与本仓库自有类的版本校验
     val shadedPaths = tasks.named<ShadowJar>("shadowJar").map { shadow ->
