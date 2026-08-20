@@ -1,45 +1,56 @@
 # StateCharge 配置
 # 文档: StateCharge/DESIGN.md
+#
+# 计费模型:玩家自己 toggle 开关状态,**按实际开启的时长**扣钱。
+#   开启 → 开始计费;关闭 → 立刻结算零头并停止。玩家不预购时长。
+#   离线不计费,开关状态保留,重新上线接着算。
 config-version: 1
 
 # 语言文件: lang/<language>.yml(zh_CN / en_US)
 language: zh_CN
 
 timing:
-  # 主计时器周期(秒)。剩余时长按"在线秒数"扣减,1 为推荐值(最小 1)。
+  # 主计时器周期(秒)。开启中的状态按这个粒度累计时长,1 为推荐值(最小 1)。
   tick-seconds: 1
 
+billing:
+  # 多久结算一次(秒)。默认 60 —— Vault 调用频率可控,玩家对扣费的感知也够及时。
+  # 调小会让扣费更细,但每个开着状态的在线玩家每个周期都要走一次 Vault。
+  interval-seconds: 60
+  # 余额保险的默认阈值:结算后余额低于它,自动关掉该玩家全部收费状态。
+  # 0 = 默认不设保险。玩家可用 /sc guard <金额> 或交易页里的盾牌按钮自行设置。
+  default-guard: 0.0
+
 storage:
-  # states.yml 的落盘间隔(秒,最小 5)。崩溃最多丢这一窗口内的扣减。
+  # states.yml 的落盘间隔(秒,最小 5)。崩溃最多丢这一窗口内的计费进度。
   flush-interval-seconds: 60
 
 notifications:
-  # 到期前在这些剩余秒数发聊天提示(空列表关闭)。
-  expiry-warning-seconds: [60, 30, 10, 5, 4, 3, 2, 1]
-  # 最后 N 秒在 actionbar 显示倒计时,0 关闭。
-  actionbar-countdown-seconds: 10
+  # 每次周期扣费都发一条聊天提示。默认关闭 —— 按分钟结算的话会把玩家刷屏。
+  # 扣款失败与余额保险触发**始终**提示,不受这个开关影响。
+  charge-message: false
 
 # 状态定义。每个状态一段;段名即状态 id(用于命令/权限),须匹配 [a-z0-9_-]{1,32}。
 # 字段:
-#   enabled: true/false            — false 时不可购买(admin give 仍可用)
+#   enabled: true/false            — false 时不出现在交易页,也不能开启
 #   display: 展示名                — 缺省用 id;纯文本(颜色由语言文件模板控制,不能含 MiniMessage 标签)
-#   price: 每份价格                — 0 = 免费
-#   unit-seconds: 每份时长(秒)
-#   max-stack-seconds: 累计上限    — 0 = 不限
-#   permission: 权限节点           — 空 = 不检查购买权限
-#   conflict-group: 互斥组         — 同组状态同时只能有一个生效;显式 "" 关闭互斥
+#   price: 每 unit-seconds 的价格  — 0 = 免费(免费状态不扣钱,也不受余额保险影响)
+#   unit-seconds: 计费周期长度     — 与 price 合起来构成费率,例如 100/1800 = 每 30 分钟 100 块
+#   permission: 权限节点           — 空 = 所有人可见可用;设了则**交易页只对有权限的玩家显示**
+#   conflict-group: 互斥组         — 同组状态同时只能开一个;显式 "" 关闭互斥
+#   icon: 交易页图标               — Material 名,缺省 NAME_TAG;写错只回退默认值并记一条警告
 #   effect: 效果参数
 #     type: scale                  — 体型(参数 scale: 0.1..16.0,1.0 为原大小)
-#     type: fly                    — 飞行(参数 auto-start: true/false,购买后自动起飞)
+#     type: fly                    — 飞行(参数 auto-start: true/false,开启后自动起飞)
 states:
   small:
     enabled: true
     display: "变小"
     price: 100.0
     unit-seconds: 1800
-    max-stack-seconds: 21600
     permission: ""
     conflict-group: scale
+    icon: RABBIT_FOOT
     effect:
       type: scale
       scale: 0.5
@@ -48,9 +59,9 @@ states:
     display: "变大"
     price: 100.0
     unit-seconds: 1800
-    max-stack-seconds: 21600
     permission: ""
     conflict-group: scale
+    icon: DRAGON_EGG
     effect:
       type: scale
       scale: 1.6
@@ -59,9 +70,9 @@ states:
     display: "飞行"
     price: 200.0
     unit-seconds: 3600
-    max-stack-seconds: 86400
     permission: ""
     conflict-group: fly
+    icon: FEATHER
     effect:
       type: fly
       auto-start: true

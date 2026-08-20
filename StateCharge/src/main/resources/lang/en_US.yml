@@ -1,6 +1,6 @@
-# StateCharge language file (en_US). All values are MiniMessage; placeholders use <name> form.
-# Keep zh_CN.yml in sync and bump lang-version when keys change (see DESIGN.md §7).
-lang-version: 1
+# StateCharge English language file
+# Values use MiniMessage; <prefix> expands to the prefix below.
+lang-version: 2
 
 prefix: "<gradient:#FFC24B:#FF8A00>StateCharge</gradient> <dark_gray>»</dark_gray> "
 
@@ -8,46 +8,66 @@ messages:
   no-permission: "<prefix><red>You do not have permission to use this command.</red>"
   player-only: "<prefix><red>This command can only be run by a player.</red>"
   help: |-
-    <prefix><gold>==== StateCharge Help ====</gold>
-    <prefix><dark_gray>/statecharge list</dark_gray> <gray>List purchasable states</gray>
-    <prefix><dark_gray>/statecharge status</dark_gray> <gray>Show your active states and remaining time</gray>
-    <prefix><dark_gray>/statecharge buy <state> [count]</dark_gray> <gray>Buy a timed state (online time, stackable)</gray>
-  buy-success: "<prefix><green>Purchased!</green> You got <gold><time></gold> of <yellow><state></yellow> for <white><price></white>. Total remaining: <green><total></green>."
-  buy-unknown-state: "<prefix><red>Unknown state: <state>. Use /statecharge list to see purchasable states.</red>"
-  buy-disabled: "<prefix><red>The <state> state is not purchasable right now.</red>"
-  buy-no-permission: "<prefix><red>You do not have permission to buy this state.</red>"
-  buy-conflict: "<prefix><red>You already have the <yellow><other></yellow> state from the same group; wait for it to end first.</red>"
-  buy-max-stack: "<prefix><red>That would exceed the state's stacking limit (<white><max></white>).</red>"
-  buy-insufficient: "<prefix><red>Not enough money; you need <white><price></white>.</red>"
-  buy-economy-failed: "<prefix><red>Payment failed: <reason>.</red>"
-  buy-invalid-count: "<prefix><red>Invalid count; use a whole number between 1 and 1000.</red>"
-  expiry-warning: "<prefix><yellow>Your <white><state></white> state expires in <red><time></red>!</yellow>"
-  expired: "<prefix><yellow>Your <white><state></white> state has expired.</yellow>"
-  actionbar-countdown: "<yellow><state> remaining <time></yellow>"
-  admin-give-success: "<prefix><green>Granted <player> <time> of <state>.</green>"
-  admin-give-unknown-state: "<prefix><red>Unknown state: <state>.</red>"
-  admin-give-invalid-seconds: "<prefix><red>Invalid duration; use a positive whole number of seconds.</red>"
-  admin-player-unknown: "<prefix><red>Player not found: <player>.</red>"
-  admin-clear-success: "<prefix><green>Cleared <count> states from <player>.</green>"
+    <prefix><gold>StateCharge</gold> <gray>— player states billed by uptime</gray>
+    <gray>/sc</gray> <dark_gray>open the shop (toggle states)</dark_gray>
+    <gray>/sc list</gray> <dark_gray>list every state and its rate</dark_gray>
+    <gray>/sc status</gray> <dark_gray>your active states and balance guard</dark_gray>
+    <gray>/sc toggle <state></gray> <dark_gray>turn a state on or off</dark_gray>
+    <gray>/sc guard <amount|off></gray> <dark_gray>set your balance guard</dark_gray>
+
+  toggle-on: "<prefix><green>Enabled <white><state></white>.</green><gray> You are billed until you turn it off.</gray>"
+  toggle-off: "<prefix><yellow>Disabled <white><state></white>.</yellow><gray> Settled <white><price></white>.</gray>"
+  toggle-already-on: "<prefix><gray><state> is already on.</gray>"
+  toggle-already-off: "<prefix><gray><state> was not on.</gray>"
+  toggle-unknown-state: "<prefix><red>Unknown state: <state>. Try /sc list.</red>"
+  toggle-disabled: "<prefix><red>State <state> is currently unavailable.</red>"
+  toggle-no-permission: "<prefix><red>You do not have permission to use <state>.</red>"
+  toggle-guard-reached: "<prefix><red>Your balance is below your guard, so <state> cannot be enabled.</red>"
+
+  charged: "<prefix><gray>[<state>] ran for <white><time></white>, charged <gold><price></gold>.</gray>"
+  charge-failed: "<prefix><red>Charge failed; <white><state></white> was turned off.</red>"
+  guard-triggered: "<prefix><red>Balance fell below your guard of <white><threshold></white>; turned off: <yellow><states></yellow></red>"
+
+  guard-prompt: "<prefix><yellow>Type your balance guard amount in chat</yellow><gray> (<white>clear</white> to reset, <white>cancel</white> to abort)</gray>"
+  guard-set: "<prefix><green>Balance guard set to <white><amount></white>.</green><gray> Paid states switch off below it.</gray>"
+  guard-reset: "<prefix><green>Balance guard reset to the default <white><amount></white>.</green>"
+  guard-invalid: "<prefix><red>Invalid amount. Enter a number of at least 0.</red>"
+  guard-cancelled: "<prefix><gray>Cancelled.</gray>"
+
+  admin-player-offline: "<prefix><red>Player <player> is offline; turning states off removes entity effects and needs them online.</red>"
+  admin-clear-success: "<prefix><green>Turned off <count> state(s) for <player>.</green>"
   admin-clear-none: "<prefix><yellow><player> has no active states.</yellow>"
   admin-reload-success: "<prefix><green>Reload complete.</green>"
-  admin-reload-failed: "<prefix><red>Reload failed at stage: <stage>. See console for details.</red>"
+  admin-reload-failed: "<prefix><red>Reload failed at stage: <stage>. See the console log.</red>"
 
 ui:
-  list-header: "<prefix><gold>Purchasable states:</gold>"
+  list-header: "<prefix><gold>Available states:</gold>"
   list-line: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray>"
-  list-line-limited: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray><dark_gray> · max </dark_gray><gray><max></gray>"
-  list-empty: "<prefix><gray>No states are purchasable right now.</gray>"
+  list-empty: "<prefix><gray>No states are available.</gray>"
+
   status-header: "<prefix><gold>Your active states:</gold>"
-  status-line: "<prefix><dark_gray> - </dark_gray><white><state></white><dark_gray> · remaining </dark_gray><green><time></green>"
-  status-empty: "<prefix><gray>You have no active states. Check /statecharge list for what is on sale.</gray>"
-  usage-buy: "<gray>Usage: /statecharge buy <state> [count]</gray>"
-  usage-list: "<gray>Usage: /statecharge list</gray>"
-  usage-status: "<gray>Usage: /statecharge status</gray>"
-  usage-admin-give: "<gray>Usage: /statecharge admin give <player> <state> <seconds></gray>"
-  usage-admin-clear: "<gray>Usage: /statecharge admin clear <player> [state]</gray>"
-  usage-admin-reload: "<gray>Usage: /statecharge admin reload</gray>"
+  status-line: "<prefix><dark_gray> - </dark_gray><white><state></white><dark_gray> · </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray>"
+  status-empty: "<prefix><gray>You have no active states. Use /sc to open the shop.</gray>"
+  status-guard: "<prefix><gray>Balance guard: <white><amount></white></gray>"
+
+  usage-toggle: "<gray>Usage: /sc toggle <state></gray>"
+  usage-on: "<gray>Usage: /sc on <state></gray>"
+  usage-off: "<gray>Usage: /sc off <state></gray>"
+  usage-guard: "<gray>Usage: /sc guard <amount|off></gray>"
+  usage-admin-off: "<gray>Usage: /sc admin off <player> [state]</gray>"
+  usage-admin-reload: "<gray>Usage: /sc admin reload</gray>"
+
+  # Duration unit labels used by durationText (e.g. "1h 30m").
   time-day: "d"
   time-hour: "h"
   time-minute: "m"
   time-second: "s"
+
+  gui-title: "<dark_gray>State Shop</dark_gray>"
+  gui-state-on: "<green>● <state></green>"
+  gui-state-off: "<gray>○ <state></gray>"
+  gui-state-rate: "<gray>Rate: <gold><price></gold> / <white><duration></white></gray>"
+  gui-state-hint: "<dark_gray>Click to toggle</dark_gray>"
+  gui-guard-name: "<aqua>Balance guard</aqua>"
+  gui-guard-current: "<gray>Current: <white><amount></white></gray>"
+  gui-guard-hint: "<dark_gray>Click, then type an amount in chat</dark_gray>"

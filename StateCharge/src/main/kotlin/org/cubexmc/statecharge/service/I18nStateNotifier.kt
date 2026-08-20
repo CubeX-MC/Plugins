@@ -1,53 +1,52 @@
 package org.cubexmc.statecharge.service
 
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import java.math.BigDecimal
 import org.bukkit.entity.Player
 import org.cubexmc.statecharge.StateChargePlugin
-import kotlin.math.max
 
 /**
- * 用语言文件渲染提醒:阈值聊天提示(`notifications.expiry-warning-seconds`)+
- * 最后 N 秒 actionbar 倒计时(`notifications.actionbar-countdown-seconds`,0 关闭)。
+ * 用语言文件渲染计费提醒。
+ *
+ * 周期扣款默认**不提示**（`notifications.charge-message: false`）——按分钟结算的话，
+ * 每次都刷一条聊天会把玩家淹掉。扣款失败与余额保险则一定提示：那两件事会让状态突然消失，
+ * 玩家必须知道为什么。
  */
 class I18nStateNotifier(private val plugin: StateChargePlugin) : StateNotifier {
 
-    private val legacySerializer = LegacyComponentSerializer.legacySection()
-
-    override fun onTick(player: Player, stateId: String, remainingSeconds: Long) {
-        val display = displayOf(stateId)
-        if (remainingSeconds in warningSeconds()) {
-            player.sendMessage(
-                plugin.lang().message(
-                    "expiry-warning",
-                    mapOf("state" to display, "time" to plugin.durationText(remainingSeconds)),
-                ),
-            )
+    override fun charged(player: Player, stateId: String, seconds: Long, amount: BigDecimal) {
+        if (!plugin.config.getBoolean("notifications.charge-message", false)) {
+            return
         }
-        val window = actionbarWindowSeconds()
-        if (window > 0 && remainingSeconds <= window) {
-            // i18n 输出 legacy §,actionbar 走 Adventure(Player#sendActionBar(String) 已弃用)。
-            player.sendActionBar(
-                legacySerializer.deserialize(
-                    plugin.lang().message(
-                        "actionbar-countdown",
-                        mapOf("state" to display, "time" to plugin.durationText(remainingSeconds)),
-                    ),
+        player.sendMessage(
+            plugin.lang().message(
+                "charged",
+                mapOf(
+                    "state" to displayOf(stateId),
+                    "time" to plugin.durationText(seconds),
+                    "price" to plugin.economy().format(amount),
                 ),
-            )
-        }
+            ),
+        )
     }
 
-    override fun expired(player: Player, stateId: String) {
-        player.sendMessage(plugin.lang().message("expired", mapOf("state" to displayOf(stateId))))
+    override fun chargeFailed(player: Player, stateId: String) {
+        player.sendMessage(
+            plugin.lang().message("charge-failed", mapOf("state" to displayOf(stateId))),
+        )
+    }
+
+    override fun guardTriggered(player: Player, turnedOff: List<String>) {
+        player.sendMessage(
+            plugin.lang().message(
+                "guard-triggered",
+                mapOf(
+                    "states" to turnedOff.joinToString(", "),
+                    "threshold" to plugin.economy().format(plugin.states().guardOf(player.uniqueId)),
+                ),
+            ),
+        )
     }
 
     private fun displayOf(stateId: String): String =
         plugin.definitions().byId(stateId)?.display() ?: stateId
-
-    private fun warningSeconds(): Set<Long> =
-        plugin.config.getLongList("notifications.expiry-warning-seconds")
-            .mapTo(HashSet()) { max(0L, it) }
-
-    private fun actionbarWindowSeconds(): Long =
-        max(0L, plugin.config.getLong("notifications.actionbar-countdown-seconds", 10L))
 }

@@ -17,16 +17,19 @@ import org.cubexmc.statecharge.command.StateChargeCommand
 import org.cubexmc.statecharge.config.LanguageManager
 import org.cubexmc.statecharge.config.StateDefinitions
 import org.cubexmc.statecharge.economy.EconomyService
+import org.cubexmc.statecharge.gui.StateShopGui
 import org.cubexmc.statecharge.listener.StateListener
 import org.cubexmc.statecharge.service.I18nStateNotifier
 import org.cubexmc.statecharge.service.StateChargeService
 import org.cubexmc.statecharge.storage.StateStorage
 import org.cubexmc.statecharge.util.TimeFormat
 import java.io.IOException
+import java.math.BigDecimal
 import kotlin.math.max
 
 /**
- * 状态收费插件:付费购买限时玩家状态(变小/变大/飞行/…),Vault 经济,在线时长计时、可叠加续费。
+ * 状态收费插件:玩家自主 toggle 开关状态(变小/变大/飞行/…),**按实际开启时长**从 Vault 扣费。
+ * 关掉即停止计费;离线不计费;余额跌破保险阈值自动关闭全部收费状态。
  * 架构照抄 Contract(共享模块参考适配插件)。
  */
 class StateChargePlugin : CubexPlugin() {
@@ -38,6 +41,7 @@ class StateChargePlugin : CubexPlugin() {
     private var definitions: StateDefinitions? = null
     private var notifier: I18nStateNotifier? = null
     private var service: StateChargeService? = null
+    private var shopGui: StateShopGui? = null
 
     override fun enablePlugin() {
         cubexScheduler = CubexScheduler.bindTo(this)
@@ -69,6 +73,11 @@ class StateChargePlugin : CubexPlugin() {
         notifier = I18nStateNotifier(this)
         service = StateChargeService(this)
 
+        // 交易页:菜单路由与聊天输入各是一个 Listener,都要注册。
+        shopGui = StateShopGui(this)
+        registerListener(shop().registry())
+        registerListener(shop())
+
         registerListener(StateListener(this))
         registerCommand("statecharge", StateChargeCommand(this))
 
@@ -82,7 +91,8 @@ class StateChargePlugin : CubexPlugin() {
 
         log().info(
             "StateCharge enabled with ${definitions().all().size} configured states " +
-                "(${definitions().purchasable().size} purchasable), ${storage().size()} active entries.",
+                "(${definitions().purchasable().size} enabled), ${storage().size()} active states, " +
+                "billing every ${billingIntervalSeconds()}s.",
         )
     }
 
@@ -161,7 +171,22 @@ class StateChargePlugin : CubexPlugin() {
 
     fun states(): StateChargeService = service ?: throw IllegalStateException("service not initialized")
 
+    fun shop(): StateShopGui = shopGui ?: throw IllegalStateException("shopGui not initialized")
+
     fun scheduler(): CubexScheduler = cubexScheduler ?: throw IllegalStateException("scheduler not initialized")
+
+    /**
+     * 结算周期(秒)。默认 60 —— Vault 调用频率可控,玩家对扣费的感知也够及时。
+     * 调小会让扣费更细,但每个开着状态的在线玩家每周期都要走一次 Vault。
+     */
+    fun billingIntervalSeconds(): Long = max(1L, config.getLong("billing.interval-seconds", 60L))
+
+    /**
+     * 余额保险的默认阈值:结算后余额低于它就自动关掉全部收费状态。
+     * 0 = 默认不设保险;玩家可用 `/sc guard <金额>` 或 GUI 自行设置。
+     */
+    fun defaultGuard(): BigDecimal =
+        BigDecimal.valueOf(max(0.0, config.getDouble("billing.default-guard", 0.0)))
 
     private fun saveDefaultFiles() {
         resourceFiles?.saveIfMissing(listOf("config.yml", "lang/zh_CN.yml", "lang/en_US.yml"))

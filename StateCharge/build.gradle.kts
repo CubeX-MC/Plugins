@@ -22,6 +22,8 @@ dependencies {
     implementation(project(":modules:cubex-scheduler"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
+    // 交易页:Menu/ItemBuilder/fillEmpty + 保险阈值的聊天输入(ChatInputState)
+    implementation(project(":modules:cubex-gui"))
     implementation("com.tcoded:FoliaLib:0.5.1")
     testImplementation(CubexDeps.junitJupiter)
     testImplementation(CubexDeps.mockitoCore)

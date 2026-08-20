@@ -1,5 +1,6 @@
 package org.cubexmc.statecharge.config
 
+import org.bukkit.Material
 import org.bukkit.configuration.ConfigurationSection
 import org.cubexmc.core.Reloadable
 import org.cubexmc.statecharge.StateChargePlugin
@@ -68,13 +69,7 @@ class StateDefinitions(private val plugin: StateChargePlugin) : Reloadable, Stat
             problem(id, "unit-seconds must be >= 1")
             return null
         }
-        val configuredMax = section.getLong("max-stack-seconds", 0L)
-        val maxStackSeconds = when {
-            configuredMax < 0 -> 0L
-            // 上限低于每份时长没有意义:钳到每份时长。
-            configuredMax in 1 until unitSeconds -> unitSeconds
-            else -> configuredMax
-        }
+        // max-stack-seconds 在"按开启时长计费"模型下没有意义(玩家不再囤时长),已废弃。
         val price = section.getDouble("price", 0.0)
         if (price < 0) {
             problem(id, "price must be >= 0")
@@ -88,16 +83,22 @@ class StateDefinitions(private val plugin: StateChargePlugin) : Reloadable, Stat
             defaultConflictGroup(effect)
         }
         val display = section.getString("display", id)?.takeIf { it.isNotBlank() } ?: id
+        // 图标只影响交易页展示,写错不该让整个状态加载失败 —— 回退到默认值并记一条 problem。
+        val iconName = section.getString("icon", "")?.takeIf { it.isNotBlank() }
+        val icon = iconName?.let { Material.matchMaterial(it) }
+        if (iconName != null && icon == null) {
+            problem(id, "unknown icon material '" + iconName + "', falling back to " + DEFAULT_ICON)
+        }
         return StateSpec(
             id,
             display,
             BigDecimal.valueOf(price),
             unitSeconds,
-            maxStackSeconds,
             permission,
             conflictGroup,
             effect,
             section.getBoolean("enabled", true),
+            icon ?: DEFAULT_ICON,
         )
     }
 
@@ -139,6 +140,7 @@ class StateDefinitions(private val plugin: StateChargePlugin) : Reloadable, Stat
     private companion object {
         val ID_PATTERN = Regex("[a-z0-9_-]{1,32}")
         const val DEFAULT_UNIT_SECONDS = 1800L
+        val DEFAULT_ICON: Material = Material.NAME_TAG
         const val MIN_SCALE = 0.1
         const val MAX_SCALE = 16.0
     }

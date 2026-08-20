@@ -18,34 +18,30 @@ commands:
 
 permissions:
   statecharge.use:
-    description: Use the player commands (list, status, buy, help).
+    description: Use the player commands (shop GUI, list, status, toggle, guard).
     default: true
-  # The buy.<id> nodes below are only checked when a state's config sets its "permission" field to
-  # that node; they default to true so a server that opts into the check does not lock everyone out.
-  statecharge.buy.small:
-    description: Buy the small state (checked only when configured on that state).
+  # 下面这些节点只有当某个状态的 config 里把 "permission" 指到它时才会被检查。
+  # 交易页**只显示玩家有权限的状态**,所以这些默认给 true,免得服主一开检查就把所有人锁在外面。
+  statecharge.state.small:
+    description: Use the small state (checked only when configured on that state).
     default: true
-  statecharge.buy.giant:
-    description: Buy the giant state (checked only when configured on that state).
+  statecharge.state.giant:
+    description: Use the giant state (checked only when configured on that state).
     default: true
-  statecharge.buy.fly:
-    description: Buy the fly state (checked only when configured on that state).
+  statecharge.state.fly:
+    description: Use the fly state (checked only when configured on that state).
     default: true
   statecharge.fly.keep:
-    description: Keep flight after the fly state expires.
+    description: Keep flight after the fly state is turned off.
     default: false
   statecharge.admin:
     description: All StateCharge admin commands.
     default: op
     children:
-      statecharge.admin.give: true
-      statecharge.admin.clear: true
+      statecharge.admin.off: true
       statecharge.admin.reload: true
-  statecharge.admin.give:
-    description: Grant a state for free. /statecharge admin give <player> <state> <seconds>
-    default: op
-  statecharge.admin.clear:
-    description: Clear active states. /statecharge admin clear <player> [state]
+  statecharge.admin.off:
+    description: Turn off a player's states. /sc admin off <player> [state]
     default: op
   statecharge.admin.reload:
     description: Reload config, language and stored state data.
