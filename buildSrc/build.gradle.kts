@@ -16,7 +16,7 @@ dependencies {
     }).get()
 
     implementation("com.gradleup.shadow:shadow-gradle-plugin:8.3.7")
-    implementation("xyz.jpenilla.run-paper:xyz.jpenilla.run-paper.gradle.plugin:2.3.1")
+    implementation("xyz.jpenilla.run-paper:xyz.jpenilla.run-paper.gradle.plugin:3.0.0")
     implementation("org.jetbrains.kotlin.jvm:org.jetbrains.kotlin.jvm.gradle.plugin:$kotlinVersion")
 
     testImplementation(kotlin("test"))
