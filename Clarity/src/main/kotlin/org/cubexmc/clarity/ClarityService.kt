@@ -14,6 +14,8 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
 import org.bukkit.inventory.meta.ItemMeta
+import org.cubexmc.core.ItemSlot
+import org.cubexmc.core.PlayerItems
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.potion.PotionEffect
 
@@ -257,17 +259,17 @@ class ClarityService(private val plugin: ClarityPlugin) {
         val config = plugin.config()
         val summary = ItemRunSummary()
         for (slot in itemSlots(player, scope)) {
-            val item = slot.stack() ?: continue
+            val item = slot.stack ?: continue
             if (item.type.isAir) continue
             summary.scanned++
             val result = cleanItem(item, config, mode, dryRun)
             if (result.hits().isEmpty()) continue
             summary.matches++
-            summary.details.add("${slot.label()} ${item.type} x${item.amount} -> ${result.hits()}")
-            msg(sender, "§e${slot.label()} §7${item.type} x${item.amount}")
+            summary.details.add("${slot.label} ${item.type} x${item.amount} -> ${result.hits()}")
+            msg(sender, "§e${slot.label} §7${item.type} x${item.amount}")
             result.hits().forEach { msg(sender, "   §7- $it") }
             if (!dryRun && result.changed()) {
-                slot.setter()(result.stack())
+                slot.replace(result.stack())
                 summary.changed++
             }
         }
@@ -406,42 +408,13 @@ class ClarityService(private val plugin: ClarityPlugin) {
         return maxAmounts[full] ?: maxAmounts[path]
     }
 
-    private fun itemSlots(player: Player, scope: ItemScope): List<ItemSlot> {
-        val slots = ArrayList<ItemSlot>()
-        val inventory = player.inventory
-        when (scope) {
-            ItemScope.HAND -> slots.add(ItemSlot("hand", inventory.itemInMainHand) { inventory.setItemInMainHand(it) })
-            ItemScope.INVENTORY -> addStorageSlots(slots, inventory)
-            ItemScope.EQUIPMENT -> addEquipmentSlots(slots, inventory)
-            ItemScope.ENDER -> addInventorySlots(slots, "ender", player.enderChest)
-            ItemScope.ALL -> {
-                addStorageSlots(slots, inventory)
-                addEquipmentSlots(slots, inventory)
-                addInventorySlots(slots, "ender", player.enderChest)
-            }
-        }
-        return slots
-    }
-
-    private fun addStorageSlots(slots: MutableList<ItemSlot>, inventory: PlayerInventory) {
-        val contents = inventory.storageContents
-        for (index in contents.indices) {
-            slots.add(ItemSlot("inventory[$index]", contents[index]) { inventory.setItem(index, it) })
-        }
-    }
-
-    private fun addEquipmentSlots(slots: MutableList<ItemSlot>, inventory: PlayerInventory) {
-        slots.add(ItemSlot("equipment[offhand]", inventory.itemInOffHand) { inventory.setItemInOffHand(it) })
-        slots.add(ItemSlot("equipment[helmet]", inventory.helmet) { inventory.helmet = it })
-        slots.add(ItemSlot("equipment[chestplate]", inventory.chestplate) { inventory.chestplate = it })
-        slots.add(ItemSlot("equipment[leggings]", inventory.leggings) { inventory.leggings = it })
-        slots.add(ItemSlot("equipment[boots]", inventory.boots) { inventory.boots = it })
-    }
-
-    private fun addInventorySlots(slots: MutableList<ItemSlot>, label: String, inventory: Inventory) {
-        for (index in 0 until inventory.size) {
-            slots.add(ItemSlot("$label[$index]", inventory.getItem(index)) { inventory.setItem(index, it) })
-        }
+    /** 槽位枚举与写回已下沉到 `cubex-core` 的 [PlayerItems];标签格式保持不变(会出现在命令输出里)。 */
+    private fun itemSlots(player: Player, scope: ItemScope): List<ItemSlot> = when (scope) {
+        ItemScope.HAND -> listOf(PlayerItems.handSlot(player))
+        ItemScope.INVENTORY -> PlayerItems.storageSlots(player)
+        ItemScope.EQUIPMENT -> PlayerItems.equipmentSlots(player)
+        ItemScope.ENDER -> PlayerItems.enderSlots(player)
+        ItemScope.ALL -> PlayerItems.allSlots(player)
     }
 
     private fun msg(sender: CommandSender?, text: String) {
@@ -449,16 +422,6 @@ class ClarityService(private val plugin: ClarityPlugin) {
     }
 
     private enum class ItemCleanupMode { SWEEP, LEVELTOOLS_PURGE }
-
-    private class ItemSlot(
-        private val label: String,
-        private val stack: ItemStack?,
-        private val setter: (ItemStack) -> Unit,
-    ) {
-        fun label(): String = label
-        fun stack(): ItemStack? = stack
-        fun setter(): (ItemStack) -> Unit = setter
-    }
 
     private class ItemCleanupResult(
         private val hits: List<String>,
