@@ -371,6 +371,11 @@ Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证�
 
 - [x] **`REAL_PLAYER_TEST.md` 真人验证已完成**（2026-08-17）：GUI 创建向导、玩家进出/死亡/断线状态清理、
       异常关服、装备托管恢复、隔离试运行、Lands/RuleGems 授权、多人 Mode 流程
+- [x] **接入 `MigrationRunner`**（2026-08-20）：此前 `RegionBaseline` 只做"版本对不上就抛异常"
+      的校验，**没有任何迁移能力**。版本表仍留在 `RegionBaseline`（5 个文件的单一来源），
+      但备份、原子写、保存失败回滚与失败报告都交给 `cubex-config`。目前没有迁移步骤——
+      首个公开版本就是起点；以后改格式只需版本号 +1 并在那里 `addStep(...)`。
+      至此 Regions 与 Contract 的模块接入完全一致
 - [ ] 校验器与第三方依赖的错误正文仍是英文常量，未拆成翻译键（真人验证中收集到的难懂文案先统一调整）
 - [ ] 子命令升级为强类型 Brigadier 节点（当前 Lifecycle Command API + 权限过滤 + 参数补全已够用）
 - [ ] 第一个公开版本发布后**冻结**数据基线（`config-version: 4`、`regions-version: 4`、
@@ -469,8 +474,18 @@ Railway 的源码包**就是** `org.cubexmc.metro`，主类 `org.cubexmc.metro.M
 Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线暂停、重复购买累加）、互斥组、
 `StateStorage` dirty flush + 损坏回退 `.bak`；测试覆盖配置解析/购买/计时/存储/时长渲染/语言对齐。
 
-- [ ] **v1 范围外，后续可加**：GUI 商店 · BossBar 倒计时 · PlaceholderAPI · MySQL ·
-      现实时间倒计时模式 · bStats（**需先注册服务 ID**）· 跨服(BungeeCord)同步
+- [x] **计费模型重做为"按开启时长计费"**（2026-08-20，用户决策）：
+      不再预购时长。玩家 toggle 开启即计费、关闭即停止并结算零头；`price`/`unit-seconds`
+      读作**费率**（数值含义不变，服主配置几乎不用改，只有 `max-stack-seconds` 作废）。
+      六条已定语义：按比例不取整 · 关闭立即结算 · **离线不计费但开关状态保留** ·
+      扣款失败则强制关闭且已用时长收不回 · 免费状态不受保险影响 · 开启前先查保险。
+      默认值：结算周期 60s、余额保险默认 0（不设）。存档升 v2（`active`/`accrued`/`guard`），
+      v1 预购时长无法换算故明确告警并忽略
+- [x] **GUI 交易页**（2026-08-20）：一状态一按钮、点击 toggle、**只显示有权限的状态**、
+      开着的发光；盾牌按钮设置余额保险（走 `cubex-gui` 的 `ChatInputState` 聊天输入）。
+      StateCharge 因此接入 `cubex-gui`
+- [ ] **v1 范围外，后续可加**：BossBar 倒计时 · PlaceholderAPI · MySQL ·
+      bStats（**需先注册服务 ID**）· 跨服(BungeeCord)同步
 - [ ] **首发前冻结数据基线**（`StateStorage` 存档格式、`config-version`/`lang-version`）：同 §5.2 纪律
 - [ ] 补 `StateCharge/docs/release-checklist.md`
 - [ ] 首发前实服验证
