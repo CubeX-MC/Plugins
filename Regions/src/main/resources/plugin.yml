@@ -10,11 +10,15 @@ softdepend: [Lands, RuleGems, Contract]
 permissions:
   regions.use:
     default: true
-    description: Use basic Regions commands.
+    description: >-
+      Take part in Region activities (/regions game ... ready|status).
+      Revoke it to keep a group out of everyone else's events; hosting is gated
+      separately by region ownership, not by this node.
   regions.admin:
     default: op
     description: RuleGems ruler access; Region ownership is still required.
     children:
+      regions.use: true
       regions.region.create: true
       regions.region.edit: true
       regions.region.remove: true
@@ -29,6 +33,7 @@ permissions:
     default: op
     description: Emergency global Regions administration and ownership bypass.
     children:
+      regions.use: true
       regions.reload: true
       regions.inspect: true
       regions.cleanup: true

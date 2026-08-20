@@ -573,7 +573,17 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         return true
     }
 
+    /**
+     * 参与 / 主持一局活动。
+     *
+     * `regions.use` 是**玩家侧的总开关**:没有它就不能参与别人的场地活动。
+     * [has] 会让统治者与超管直接通过,所以场主不会被自己的开关挡住;
+     * `start`/`end` 另有 [canManage](场主 + Source owner)把关。
+     */
     private fun game(sender: CommandSender, args: Array<String>): Boolean {
+        if (!has(sender, USE_PERMISSION)) {
+            return true
+        }
         if (args.size < 3) {
             plugin.lang().send(sender, "invalid-usage", mapOf("usage" to "/regions game <id> <ready|start|status|end>"))
             return true
@@ -936,6 +946,9 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         plugin.authority().visibleRegions(sender, plugin.regions().all()).map { it.id }
 
     companion object {
+        /** 玩家侧总开关:没有它就不能参与别人场地的活动。 */
+        const val USE_PERMISSION = "regions.use"
+
         private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
             .withZone(ZoneId.systemDefault())
     }
@@ -944,6 +957,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
 internal fun regionRootSuggestions(canManage: Boolean, args: Array<out String>): List<String>? {
     val commands = if (canManage) MANAGEMENT_ROOT_COMMANDS else PLAYER_ROOT_COMMANDS
     return CubexCommandSuggestions.root(args, commands)?.sorted()?.take(20)
+
 }
 
 private val MANAGEMENT_ROOT_COMMANDS = listOf(
