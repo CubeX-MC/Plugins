@@ -18,6 +18,8 @@ dependencies {
     implementation(project(":modules:cubex-i18n"))
     implementation(project(":modules:cubex-scheduler"))
     implementation(project(":modules:cubex-integrations"))
+    // ChatInputState:聊天提问状态机与两条聊天链路的去重(PLAN §7.4)
+    implementation(project(":modules:cubex-gui"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation(CubexDeps.mockitoCore)
 }
