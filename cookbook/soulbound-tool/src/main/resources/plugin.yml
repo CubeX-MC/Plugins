@@ -1,0 +1,19 @@
+name: CookbookSoulboundTool
+version: '${version}'
+main: org.cubexmc.cookbook.soulboundtool.SoulboundToolPlugin
+api-version: '1.18'
+author: CubeX
+description: Cookbook 03 - bind the held item to its owner, then audit the whole inventory.
+commands:
+  soulbind:
+    description: Bind the held item to you.
+    usage: /soulbind
+    permission: cookbook.soulbind
+  soulaudit:
+    description: List every carried item bound to someone else.
+    usage: /soulaudit
+    permission: cookbook.soulbind
+permissions:
+  cookbook.soulbind:
+    description: Allows using the soulbound commands.
+    default: true
