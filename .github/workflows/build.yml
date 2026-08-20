@@ -25,8 +25,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # buildSrc 是独立构建,根构建的 `build` 不会带上它的测试。
+      # plugin.yml 的 depend 注入逻辑住在这里,必须显式跑一次。
+      - name: Test build logic
+        run: ./gradlew -p buildSrc test
+
       - name: Build shadow jars
         run: ./gradlew shadowJarAll
+
+      # jarGateAll 覆盖**全部**子项目(含 CubeXLib 与 cookbook 范例),下面的 matrix 是手写清单、
+      # 会漂移。打包模式的门禁(EMBEDDED/EXTERNAL/LIB)靠这一步保证不漏。
+      - name: Gate every deployable jar
+        run: ./gradlew jarGateAll
 
       - name: Upload plugin jars
         uses: actions/upload-artifact@v4
@@ -34,6 +44,10 @@ jobs:
           name: plugin-jars
           if-no-files-found: error
           path: |
+            # 外置模式插件在服务器上离不开它,必须和插件一起产出。
+            # cookbook 范例不在此列:它是样例,不是要部署的东西。
+            CubeXLib/build/libs/*.jar
+            !CubeXLib/build/libs/*-plain.jar
             BookLite/build/libs/*.jar
             !BookLite/build/libs/*-plain.jar
             FAWEReplacer/build/libs/*.jar
@@ -66,6 +80,8 @@ jobs:
       fail-fast: false
       matrix:
         plugin:
+          # 运行时 lib 插件:不进镜像同步(mirror.yml 无对应 repo),但要和插件一样过 jarGate。
+          - CubeXLib
           - BookLite
           - FAWEReplacer
           - MountLicense
