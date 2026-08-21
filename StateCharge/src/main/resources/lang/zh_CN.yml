@@ -16,7 +16,7 @@ messages:
     <gray>/sc guard <金额|off></gray> <dark_gray>设置余额保险</dark_gray>
 
   toggle-on: "<prefix><green>已开启 <white><state></white>。</green><gray>关闭前会持续计费。</gray>"
-  toggle-off: "<prefix><yellow>已关闭 <white><state></white>。</yellow><gray>本次结算 <white><price></white>。</gray>"
+  toggle-off: "<prefix><yellow>已关闭 <white><state></white>。</yellow><gray>本次开启共扣 <white><price></white>。</gray>"
   toggle-already-on: "<prefix><gray><state> 已经开着了。</gray>"
   toggle-already-off: "<prefix><gray><state> 本来就没开。</gray>"
   toggle-unknown-state: "<prefix><red>未知状态: <state>。用 /sc list 看看有哪些。</red>"

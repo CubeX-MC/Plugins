@@ -63,6 +63,8 @@ class StateChargeService(private val plugin: StateChargePlugin) {
             }
         }
 
+        // 新的一次开启:累计总额从零开始算。
+        plugin.storage().clearSessionCharged(player.uniqueId, spec.id())
         plugin.storage().setActive(player.uniqueId, spec.id(), true)
         atPlayer(player) { spec.effect().start(it) }
         return ToggleResult.on(spec)
@@ -70,10 +72,14 @@ class StateChargeService(private val plugin: StateChargePlugin) {
 
     fun turnOff(player: Player, spec: StateSpec): ToggleResult {
         // 先结算零头:玩家已经用掉的这段时间照收,关闭只是停止继续累计。
-        val charged = settleState(player, spec)
+        settleState(player, spec)
+        // 报给玩家的是**本次开启以来的总额**,不是刚结算的那点零头。
+        // 一个开了一小时的状态中间已经按周期扣过很多次,只报零头会让玩家以为整段就这么便宜。
+        val sessionTotal = plugin.storage().sessionCharged(player.uniqueId, spec.id())
+        plugin.storage().clearSessionCharged(player.uniqueId, spec.id())
         plugin.storage().setActive(player.uniqueId, spec.id(), false)
         atPlayer(player) { spec.effect().remove(it) }
-        return ToggleResult.off(spec, charged)
+        return ToggleResult.off(spec, sessionTotal)
     }
 
     /**
@@ -143,6 +149,10 @@ class StateChargeService(private val plugin: StateChargePlugin) {
      *
      * 扣款失败时**仍然清掉累计**并关掉该状态：留着它只会在下次结算时重复失败、反复刷日志，
      * 而这段时间玩家确实已经用了，收不回来。此处记 WARNING 供服主追查。
+     *
+     * 走 `charge()` 而不是 `withdraw()`：钱要转进 `economy.account`（内循环经济）。
+     * 它的 `success()` 只表示**扣款**成不成 —— 入账到服务器账户失败时玩家照样付了钱、
+     * 状态照常开着，只是那笔钱丢了，由 `VaultEconomy` 记 WARNING。
      */
     private fun chargeFor(player: Player, spec: StateSpec, seconds: Long): BigDecimal {
         val cost = spec.costFor(seconds)
@@ -150,7 +160,7 @@ class StateChargeService(private val plugin: StateChargePlugin) {
         if (cost.signum() <= 0) {
             return BigDecimal.ZERO
         }
-        val result = plugin.economy().withdraw(player, cost)
+        val result = plugin.economy().charge(player, cost)
         if (!result.success()) {
             plugin.log().warn(
                 "Failed to charge ${player.name} ${plugin.economy().format(cost)} " +
@@ -160,6 +170,7 @@ class StateChargeService(private val plugin: StateChargePlugin) {
             plugin.notifier().chargeFailed(player, spec.id())
             return BigDecimal.ZERO
         }
+        plugin.storage().addSessionCharged(player.uniqueId, spec.id(), cost)
         plugin.notifier().charged(player, spec.id(), seconds, cost)
         return cost
     }
@@ -219,6 +230,7 @@ class StateChargeService(private val plugin: StateChargePlugin) {
     /** 强制关闭且不结算（扣款已失败的路径用，避免二次扣款尝试）。 */
     fun forceOff(player: Player, spec: StateSpec) {
         plugin.storage().clearAccrued(player.uniqueId, spec.id())
+        plugin.storage().clearSessionCharged(player.uniqueId, spec.id())
         plugin.storage().setActive(player.uniqueId, spec.id(), false)
         atPlayer(player) { spec.effect().remove(it) }
     }
@@ -235,6 +247,7 @@ class StateChargeService(private val plugin: StateChargePlugin) {
                 // 配置里已经删掉的状态:只清存储,没有效果可移除。
                 plugin.storage().setActive(target.uniqueId, activeId, false)
                 plugin.storage().clearAccrued(target.uniqueId, activeId)
+                plugin.storage().clearSessionCharged(target.uniqueId, activeId)
             } else {
                 turnOff(target, spec)
             }
@@ -266,7 +279,12 @@ class ToggleResult private constructor(
 
     fun stateId(): String = stateId
 
-    /** 本次关闭时结算掉的零头金额（开启时为 0）。 */
+    /**
+     * 本次开启到关闭**累计**扣掉的总金额（开启时为 0）。
+     *
+     * 不是关闭那一刻结算的零头 —— 按周期计费的状态在关闭前已经扣过很多次，
+     * 只报最后一次会让玩家以为整段开启就花了那么点钱。
+     */
     fun charged(): BigDecimal = charged
 
     fun failure(): Failure? = failure

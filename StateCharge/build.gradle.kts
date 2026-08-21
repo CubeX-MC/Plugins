@@ -22,6 +22,8 @@ dependencies {
     implementation(project(":modules:cubex-scheduler"))
     implementation(project(":modules:cubex-config"))
     implementation(project(":modules:cubex-i18n"))
+    // Vault 封装 + economy.account 入账路由(内循环经济:收上来的钱不销毁)
+    implementation(project(":modules:cubex-economy"))
     // 交易页:Menu/ItemBuilder/fillEmpty + 保险阈值的聊天输入(ChatInputState)
     implementation(project(":modules:cubex-gui"))
     implementation("com.tcoded:FoliaLib:0.5.1")

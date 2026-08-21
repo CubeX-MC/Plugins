@@ -11,6 +11,7 @@ include(":modules:cubex-spatial"); project(":modules:cubex-spatial").projectDir 
 include(":modules:cubex-gui"); project(":modules:cubex-gui").projectDir = file("modules/cubex-gui")
 include(":modules:cubex-database"); project(":modules:cubex-database").projectDir = file("modules/cubex-database")
 include(":modules:cubex-command"); project(":modules:cubex-command").projectDir = file("modules/cubex-command")
+include(":modules:cubex-economy"); project(":modules:cubex-economy").projectDir = file("modules/cubex-economy")
 
 // —— 运行时 lib 插件(PLAN §7.1):为外置模式插件提供 cubex-* ——
 include(":CubeXLib"); project(":CubeXLib").projectDir = file("CubeXLib")

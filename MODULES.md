@@ -18,6 +18,7 @@
 | [`cubex-command`](modules/cubex-command) | 动态指令：CommandMap 解析、动态指令注册与生命期注销 | **2/12** | FAWEReplacer, RuleGems |
 | [`cubex-gui`](modules/cubex-gui) | 界面交互：基于 Inventory 实例事件路由的 Menu 框架、ItemBuilder、Pagination、ChatInputState | **5/12** | Contract, Metro, Railway, EcoBalancer, Regions |
 | [`cubex-spatial`](modules/cubex-spatial) | 空间索引：Point3D, Range3D (AABB), Octree 八叉树索引 | **2/12** | Metro, Railway |
+| [`cubex-economy`](modules/cubex-economy) | Vault 经济封装 + `economy.account` 入账路由（内循环经济） | **1/12** | StateCharge |
 
 ---
 
@@ -350,6 +351,74 @@ val octree = Octree<Station>(
 octree.insert(Range3D(minPoint, maxPoint), myStation)
 val results = octree.getAllRanges(queryAABB)
 ```
+
+---
+
+### 2.10 `cubex-economy`
+Vault 经济封装，外加一条**"玩家付的钱转到哪里去"**的路由。
+
+CubeX 服务器的经济是内循环的：收费插件收走的钱要转进服务器账户，而不是凭空销毁。
+本模块把这条路由收敛成一个配置键 `economy.account`，各插件同名同义。
+
+#### 接入（三步）
+
+```kotlin
+// 1. enable：hook Vault。返回 null 表示 Vault 或经济提供方缺席。
+economyService = VaultEconomy.hook(this, log())
+    ?: abortEnable("Vault economy provider not found.")
+
+// 2. enable 与 reload 各解析一次 economy.account。名字解析可能触发一次
+//    阻塞的 profile 查询,**不能**放进每次扣款的路径里。
+//    useAccount 在"配置没变且上次解析成功"时会整个跳过;上次失败则一定重试,
+//    所以服主修好配置后一次 reload 就能救回来。
+private fun applyEconomyAccount() {
+    val account = try {
+        EconomyAccount.parse(config.getString("economy.account", ""))
+    } catch (ex: IllegalArgumentException) {
+        log().severe("economy.account is invalid; charges will not be banked. ${ex.message}")
+        EconomyAccount.None
+    }
+    economy().useAccount(account)
+}
+
+// 3. 收费走 charge():扣款 + 入账一步到位。
+val result = economy().charge(player, cost)
+if (!result.success()) { /* 玩家付不起,回滚玩法侧 */ }
+```
+
+#### `economy.account` 支持的写法
+
+| 配置值 | 含义 |
+|---|---|
+| 空 / 缺省 | 不入账，扣掉的钱销毁（接入本模块之前的旧行为） |
+| `uuid:<uuid>` 或裸 UUID | 按 UUID 精确指定玩家账户（**最稳**） |
+| `name:<名字>` | 名字原样交给 Vault 的 name 重载，由经济插件认账户 |
+| `<玩家名>` | 先把名字解析成 UUID 再入账 |
+| `bank:<名字>` | Vault 的 bank 账户（需要经济插件 `hasBankSupport()`） |
+
+> **Vault 没有"按名字查 UUID"的 API** —— `Economy` 接口里一个返回 UUID 的方法都没有，
+> 只有 name 重载和 `OfflinePlayer` 重载。所以 `name:` 不是"用 Vault 查 UUID"，
+> 而是**根本不查**：把名字交给经济插件，由它用自己的 name↔账户映射去认。
+> 对从不登录的虚拟银行账户来说这是最短的一条路。
+
+#### 两条必须知道的语义
+
+1. **`charge()` 的 `success()` 只表示扣款成不成。** 扣款成功后**一律不回滚**：
+   玩家已经消费掉了服务，退款等于白送，而且退款本身同样可能被经济插件拒绝。
+   入账失败记 WARNING 并在结果上挂 `depositFailed()`，交给服主对账 ——
+   这是唯一一条会让货币总量下降的路径，必须留痕。
+2. **按名字解析会识别出"编造的 UUID"并拒绝入账。**
+   profile 查不到时 `Bukkit.getOfflinePlayer(name)` 不会失败，而是按
+   `UUID.nameUUIDFromBytes("OfflinePlayer:" + name)` **编造**一个 v3 UUID ——
+   那是另一个账户，静默入账进去是最难发现的一种资金流失。
+   模块把这个算法复刻了一份做比对（比"看版本号是不是 4"精确，也不受代理服
+   `online-mode=false` 但 UUID 是 v4 的情况干扰）；只有在**离线模式**服务器上
+   编造出来的 UUID 才是正确答案，那时才接受。
+   解析顺序：在线玩家 → Paper `getOfflinePlayerIfCached`（纯查 usercache）→
+   `getOfflinePlayer(name)`（在线模式下即一次 profile 查询，查到后服务器自己写进 `usercache.json`）。
+
+> 模块**不用** `Bukkit.getOfflinePlayers()`：那个方法每次调用都要列一遍 `playerdata` 目录，
+> 在主线程上是 O(存档数)。
 
 ---
 

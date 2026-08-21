@@ -75,10 +75,11 @@ plugins/
 │     ├─ cubex-kotlin-library.gradle.kts  # Kotlin 共享模块约定(Java 17/JUnit/互操作参数)
 │     ├─ CubexVersions.kt / CubexDependencies.kt / CubexRelocations.kt
 │     └─ CubexPackaging.kt                # 打包模式(内嵌/外置/LIB)与共享模块名单
-├─ modules/                 # 9 个共享模块(无 shadowJar,内嵌模式下被各插件 shade 进去)
+├─ modules/                 # 10 个共享模块(无 shadowJar,内嵌模式下被各插件 shade 进去)
 │  ├─ cubex-core/        cubex-config/      cubex-i18n/
 │  ├─ cubex-scheduler/   cubex-integrations/ cubex-database/
-│  └─ cubex-command/     cubex-gui/         cubex-spatial/
+│  ├─ cubex-command/     cubex-gui/         cubex-spatial/
+│  └─ cubex-economy/
 ├─ CubeXLib/                # 运行时 lib 插件:为外置模式插件以原包名提供 modules/ 与 Kotlin stdlib
 └─ <各插件>/                # BookLite FAWEReplacer MountLicense Contract
                             # EcoBalancer RuleGems Metro Railway Clarity Reputations

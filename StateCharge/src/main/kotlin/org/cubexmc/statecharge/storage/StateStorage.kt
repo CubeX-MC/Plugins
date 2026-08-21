@@ -18,9 +18,11 @@ import org.cubexmc.statecharge.StateChargePlugin
 /**
  * 玩家状态开关与计费进度的 YAML 持久化（`states.yml`）。
  *
- * 存三样东西：
+ * 存四样东西：
  * - **active** 当前开启的状态 id。玩家离线**不清除**——离线不计费，重新上线接着算。
  * - **accrued** 上次结算之后已经开启了多少秒。结算成功即归零；进程被杀最多丢一个 flush 窗口。
+ * - **session** 本次开启以来**累计扣掉**的总金额。开启时归零，关闭时报给玩家后清掉。
+ *   它和 accrued 是两回事：accrued 每次周期结算都归零，只有 session 记得整个开启周期。
  * - **guard** 余额保险阈值：结算后余额低于它就自动关掉全部收费状态。
  *
  * 实现 [Reloadable] 以便作为 reload 链的命名阶段，实现 [Terminable] 让 `bind(this)` 在关停时
@@ -36,6 +38,7 @@ class StateStorage : Reloadable, Terminable {
 
     private val active: MutableMap<UUID, MutableSet<String>> = LinkedHashMap()
     private val accrued: MutableMap<UUID, MutableMap<String, Long>> = LinkedHashMap()
+    private val sessions: MutableMap<UUID, MutableMap<String, BigDecimal>> = LinkedHashMap()
     private val guards: MutableMap<UUID, BigDecimal> = LinkedHashMap()
 
     @Volatile
@@ -84,9 +87,11 @@ class StateStorage : Reloadable, Terminable {
         val loaded = read()
         active.clear()
         accrued.clear()
+        sessions.clear()
         guards.clear()
         active.putAll(loaded.active)
         accrued.putAll(loaded.accrued)
+        sessions.putAll(loaded.sessions)
         guards.putAll(loaded.guards)
     }
 
@@ -150,6 +155,40 @@ class StateStorage : Reloadable, Terminable {
         }
     }
 
+    // ---- 本次开启以来累计扣掉的总额 ----
+
+    /**
+     * 本次开启以来累计扣掉的总额。
+     *
+     * 关闭提示报的是这个数,不是 [accruedSeconds] 结算出来的零头 ——
+     * 按周期计费的状态开一小时会结算很多次,只报最后那一次会让玩家以为整段只花了那么点钱。
+     */
+    @Synchronized
+    fun sessionCharged(player: UUID, stateId: String): BigDecimal =
+        sessions[player]?.get(stateId) ?: BigDecimal.ZERO
+
+    @Synchronized
+    fun addSessionCharged(player: UUID, stateId: String, amount: BigDecimal) {
+        if (amount.signum() <= 0) {
+            return
+        }
+        val states = sessions.getOrPut(player) { LinkedHashMap() }
+        states[stateId] = (states[stateId] ?: BigDecimal.ZERO).add(amount)
+        markDirty()
+    }
+
+    /** 开启时归零、关闭报完数后清掉。 */
+    @Synchronized
+    fun clearSessionCharged(player: UUID, stateId: String) {
+        val states = sessions[player] ?: return
+        if (states.remove(stateId) != null) {
+            markDirty()
+            if (states.isEmpty()) {
+                sessions.remove(player)
+            }
+        }
+    }
+
     // ---- 余额保险 ----
 
     /** 玩家自设的余额下限；null = 用配置里的默认值。 */
@@ -176,6 +215,7 @@ class StateStorage : Reloadable, Terminable {
     fun removePlayer(player: UUID) {
         var changed = active.remove(player) != null
         changed = accrued.remove(player) != null || changed
+        changed = sessions.remove(player) != null || changed
         changed = guards.remove(player) != null || changed
         if (changed) {
             markDirty()
@@ -262,6 +302,19 @@ class StateStorage : Reloadable, Terminable {
                 }
             }
 
+            section.getConfigurationSection("session-charged")?.let { sessionSection ->
+                val entries = LinkedHashMap<String, BigDecimal>()
+                for (stateId in sessionSection.getKeys(false)) {
+                    val amount = sessionSection.getDouble(stateId, 0.0)
+                    if (amount > 0.0) {
+                        entries[stateId] = BigDecimal.valueOf(amount)
+                    }
+                }
+                if (entries.isNotEmpty()) {
+                    snapshot.sessions[uuid] = entries
+                }
+            }
+
             if (section.isSet("guard")) {
                 snapshot.guards[uuid] = BigDecimal.valueOf(section.getDouble("guard"))
             }
@@ -277,6 +330,7 @@ class StateStorage : Reloadable, Terminable {
         val everyone = LinkedHashSet<UUID>()
         everyone.addAll(active.keys)
         everyone.addAll(accrued.keys)
+        everyone.addAll(sessions.keys)
         everyone.addAll(guards.keys)
         for (uuid in everyone) {
             val section = players.createSection(uuid.toString())
@@ -285,6 +339,12 @@ class StateStorage : Reloadable, Terminable {
                 val accruedSection = section.createSection("accrued")
                 for ((stateId, seconds) in entries) {
                     accruedSection.set(stateId, seconds)
+                }
+            }
+            sessions[uuid]?.takeIf { it.isNotEmpty() }?.let { entries ->
+                val sessionSection = section.createSection("session-charged")
+                for ((stateId, amount) in entries) {
+                    sessionSection.set(stateId, amount.toDouble())
                 }
             }
             guards[uuid]?.let { section.set("guard", it.toDouble()) }
@@ -306,6 +366,7 @@ class StateStorage : Reloadable, Terminable {
     private class Snapshot {
         val active: MutableMap<UUID, MutableSet<String>> = LinkedHashMap()
         val accrued: MutableMap<UUID, MutableMap<String, Long>> = LinkedHashMap()
+        val sessions: MutableMap<UUID, MutableMap<String, BigDecimal>> = LinkedHashMap()
         val guards: MutableMap<UUID, BigDecimal> = LinkedHashMap()
 
         fun size(): Int = active.values.sumOf { it.size }
@@ -314,7 +375,12 @@ class StateStorage : Reloadable, Terminable {
     companion object {
         const val FILE_NAME = "states.yml"
 
-        /** v1 = 预购时长模型；v2 = 按实际开启时长计费。 */
+        /**
+         * v1 = 预购时长模型；v2 = 按实际开启时长计费。
+         *
+         * `session-charged` 是 v2 里**可选**的一段，旧文件缺了它只会让升级前就开着的状态
+         * 从 0 重新累计 —— 不值得为它再跳一个版本，那会让 v2 的旧文件被整段丢弃。
+         */
         const val STORAGE_VERSION = 2
     }
 }

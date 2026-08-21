@@ -50,10 +50,14 @@ Linux/CI 上是 `./gradlew`，任务名相同。
   **回调式 API 跨不过这条边界**；需要通知就用 Bukkit 事件或轮询。
 - **可选连接不是依赖**：通过 `cubex-integrations` 使用提供方插件 ClassLoader 解析 Bukkit service；消费方不 `implementation`/`compileOnly` 另一个插件，也不 shade 对方 API。`softdepend` 只用于可选加载顺序。
 - **新插件要加进 `buildSrc/src/main/kotlin/CubexRelocations.kt` 的 pluginIds**，否则 shadowJar 报 `Key X missing`。
-- **新增 `modules/cubex-*` 要改三处**：`settings.gradle.kts`、`buildSrc/.../CubexPackaging.kt` 的
-  `CubexModules` 名单、以及 `CubeXLib/build.gradle.kts` 的依赖列表。
+- **新增 `modules/cubex-*` 要改四处**：`settings.gradle.kts`、`buildSrc/.../CubexPackaging.kt` 的
+  `CubexModules` 名单、`buildSrc/.../CubexScaffold.kt` 的 `KNOWN_MODULES`（与前者同源），
+  以及 `CubeXLib/build.gradle.kts` 的依赖列表。
   漏第二处，该模块的类会被拿插件自己的 java release 去校验字节码（Clarity 是 release 21，一接入就误判失败）；
-  漏第三处，外置模式插件在运行时找不到这个模块。
+  漏第三处，`createPlugin -Pmodules=<新模块>` 会报"未知模块"；
+  漏第四处，外置模式插件在运行时找不到这个模块，且 `CubeXLib:jarGate` 会报缺模块。
+  模块的**包名由名字机械推导**为 `org/cubexmc/<name>/`，所以起名前先 grep 一遍全仓有没有同名包
+  （`cubex-economy` 就和 RuleGems 自带的 `org.cubexmc.economy` 撞了，见 `PLAN.md`）。
 - **提交严格按插件 scope**（`git add -A -- <Plugin>`）：工作区经常有别的项目的并行 WIP，别卷进来。
 - **不要把重构和玩法/配置/文案改动混在一个提交里**。
 - 推 `main` 会触发 CI 与 **10** 个公开镜像仓同步（[`.github/workflows/mirror.yml`](.github/workflows/mirror.yml) 的 `repos` 数组；Reputations、StateCharge 尚无镜像 repo）—— **推送前先跟用户确认**。
@@ -84,7 +88,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 当前迁移基线
 
-- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；**9 个** `cubex-*` 模块均使用 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
+- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；**10 个** `cubex-*` 模块均使用 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
 - Railway 的迁移批次、共享能力审计和“能不能复用 Metro `.kt`”的两步判据原在 `KOTLIN_MIGRATION_RUNBOOK.md`，该文件已于 `484c1f6` 随 13 份计划文件一并删除；**需要时从 git 历史取**（`git show 2783844:KOTLIN_MIGRATION_RUNBOOK.md`）。它们不是待办清单。
 
 ## 已知脆弱点

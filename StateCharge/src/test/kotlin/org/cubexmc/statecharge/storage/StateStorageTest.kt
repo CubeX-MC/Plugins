@@ -115,6 +115,70 @@ class StateStorageTest {
     }
 
     @Test
+    fun `session totals accumulate across billing cycles`() {
+        val storage = storage()
+        assertEquals(BigDecimal.ZERO, storage.sessionCharged(player, "fly"))
+
+        // 一个开着一小时的状态会按周期结算很多次;关闭提示要报的是它们的和。
+        storage.addSessionCharged(player, "fly", BigDecimal("2.00"))
+        storage.addSessionCharged(player, "fly", BigDecimal("2.00"))
+        storage.addSessionCharged(player, "fly", BigDecimal("2.06"))
+
+        assertEquals(0, BigDecimal("6.06").compareTo(storage.sessionCharged(player, "fly")))
+    }
+
+    @Test
+    fun `session totals are per state and survive a save-load round trip`() {
+        val storage = storage()
+        storage.setActive(player, "fly", true)
+        storage.addSessionCharged(player, "fly", BigDecimal("2.06"))
+        storage.addSessionCharged(player, "small", BigDecimal("2.00"))
+        storage.flushIfDirty()
+
+        // 离线不计费但状态保留,所以累计额也必须跨重启活下来。
+        val reloaded = storage()
+        reloaded.load()
+
+        assertEquals(0, BigDecimal("2.06").compareTo(reloaded.sessionCharged(player, "fly")))
+        assertEquals(0, BigDecimal("2.00").compareTo(reloaded.sessionCharged(player, "small")))
+    }
+
+    @Test
+    fun `clearing a session total leaves the other states alone`() {
+        val storage = storage()
+        storage.addSessionCharged(player, "fly", BigDecimal("2.06"))
+        storage.addSessionCharged(player, "small", BigDecimal("2.00"))
+
+        storage.clearSessionCharged(player, "fly")
+
+        assertEquals(BigDecimal.ZERO, storage.sessionCharged(player, "fly"))
+        assertEquals(0, BigDecimal("2.00").compareTo(storage.sessionCharged(player, "small")))
+    }
+
+    @Test
+    fun `a v2 file without session totals still loads`() {
+        // session-charged 是 v2 里后加的可选段:旧文件缺了它只该从零重新累计,不该整段作废。
+        val file = File(tempDir, StateStorage.FILE_NAME)
+        Files.writeString(
+            file.toPath(),
+            """
+            storage-version: 2
+            players:
+              $player:
+                active:
+                - fly
+            """.trimIndent(),
+            StandardCharsets.UTF_8,
+        )
+
+        val storage = storage()
+        storage.load()
+
+        assertTrue(storage.isActive(player, "fly"))
+        assertEquals(BigDecimal.ZERO, storage.sessionCharged(player, "fly"))
+    }
+
+    @Test
     fun `a v1 file is ignored rather than mis-converted`() {
         // v1 存的是"预购的剩余时长",与按开启时长计费无法换算 —— 宁可忽略也不猜折算比例。
         val file = File(tempDir, StateStorage.FILE_NAME)

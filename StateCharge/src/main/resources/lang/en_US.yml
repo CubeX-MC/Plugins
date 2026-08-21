@@ -16,7 +16,7 @@ messages:
     <gray>/sc guard <amount|off></gray> <dark_gray>set your balance guard</dark_gray>
 
   toggle-on: "<prefix><green>Enabled <white><state></white>.</green><gray> You are billed until you turn it off.</gray>"
-  toggle-off: "<prefix><yellow>Disabled <white><state></white>.</yellow><gray> Settled <white><price></white>.</gray>"
+  toggle-off: "<prefix><yellow>Disabled <white><state></white>.</yellow><gray> Charged <white><price></white> in total.</gray>"
   toggle-already-on: "<prefix><gray><state> is already on.</gray>"
   toggle-already-off: "<prefix><gray><state> was not on.</gray>"
   toggle-unknown-state: "<prefix><red>Unknown state: <state>. Try /sc list.</red>"

@@ -16,7 +16,7 @@ object CubexScaffold {
     /** 允许出现在 `--modules` 里的短名，与 `CubexModules` 的名单同源。 */
     val KNOWN_MODULES: List<String> = listOf(
         "core", "config", "i18n", "scheduler", "integrations",
-        "database", "command", "gui", "spatial",
+        "database", "command", "gui", "spatial", "economy",
     )
 
     fun requireValidName(name: String): String {

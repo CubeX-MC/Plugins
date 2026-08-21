@@ -16,7 +16,8 @@
 | 决策点 | 结论 |
 |---|---|
 | 服务器平台 | Paper 1.21.x(体型走 1.20.5+ 的现代属性 API `Attribute.SCALE`,与 Clarity 同一路线,不需要 ProtocolLib;paper-api 1.21.11 已无 `Entity#setScale` 糖);编译 paper-api 1.21.11、字节码 release 17(与 Contract 相同) |
-| 经济 | Vault（`depend: [Vault]`，无 provider 时 abortEnable），照抄 Contract `EconomyService` |
+| 经济 | Vault（`depend: [Vault]`，无 provider 时 abortEnable）。**2026-08-21 起走共享模块 `cubex-economy` 的 `VaultEconomy`**，本地 `EconomyService` 已删除 |
+| 钱去哪 | **2026-08-21 新增**：扣下来的钱转进 `economy.account` 指定的账户（玩家账户或 Vault bank），留空才回到旧的"销毁"行为。CubeX 服务器的经济是内循环的，收费插件不该单向减少货币总量 |
 | 状态范围 | 配置驱动的可扩展框架：内置 `scale` / `fly` 两种 effect kind，内置 small/giant/fly 三个状态；服主在 `config.yml` 增删状态、改价格/时长，新增效果类型才需要代码 |
 | 计时语义 | **在线时长**：离线暂停（不扣时、不生效），在线每秒扣 1；重复购买**累加**剩余时长 |
 
@@ -38,6 +39,7 @@
 | `cubex-config` | `ResourceFiles` 保存默认文件；`MigrationRunner` 跑 config/lang 迁移；`ReloadChain` 做 `/statecharge admin reload` |
 | `cubex-i18n` | 一个 `I18nService`（MiniMessage 渲染成 legacy § 输出，与 Contract 相同，`player.sendMessage(String)` 直接可用） |
 | `cubex-scheduler` | `CubexScheduler`：1s 全局计时器 + 所有实体操作经 `runAtEntity`（Folia 安全） |
+| `cubex-economy` | `VaultEconomy`：Vault 封装 + `economy.account` 入账路由；StateCharge 是它的首个消费方 |
 
 包结构（`org.cubexmc.statecharge`）：
 
@@ -45,7 +47,7 @@
 StateChargePlugin.kt       主类：enable / ReloadChain / 计时与 flush 调度
 config/LanguageManager.kt  I18nService 包装（zh_CN 默认，en_US 附带）
 config/StateDefinitions.kt 配置 → StateSpec 解析（Reloadable + StateCatalog）
-economy/EconomyService.kt  Vault 封装（照抄 Contract）
+(经济封装已下沉到 modules/cubex-economy 的 VaultEconomy，本插件不再持有副本)
 effect/StateEffect.kt      effect 接口：start / reapply / remove
 effect/ScaleEffect.kt      setScale 体型
 effect/FlightEffect.kt     allowFlight + 可选自动起飞

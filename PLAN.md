@@ -18,8 +18,8 @@
 | 维度 | 现状 |
 |---|---|
 | 插件数 | 12 个可独立安装：BookLite · FAWEReplacer · MountLicense · Contract · EcoBalancer · RuleGems · Metro · Railway · Clarity · Reputations · Regions · StateCharge |
-| 运行时 lib | **CubeXLib**（2026-08-19 新建）：为外置模式插件以原包名提供 9 个 `cubex-*` 与 Kotlin stdlib。不进镜像同步 |
-| 共享模块 | **9 个**：`cubex-core` · `cubex-config` · `cubex-i18n` · `cubex-scheduler` · `cubex-integrations` · `cubex-database` · `cubex-command` · `cubex-gui` · `cubex-spatial` |
+| 运行时 lib | **CubeXLib**（2026-08-19 新建）：为外置模式插件以原包名提供 10 个 `cubex-*` 与 Kotlin stdlib。不进镜像同步 |
+| 共享模块 | **10 个**：`cubex-core` · `cubex-config` · `cubex-i18n` · `cubex-scheduler` · `cubex-integrations` · `cubex-database` · `cubex-command` · `cubex-gui` · `cubex-spatial` · `cubex-economy`（2026-08-21 新建） |
 | Kotlin 化 | ✅ 2026-08-16 收口。全部插件与模块 opt-in Kotlin 并继承 `CubexPlugin` |
 | 字节码目标 | 全仓 Java 17；**Clarity 例外为 21**（1.21 属性 API）。`jarGate` 按各插件 release 分别校验 |
 | 已发布/待发布 | 已公开：BookLite · MountLicense · Metro · Railway · RuleGems · EcoBalancer · FAWEReplacer。未公开首发：Contract · Regions · StateCharge · Clarity · Reputations |
@@ -138,22 +138,30 @@ Metro/Railway 各自保留同名 `org.cubexmc.metro.gui.ItemBuilder` 作为**薄
 抽取前已核对 Metro 与 Railway 两侧内容**逐字节一致**（仅换行符不同）。
 按既定纪律**只下沉无状态空间索引**，`StopManager`/`Stop` 留在插件内。
 
-### 2.10 模块接入矩阵
+### 2.10 `cubex-economy` — 1/12（StateCharge）· 2026-08-21 新建
 
-| 插件 | core | config | i18n | scheduler | integrations | database | command | gui | spatial |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| BookLite | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — |
-| FAWEReplacer | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — |
-| MountLicense | ✅ | ✅ | ✅ | — | — | — | — | — | — |
-| Contract | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — |
-| EcoBalancer | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — |
-| RuleGems | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — |
-| Metro | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| Railway | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| Regions | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — |
-| StateCharge | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
-| Clarity | ✅ | — | — | — | — | — | — | — | — |
-| Reputations | ✅ | — | — | — | — | — | — | — | — |
+`VaultEconomy`（`has`/`balance`/`withdraw`/`deposit`/`charge`/`format` + `useAccount` 入账路由）·
+`EconomyAccount`（`economy.account` 的纯解析：空 / `uuid:<uuid>` / 裸 UUID / `<玩家名>` / `bank:<名字>`）·
+`OfflinePlayerLookup`（在线 → Paper `getOfflinePlayerIfCached` → 有存档的兜底，**不用** `getOfflinePlayers()`）·
+`EconomyResult`（`success()` 只表示扣款侧；`depositFailed()` 是入账侧的旁路信号）。
+两条不变量与取舍见 §7.4 的 `cubex-economy` 小节。
+
+### 2.11 模块接入矩阵
+
+| 插件 | core | config | i18n | scheduler | integrations | database | command | gui | spatial | economy |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| BookLite | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — | — |
+| FAWEReplacer | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | — |
+| MountLicense | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
+| Contract | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — |
+| EcoBalancer | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | — |
+| RuleGems | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — | — |
+| Metro | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | — |
+| Railway | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | — |
+| Regions | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — |
+| StateCharge | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | ✅ |
+| Clarity | ✅ | — | — | — | — | — | — | — | — | — |
+| Reputations | ✅ | — | — | — | — | — | — | — | — | — |
 
 ---
 
@@ -719,6 +727,59 @@ graph TD
 | ~~`SoundUtil.playNoteSequence`~~ | **只有 Metro/Railway，同源同一份代码 = 1** | ❌ 与 §3.1 否决 `MinecraftVersion` 同一条理由 |
 | ~~`FastScoreboard`~~ | Metro/Railway 已 shade **scoreboardlibrary** | ❌ §3.2 (b)：封装已有库，不重造 |
 
+#### `cubex-economy` —— 消费后的钱去哪（2026-08-21 落地）
+
+**问题**：CubeX 的经济是内循环的（玩家消费 → 钱进服务器账户），但按源码数下来
+**六个插件六种做法**：EcoBalancer 有 `tax-account` 并真的入账；Metro/Railway 转给线路 owner、
+没设 owner 就蒸发；Contract 的 `SYSTEM_SINK` 只累加进 `outcome.toSink` 记日志、钱蒸发；
+MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer 外全是漏斗，
+货币总量单向下降。同时 Contract 与 StateCharge 的 `EconomyService` 是**逐行照抄**的两份副本。
+
+**§3.2 判据**：(a) 真实使用方 5~6 个 ✅；(b) Vault 已是经济抽象，本模块只封装不重造 ✅；
+(c) **无状态**——只有"配置解析出的入账目标"，可以 shade ✅；(d) 首个消费方 StateCharge 已切换 ✅。
+
+- [x] **`modules/cubex-economy`**（[`VaultEconomy`](modules/cubex-economy/src/main/kotlin/org/cubexmc/economy/VaultEconomy.kt) ·
+      [`EconomyAccount`](modules/cubex-economy/src/main/kotlin/org/cubexmc/economy/EconomyAccount.kt) ·
+      `OfflinePlayerLookup` · `EconomyResult`，24 条单测）。
+      统一配置键 **`economy.account`**：空 = 销毁（旧行为）· `uuid:<uuid>` / 裸 UUID ·
+      `name:<名字>` · `<玩家名>` · `bank:<名字>`。
+      两条写进类注释与单测的语义：
+      **① `charge()` 扣款成功后一律不回滚**（玩家已消费掉服务，退款等于白送；入账失败记 WARNING +
+      `depositFailed()`，这是唯一让货币总量下降的路径，必须留痕）；
+      **② 按名字解析会识别出"编造的 UUID"并拒绝入账** —— profile 查不到时 Bukkit 不会失败，
+      而是按 `UUID.nameUUIDFromBytes("OfflinePlayer:" + name)` 编造一个 v3 UUID，那是另一个账户。
+      模块复刻了这个算法做比对（比看版本号精确，也不受代理服 `online-mode=false` 但 UUID 是 v4 的情况干扰），
+      只有离线模式服务器上编造的 UUID 才被接受。解析走
+      在线玩家 → Paper `getOfflinePlayerIfCached`（纯查 usercache，反射，Spigot 上跳过）→
+      `getOfflinePlayer(name)`（在线模式下即一次 profile 查询），
+      **不用** `Bukkit.getOfflinePlayers()`（每次调用要列一遍 `playerdata` 目录）
+- [x] **`name:<名字>` 形态**（2026-08-21 追加）：**Vault 的 `Economy` 接口没有任何返回 UUID 的方法**
+      （只有 name 重载与 `OfflinePlayer` 重载），所以"用 Vault 查 UUID"做不到；
+      但反过来可以**根本不查** —— 名字原样进 `depositPlayer(String, double)`，
+      由经济插件用它自己的 name↔账户映射去认（EssentialsX / CMI 都有这张表）。
+      这是**从不登录的虚拟银行账户**（CubeX 的 `cubex_bank` 就是）最短的一条路。
+      代价是无从核对钱进了哪个账户，启动时只能用 `hasAccount(String)` 确认经济插件认得这个名字
+- [x] **`useAccount` 在配置没变且上次解析成功时跳过重解析**：避免每次 `/reload` 都触发一次
+      阻塞的 profile 查询；上次失败则一定重试，服主修好配置或 profile 服务恢复后一次 reload 就能救回来
+- [x] **`toResult` 接受 null 响应**：`Economy` 是第三方实现，返回 null 会让扣款路径抛 NPE，
+      而调用方（按周期结算的计时器）那时已经把累计清掉了 —— 结果是"既没扣到钱也没留下痕迹"。
+      当成失败处理才有日志可查。`format` 同理
+- [x] **StateCharge 已切换**：删掉本地 `economy/EconomyService.kt`，`config.yml` 升到 v2
+      并带 `economy.account` 的迁移步骤；`applyEconomyAccount()` 在 enable 与 reload 各解析一次
+      （名字解析要查 usercache/存档，不能落进每分钟一次的结算里）
+- ⚠️ **包名撞车（已知、暂时无害）**：模块包名由模块名机械推导为 `org/cubexmc/economy/`，
+      而 RuleGems 自带一个同包的 `org.cubexmc.economy.EconomyProvider`。今天不炸
+      （RuleGems 是 EMBEDDED、release 17，`jarGate` 已实测通过），但它会在 RuleGems 改打包模式时炸。
+      RuleGems 迁到本模块时这个类会被删掉，撞车随之消失
+- [ ] **其余消费方迁移**（每个都是独立提交，不要和玩法改动混在一起）：
+      - [ ] **MountLicense**：最简单，一处 `withdraw`，与 StateCharge 同形
+      - [ ] **Metro / Railway**：现有"有 owner 转 owner"的行为要保留，`economy.account` 只接管 owner 缺席的分支
+      - [ ] **RuleGems**：把 `EconomyProvider.transfer` 的补偿回滚语义搬进模块（它是全仓唯一正确处理
+            "Vault 没有跨账户事务"的实现），顺带修掉 `resolveAccounts` 里的
+            `Bukkit.getOfflinePlayers()`（主线程 O(存档数)，且一次转账要扫两遍）
+      - [ ] **EcoBalancer**：已能工作，最后再迁，且必须保持 `tax-account` / `tax-account-name` 键兼容
+      - [ ] **Contract**：`SYSTEM_SINK` 接入本模块 —— **等 §4 R1 真钱故障注入验证之后再动**
+
 #### 已下沉的其余项（2026-08-19）
 
 - [x] **PDC 读写扩展**（[`CubexPdc.kt`](modules/cubex-core/src/main/kotlin/org/cubexmc/core/CubexPdc.kt)，7 条单测）：
@@ -793,9 +854,12 @@ graph TD
 - [ ] **quest**：行为目标追踪（来源：Contract `ObjectiveListener`）。
       ⚠️ **目前只有 1 个真实使用方**——EcoBalancer 事件税（§4 R2）还没开工，
       在 R2 落地前不满足 §3.2 (a)，先不动
-- [ ] **economy**：事务经济与审计流水（来源：EcoBalancer `TaxLedgerService` + Contract `EconomyEngine`）。
+- [ ] **economy（有状态那一半）**：事务经济与审计流水（来源：EcoBalancer `TaxLedgerService` + Contract `EconomyEngine`）。
       **必须排在 §4 R1 真钱故障注入验证之后**——`EconomyEngine` 承载 §5.1 那四条跨阶段不变量，
-      在唯一的正确性证据到位之前把它抽出来重构，等于把风险最高的代码放在验证最少的时刻动
+      在唯一的正确性证据到位之前把它抽出来重构，等于把风险最高的代码放在验证最少的时刻动。
+      ⚠️ **2026-08-21 拆分**：本条只剩"账本 / 流水"这一半。无状态的那一半
+      （Vault 封装 + `economy.account` 入账路由）已按 §7.4 落成 `modules/cubex-economy`，
+      **不受本条推后约束** —— 它不持有跨插件状态，也不碰 `EconomyEngine` 的不变量
 
 ### 7.6 AI 协作上下文（原 DX-3 改形态）
 

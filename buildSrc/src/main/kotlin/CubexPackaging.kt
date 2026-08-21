@@ -33,7 +33,7 @@ object CubexModules {
 
     private val names = listOf(
         "core", "config", "i18n", "scheduler", "integrations",
-        "database", "command", "gui", "spatial",
+        "database", "command", "gui", "spatial", "economy",
     )
 
     // 形如 org/cubexmc/core/ 。与 settings.gradle.kts 里的 modules:cubex-* 一一对应。
