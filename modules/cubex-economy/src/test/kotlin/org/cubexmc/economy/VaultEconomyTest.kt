@@ -214,6 +214,21 @@ class VaultEconomyTest {
     }
 
     @Test
+    fun `enable does not crash when the economy plugin returns nulls`() {
+        // Vault 的 getName / bankBalance 都没有可空标注 —— Kotlin 拿到的是 platform type,
+        // 当成非空用就会在 enable 路径上抛 NPE,插件直接起不来。
+        `when`(economy.name).thenReturn(null)
+        `when`(economy.hasBankSupport()).thenReturn(true)
+        `when`(economy.bankBalance(anyString())).thenReturn(null)
+
+        val vault = newEconomy()
+        vault.useAccount(EconomyAccount.Bank("CubeXBank"))
+
+        assertEquals("unknown economy provider", vault.provider())
+        assertTrue(vault.accountUsable())
+    }
+
+    @Test
     fun `a null response from the economy plugin is a failure, not a crash`() {
         `when`(economy.withdrawPlayer(any(OfflinePlayer::class.java), anyDouble())).thenReturn(null)
         val vault = economyWith(EconomyAccount.PlayerUuid(bankUuid))

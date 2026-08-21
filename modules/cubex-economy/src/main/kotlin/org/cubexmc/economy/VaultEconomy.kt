@@ -34,8 +34,14 @@ class VaultEconomy @JvmOverloads constructor(
     private var target: Target = Target.None
     private var resolvedSpec: EconomyAccount? = null
 
-    /** 底层经济插件的名字,用于启动日志。 */
-    fun provider(): String = economy.name
+    /**
+     * 底层经济插件的名字,用于启动日志。
+     *
+     * `Economy#getName()` 在 Vault 里没有可空标注,Kotlin 拿到的是 platform type ——
+     * 直接当成非空返回会插入一次 intrinsic 检查,第三方实现返回 null 时**整个 enable 炸掉**。
+     * 一个日志用的名字不值得这个代价。
+     */
+    fun provider(): String = economy.name ?: "unknown economy provider"
 
     /**
      * 设置(或重设)入账目标。enable 时调一次,reload 时再调一次。
@@ -208,12 +214,14 @@ class VaultEconomy @JvmOverloads constructor(
     }
 
     private fun bankTarget(name: String): Target {
-        val balance = economy.bankBalance(name)
-        if (balance.transactionSuccess()) {
+        // 经 toResult 而不是直接 .transactionSuccess():bankBalance 同样是 platform type,
+        // 而这里跑在 enable 路径上 —— 返回 null 会让插件起不来,只为了一条探测日志。
+        val probe = toResult(economy.bankBalance(name))
+        if (probe.success()) {
             logger.info("Economy account resolved: Vault bank '$name'; charged money is routed there.")
         } else {
             logger.warn(
-                "Vault bank '$name' is not readable (${reasonOf(balance)}). " +
+                "Vault bank '$name' is not readable (${probe.reason()}). " +
                     "Create the bank in ${economy.name} first, or the charges will be lost.",
             )
         }
