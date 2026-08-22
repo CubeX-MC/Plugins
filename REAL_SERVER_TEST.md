@@ -13,6 +13,7 @@
 | Java | **21** | Clarity 编译到 Java 21（全仓唯一例外） |
 | 前置 | **Vault** + 任一经济提供方 | Contract / EcoBalancer / StateCharge 都是 `depend: [Vault]`，缺了会 `abortEnable` |
 | 可选前置 | **CMI**（或任一监听 legacy 聊天事件的插件） | 阶段 2 的聊天链路对照组要用 |
+| 测试账户 | 一个**服务器银行账户**（如 `cubex_bank`），先用经济插件建好（`/eco set cubex_bank 0`） | §3.2 的 StateCharge `economy.account` 一组要核对钱有没有真的转进去 |
 
 出 jar：
 
@@ -229,7 +230,9 @@ give @s diamond_pickaxe[minecraft:custom_data={PublicBukkitValues:{"leveltools:l
       - [ ] `/sc` 打开交易页：**只显示你有权限的状态**；开着的按钮发光
       - [ ] 点击开启 `small` → 体型立刻变化，聊天提示"关闭前会持续计费"
       - [ ] 等一个结算周期（默认 60s）→ 余额减少；金额 ≈ 费率 × 已开启秒数（**不取整**）
-      - [ ] 点击关闭 → 体型还原，提示里的结算金额只覆盖**这一段**开启时长
+      - [ ] 点击关闭 → 体型还原，提示报的是**本次开启到关闭的累计总额**
+            （2026-08-21 修正：此前报的是最后一个周期的零头。开满 3 个周期再关，
+            提示金额应 ≈ 3 个周期之和，而不是 1 个周期的钱）
       - [ ] **离线不计费**：开着状态下线，等几分钟再上线，余额不应减少
       - [ ] 互斥：开着 `small` 时点 `giant` → `small` 自动关闭并结算，不叠加
       - [ ] 余额保险：`/sc guard 500`（或交易页的盾牌按钮 → 聊天输入）→ 余额跌破 500 时
@@ -238,6 +241,36 @@ give @s diamond_pickaxe[minecraft:custom_data={PublicBukkitValues:{"leveltools:l
       - [ ] 扣款失败（把余额清零）→ 状态被强制关闭，控制台记 WARNING
       - [ ] 存档：手动改坏 `plugins/StateCharge/states.yml` 一个字符 → 重启回退 `.bak`，不丢档
       - [ ] 旧存档：放一份 v1 格式（`players.<uuid>.<state>: 1800`）→ 启动时明确告警并忽略，不误换算
+- [ ] **StateCharge 累计总额**（2026-08-21 新增，`states.yml` 的 `session-charged` 段）：
+      - [ ] 跨重启：开着状态关服 → 重启 → 再关掉，提示金额应从**最初开启**算起，不从重启算起
+      - [ ] 扣款失败被强制关闭后重新开启 → 累计从 0 重算（不该继承上一段）
+      - [ ] 互斥自动关闭（开 `small` 时点 `giant`）→ `small` 报的也是它自己那一段的累计总额
+      - [ ] 升级路径：拿一份**没有** `session-charged` 段的旧 `states.yml` 启动 → 正常加载，
+            升级前就开着的状态从 0 重新累计（这是预期，不是 bug）
+- [ ] **StateCharge 内循环经济 `economy.account`**（2026-08-21 新增）：
+      - [ ] **升级路径**：拿一份 `config-version: 1` 的旧 config 启动 → 自动补出
+            `economy.account: ''`、版本变 2，且**行为与升级前完全一致**（钱照旧销毁）
+      - [ ] 留空（默认）→ 扣款后没有任何账户余额增加
+      - [ ] `uuid:<cubex_bank 的 uuid>` → 玩家扣多少，该账户就涨多少（逐笔核对，别只看总数）
+      - [ ] `name:cubex_bank` → **从不登录的账户也能收到钱**；启动日志确认经济插件认得这个名字
+      - [ ] 裸名字 `cubex_bank` → 启动日志打出解析到的 UUID 与
+            `Pin it with 'economy.account: uuid:...'` 提示；核对 UUID 是不是你要的那个账户
+      - [ ] 写一个**服务器从没见过的名字** → 启动记 SEVERE，插件**照常启动**、状态照常开关、
+            照常扣钱，但每笔扣款一条 WARNING（钱确实丢了 —— 确认日志能让你对上账）
+      - [ ] `bank:<名字>` 且经济插件不支持 bank → SEVERE 并降级，不静默吞钱
+      - [ ] 改错的配置修好后 `/sc admin reload` → **不重启**即重新解析成功
+      - [ ] 配置没变时连按两次 `/sc admin reload` → 不应重复出现账户解析日志（跳过重解析）
+- [ ] **Regions 权限面**（`f670632` + `f87d915`，两批死节点接线）：
+      - [ ] ⚠️ **上服前先扫权限插件配置**：`regions.use` 以前是死节点，现在真的生效。
+            哪个组显式写了 `-regions.use`，那些人现在会被挡在 `/regions game` 之外
+      - [ ] 普通玩家（有 `regions.use`）能 `/regions game <id> ready|status`
+      - [ ] 撤掉 `regions.use` 的玩家 → 被拒；统治者与超管**不受影响**（`has()` 直通）
+      - [ ] 只发 `regions.reload` 给一个非超管 → 他能 `/regions reload`，
+            但 `/regions cleanup`、`/regions inspect` 仍被拒
+      - [ ] 统治者（`regions.admin`）不带 `regions.reload` → **被拒**。
+            全服级操作刻意不走统治者旁路，这条挂了说明 `canUseGlobalAdministration` 被改错了
+      - [ ] 超管不带任何细粒度节点 → 四条命令（含 `doctor`）全部照常
+      - [ ] `regions.template.apply` 已从 `plugin.yml` 删除 → 权限插件里留着这行也不影响建场地
 - [ ] **Clarity**：属性清理主流程（另见 2.4）
 - [ ] **Reputations**：Vault 模式共享信誉服务
 
