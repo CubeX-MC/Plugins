@@ -3,6 +3,7 @@ package org.cubexmc.regions
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.cubexmc.config.ConfigReload
 import org.cubexmc.config.MigrationException
+import org.cubexmc.config.MigrationRunner
 import org.cubexmc.config.ReloadChain
 import org.cubexmc.config.ReloadFailurePolicy
 import org.cubexmc.config.ReloadReport
@@ -387,14 +388,18 @@ class RegionsPlugin : CubexPlugin() {
         )
     }
 
+    /**
+     * 把数据基线文件跑一遍 `cubex-config` 的迁移框架。
+     *
+     * 以前这里只是"版本对不上就抛异常",没有迁移能力。现在版本表仍在 [RegionBaseline]，
+     * 但备份、原子写、保存失败回滚与失败报告都由 `MigrationRunner` 负责——
+     * 首个公开版本之后要改格式，只需在那边 `addStep(...)`，不用再动这里。
+     */
     @Throws(MigrationException::class)
     private fun verifyBaselineFiles() {
-        val errors = RegionBaseline.validate(dataFolder)
-        if (errors.isNotEmpty()) {
-            throw MigrationException(
-                errors.joinToString("; ") +
-                    ". Pre-release development files are intentionally not migrated; regenerate or update them.",
-            )
+        val migrations = MigrationRunner(this)
+        for (plan in RegionBaseline.plans()) {
+            migrations.run(plan)
         }
     }
 

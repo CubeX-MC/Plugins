@@ -46,7 +46,6 @@ internal class RegionsHolder(
     override fun getInventory(): Inventory = Bukkit.createInventory(null, 9)
 }
 
-internal class PendingInput(val onSubmit: (String) -> Unit)
 
 /**
  * Icons shared by several menus.

@@ -9,6 +9,7 @@ import org.cubexmc.mountlicense.MountLicensePlugin
 import org.cubexmc.mountlicense.lang.LanguageManager
 import java.util.UUID
 import kotlin.math.max
+import org.cubexmc.core.getUuid
 
 class ItemFactory(
     private val plugin: MountLicensePlugin,
@@ -62,12 +63,7 @@ class ItemFactory(
     fun readBoundVehicleId(item: ItemStack?): UUID? {
         if (!isKey(item)) return null
         val meta: ItemMeta = item?.itemMeta ?: return null
-        val raw = meta.persistentDataContainer.get(keys.keyBoundVehicle(), PersistentDataType.STRING) ?: return null
-        return try {
-            UUID.fromString(raw)
-        } catch (ex: IllegalArgumentException) {
-            null
-        }
+        return meta.persistentDataContainer.getUuid(keys.keyBoundVehicle())
     }
 
     fun bindKey(item: ItemStack?, vehicleId: UUID, shortLabel: String): Boolean {

@@ -32,6 +32,7 @@ import java.time.format.DateTimeParseException
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import org.cubexmc.gui.chat.ChatOutcome
 
 /**
  * Drives the contract GUI. The hall (`openHall`) is the landing screen; contracts are grouped by

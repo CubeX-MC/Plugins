@@ -1,16 +1,18 @@
 package org.cubexmc.statecharge.storage
 
-import org.cubexmc.core.CubexLogger
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.math.BigDecimal
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.UUID
 import java.util.logging.Logger
+import org.cubexmc.core.CubexLogger
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 
 class StateStorageTest {
 
@@ -20,122 +22,193 @@ class StateStorageTest {
     private val logger = CubexLogger(Logger.getLogger("statecharge-test"))
     private val player = UUID.randomUUID()
 
-    private fun storage(): StateStorage = StateStorage(File(tempDir, "states.yml"), logger)
+    private fun storage(): StateStorage = StateStorage(File(tempDir, StateStorage.FILE_NAME), logger)
 
     @Test
-    fun setAddRemoveRoundtrip() {
+    fun `toggling a state on and off round-trips`() {
         val storage = storage()
-        assertEquals(0L, storage.remaining(player, "fly"))
+        assertFalse(storage.isActive(player, "small"))
 
-        storage.setRemaining(player, "fly", 100L)
-        assertEquals(100L, storage.remaining(player, "fly"))
-        assertEquals(mapOf("fly" to 100L), storage.active(player))
+        storage.setActive(player, "small", true)
+        assertTrue(storage.isActive(player, "small"))
+        assertEquals(setOf("small"), storage.activeStates(player))
 
-        storage.addSeconds(player, "fly", 50L)
-        assertEquals(150L, storage.remaining(player, "fly"))
-
-        storage.removeState(player, "fly")
-        assertEquals(0L, storage.remaining(player, "fly"))
-        assertTrue(storage.active(player).isEmpty())
-        assertEquals(0, storage.size())
+        storage.setActive(player, "small", false)
+        assertFalse(storage.isActive(player, "small"))
+        assertTrue(storage.activeStates(player).isEmpty())
     }
 
     @Test
-    fun setToZeroOrNegativeRemovesEntry() {
+    fun `accrued seconds add up and clear`() {
         val storage = storage()
-        storage.setRemaining(player, "small", 10L)
-        storage.setRemaining(player, "small", 0L)
-        assertTrue(storage.active(player).isEmpty())
 
-        storage.setRemaining(player, "small", 10L)
-        storage.setRemaining(player, "small", -3L)
-        assertTrue(storage.active(player).isEmpty())
+        storage.addAccrued(player, "small", 30L)
+        storage.addAccrued(player, "small", 12L)
+        assertEquals(42L, storage.accruedSeconds(player, "small"))
+
+        storage.clearAccrued(player, "small")
+        assertEquals(0L, storage.accruedSeconds(player, "small"))
     }
 
     @Test
-    fun removePlayerClearsAllStates() {
+    fun `a non-positive accrual is ignored`() {
         val storage = storage()
-        storage.setRemaining(player, "small", 10L)
-        storage.setRemaining(player, "fly", 20L)
-        storage.removePlayer(player)
-        assertTrue(storage.active(player).isEmpty())
-        assertEquals(0, storage.size())
+
+        storage.addAccrued(player, "small", 0L)
+        storage.addAccrued(player, "small", -5L)
+
+        assertEquals(0L, storage.accruedSeconds(player, "small"))
     }
 
     @Test
-    fun loadPersistsAndRestores() {
-        val first = storage()
-        first.setRemaining(player, "fly", 3600L)
-        first.flushIfDirty()
-        assertTrue(File(tempDir, "states.yml").isFile)
+    fun `guard defaults to null so the service can fall back to config`() {
+        val storage = storage()
+        assertNull(storage.guard(player))
 
-        val second = storage()
-        second.load()
-        assertEquals(3600L, second.remaining(player, "fly"))
+        storage.setGuard(player, BigDecimal("500"))
+        assertEquals(BigDecimal("500"), storage.guard(player))
+
+        storage.setGuard(player, null)
+        assertNull(storage.guard(player))
     }
 
     @Test
-    fun flushOnlyWhenDirty() {
+    fun `active states, accrual and guard all survive a save-load cycle`() {
         val storage = storage()
-        storage.load()
-        assertFalse(storage.isDirty())
+        storage.setActive(player, "small", true)
+        storage.addAccrued(player, "small", 42L)
+        storage.setGuard(player, BigDecimal("250.5"))
         storage.flushIfDirty()
-        assertFalse(File(tempDir, "states.yml").exists())
-
-        storage.setRemaining(player, "fly", 10L)
-        assertTrue(storage.isDirty())
-        storage.flushIfDirty()
-        assertFalse(storage.isDirty())
-        assertTrue(File(tempDir, "states.yml").exists())
-    }
-
-    @Test
-    fun corruptFileFallsBackToBackup() {
-        val file = File(tempDir, "states.yml")
-        val storage = storage()
-        storage.setRemaining(player, "fly", 1234L)
-        storage.flushIfDirty()
-        // 第二次保存才会把已有主文件拷成 .bak(备份滞后一个版本)。
-        storage.setRemaining(player, "small", 60L)
-        storage.flushIfDirty()
-        assertTrue(File(tempDir, "states.yml.bak").exists())
-
-        // 把主文件写坏,备份仍是好的(内含上一版本 fly=1234)。
-        Files.writeString(file.toPath(), "players: [this is not: a: map", StandardCharsets.UTF_8)
 
         val reloaded = storage()
         reloaded.load()
-        assertEquals(1234L, reloaded.remaining(player, "fly"))
+
+        assertTrue(reloaded.isActive(player, "small"))
+        assertEquals(42L, reloaded.accruedSeconds(player, "small"))
+        assertEquals(0, BigDecimal("250.5").compareTo(reloaded.guard(player)))
     }
 
     @Test
-    fun invalidPlayerKeyIsSkipped() {
-        val file = File(tempDir, "states.yml")
-        val yaml = """
+    fun `anyActive reports whether the billing loop has anything to do`() {
+        val storage = storage()
+        assertFalse(storage.anyActive())
+
+        storage.setActive(player, "small", true)
+        assertTrue(storage.anyActive())
+
+        storage.setActive(player, "small", false)
+        assertFalse(storage.anyActive())
+    }
+
+    @Test
+    fun `removePlayer drops everything for that player`() {
+        val storage = storage()
+        storage.setActive(player, "small", true)
+        storage.addAccrued(player, "small", 10L)
+        storage.setGuard(player, BigDecimal.TEN)
+
+        storage.removePlayer(player)
+
+        assertFalse(storage.isActive(player, "small"))
+        assertEquals(0L, storage.accruedSeconds(player, "small"))
+        assertNull(storage.guard(player))
+    }
+
+    @Test
+    fun `session totals accumulate across billing cycles`() {
+        val storage = storage()
+        assertEquals(BigDecimal.ZERO, storage.sessionCharged(player, "fly"))
+
+        // 一个开着一小时的状态会按周期结算很多次;关闭提示要报的是它们的和。
+        storage.addSessionCharged(player, "fly", BigDecimal("2.00"))
+        storage.addSessionCharged(player, "fly", BigDecimal("2.00"))
+        storage.addSessionCharged(player, "fly", BigDecimal("2.06"))
+
+        assertEquals(0, BigDecimal("6.06").compareTo(storage.sessionCharged(player, "fly")))
+    }
+
+    @Test
+    fun `session totals are per state and survive a save-load round trip`() {
+        val storage = storage()
+        storage.setActive(player, "fly", true)
+        storage.addSessionCharged(player, "fly", BigDecimal("2.06"))
+        storage.addSessionCharged(player, "small", BigDecimal("2.00"))
+        storage.flushIfDirty()
+
+        // 离线不计费但状态保留,所以累计额也必须跨重启活下来。
+        val reloaded = storage()
+        reloaded.load()
+
+        assertEquals(0, BigDecimal("2.06").compareTo(reloaded.sessionCharged(player, "fly")))
+        assertEquals(0, BigDecimal("2.00").compareTo(reloaded.sessionCharged(player, "small")))
+    }
+
+    @Test
+    fun `clearing a session total leaves the other states alone`() {
+        val storage = storage()
+        storage.addSessionCharged(player, "fly", BigDecimal("2.06"))
+        storage.addSessionCharged(player, "small", BigDecimal("2.00"))
+
+        storage.clearSessionCharged(player, "fly")
+
+        assertEquals(BigDecimal.ZERO, storage.sessionCharged(player, "fly"))
+        assertEquals(0, BigDecimal("2.00").compareTo(storage.sessionCharged(player, "small")))
+    }
+
+    @Test
+    fun `a v2 file without session totals still loads`() {
+        // session-charged 是 v2 里后加的可选段:旧文件缺了它只该从零重新累计,不该整段作废。
+        val file = File(tempDir, StateStorage.FILE_NAME)
+        Files.writeString(
+            file.toPath(),
+            """
+            storage-version: 2
             players:
-              not-a-uuid:
-                fly: 100
-        """.trimIndent()
-        Files.writeString(file.toPath(), yaml, StandardCharsets.UTF_8)
+              $player:
+                active:
+                - fly
+            """.trimIndent(),
+            StandardCharsets.UTF_8,
+        )
 
         val storage = storage()
         storage.load()
+
+        assertTrue(storage.isActive(player, "fly"))
+        assertEquals(BigDecimal.ZERO, storage.sessionCharged(player, "fly"))
+    }
+
+    @Test
+    fun `a v1 file is ignored rather than mis-converted`() {
+        // v1 存的是"预购的剩余时长",与按开启时长计费无法换算 —— 宁可忽略也不猜折算比例。
+        val file = File(tempDir, StateStorage.FILE_NAME)
+        Files.writeString(
+            file.toPath(),
+            "players:\n  $player:\n    small: 1800\n",
+            StandardCharsets.UTF_8,
+        )
+
+        val storage = storage()
+        storage.load()
+
+        assertFalse(storage.isActive(player, "small"))
         assertEquals(0, storage.size())
     }
 
     @Test
-    fun nonPositiveValuesAreSkippedOnLoad() {
-        val file = File(tempDir, "states.yml")
-        val yaml = """
-            players:
-              $player:
-                fly: 100
-                broken: -5
-        """.trimIndent()
-        Files.writeString(file.toPath(), yaml, StandardCharsets.UTF_8)
-
+    fun `an unreadable file falls back to the backup`() {
         val storage = storage()
-        storage.load()
-        assertEquals(mapOf("fly" to 100L), storage.active(player))
+        storage.setActive(player, "small", true)
+        storage.flushIfDirty()
+        // 再存一次,让 .bak 里留着上一份完好数据
+        storage.setActive(player, "giant", true)
+        storage.flushIfDirty()
+
+        File(tempDir, StateStorage.FILE_NAME).writeText("{ this is not yaml", StandardCharsets.UTF_8)
+
+        val recovered = storage()
+        recovered.load()
+
+        assertTrue(recovered.isActive(player, "small"))
     }
 }

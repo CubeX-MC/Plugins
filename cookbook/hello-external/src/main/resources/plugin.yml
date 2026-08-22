@@ -1,0 +1,16 @@
+name: CookbookHelloExternal
+version: '${version}'
+main: org.cubexmc.cookbook.helloexternal.HelloExternalPlugin
+api-version: '1.18'
+author: CubeX
+description: Cookbook 01 - the smallest external-mode plugin.
+# depend 由构建按打包模式注入,这里**不要**写 CubeXLib。
+commands:
+  hello:
+    description: Greet the sender using the configured template.
+    usage: /hello [name]
+    permission: cookbook.hello
+permissions:
+  cookbook.hello:
+    description: Allows using /hello.
+    default: true

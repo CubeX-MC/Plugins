@@ -573,7 +573,17 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         return true
     }
 
+    /**
+     * 参与 / 主持一局活动。
+     *
+     * `regions.use` 是**玩家侧的总开关**:没有它就不能参与别人的场地活动。
+     * [has] 会让统治者与超管直接通过,所以场主不会被自己的开关挡住;
+     * `start`/`end` 另有 [canManage](场主 + Source owner)把关。
+     */
     private fun game(sender: CommandSender, args: Array<String>): Boolean {
+        if (!has(sender, USE_PERMISSION)) {
+            return true
+        }
         if (args.size < 3) {
             plugin.lang().send(sender, "invalid-usage", mapOf("usage" to "/regions game <id> <ready|start|status|end>"))
             return true
@@ -649,7 +659,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
     }
 
     private fun reload(sender: CommandSender): Boolean {
-        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
+        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender, RELOAD_PERMISSION))) {
             return true
         }
         val report = plugin.reloadRegions()
@@ -692,7 +702,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
     }
 
     private fun inspect(sender: CommandSender, args: Array<String>): Boolean {
-        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
+        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender, INSPECT_PERMISSION))) {
             return true
         }
         if (args.size < 2) {
@@ -724,7 +734,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
     }
 
     private fun cleanup(sender: CommandSender, args: Array<String>): Boolean {
-        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
+        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender, CLEANUP_PERMISSION))) {
             return true
         }
         if (args.size < 2) {
@@ -745,6 +755,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         return true
     }
 
+    // doctor 没有自己的细粒度节点(plugin.yml 里也没声明过),所以只有超管能用。
     private fun doctor(sender: CommandSender): Boolean {
         if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
             return true
@@ -936,6 +947,14 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         plugin.authority().visibleRegions(sender, plugin.regions().all()).map { it.id }
 
     companion object {
+        /** 玩家侧总开关:没有它就不能参与别人场地的活动。 */
+        const val USE_PERMISSION = "regions.use"
+
+        // 全服级操作的细粒度节点:发了其中一个就能只做那一件事,不必给整个 regions.superadmin。
+        const val RELOAD_PERMISSION = "regions.reload"
+        const val INSPECT_PERMISSION = "regions.inspect"
+        const val CLEANUP_PERMISSION = "regions.cleanup"
+
         private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
             .withZone(ZoneId.systemDefault())
     }

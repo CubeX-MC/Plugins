@@ -47,6 +47,43 @@ class RegionAuthorityServiceTest {
     }
 
     @Test
+    fun `a fine-grained node grants exactly one global action`() {
+        // plugin.yml 早就声明了 regions.reload / inspect / cleanup,但此前谁也没检查过 ——
+        // 只给这些节点等于什么都没给。现在它们能单独授权,不必发整个 regions.superadmin。
+        val service = service()
+        val reloader = player(UUID.randomUUID(), nodes = setOf("regions.reload"))
+
+        assertTrue(service.canUseGlobalAdministration(reloader, "regions.reload").allowed)
+        assertEquals(
+            AuthorityDenial.SUPERADMIN_REQUIRED,
+            service.canUseGlobalAdministration(reloader, "regions.cleanup").denial,
+        )
+        assertEquals(AuthorityDenial.SUPERADMIN_REQUIRED, service.canUseGlobalAdministration(reloader).denial)
+    }
+
+    @Test
+    fun `rulers get no implicit access to global administration`() {
+        // 全服级操作和"能管自己的场地"不是一回事:统治者在这条路径上没有旁路,
+        // 与 canManage 的语义刻意不同。
+        val service = service()
+        val ruler = player(UUID.randomUUID(), ruler = true)
+
+        assertEquals(
+            AuthorityDenial.SUPERADMIN_REQUIRED,
+            service.canUseGlobalAdministration(ruler, "regions.reload").denial,
+        )
+    }
+
+    @Test
+    fun `superadmin still passes without holding any fine-grained node`() {
+        val service = service()
+        val superAdmin = player(UUID.randomUUID(), superAdmin = true)
+
+        assertTrue(service.canUseGlobalAdministration(superAdmin, "regions.reload").allowed)
+        assertTrue(service.canUseGlobalAdministration(superAdmin).allowed)
+    }
+
+    @Test
     fun `ruler receives stable source denial reasons`() {
         val player = player(UUID.randomUUID(), ruler = true)
         val unavailable = service(FakeSource("lands", available = false))
@@ -163,11 +200,19 @@ class RegionAuthorityServiceTest {
         source: RegionSourceRef = RegionSourceRef("lands", mapOf("land" to "capital", "area" to "default")),
     ): RegionDefinition = RegionDefinition(id = id, name = id, source = source)
 
-    private fun player(id: UUID, ruler: Boolean = false, superAdmin: Boolean = false): Player {
+    private fun player(
+        id: UUID,
+        ruler: Boolean = false,
+        superAdmin: Boolean = false,
+        nodes: Set<String> = emptySet(),
+    ): Player {
         val player = mock(Player::class.java)
         `when`(player.uniqueId).thenReturn(id)
         `when`(player.hasPermission(RegionAuthorityService.RULER_PERMISSION)).thenReturn(ruler)
         `when`(player.hasPermission(RegionAuthorityService.SUPERADMIN_PERMISSION)).thenReturn(superAdmin)
+        for (node in nodes) {
+            `when`(player.hasPermission(node)).thenReturn(true)
+        }
         return player
     }
 

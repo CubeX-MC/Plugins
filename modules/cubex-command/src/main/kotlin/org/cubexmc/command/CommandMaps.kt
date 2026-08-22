@@ -45,22 +45,62 @@ object CommandMaps {
      *
      * Bukkit has no public "unregister one command" call, so the `knownCommands` map is edited
      * directly. Only entries actually pointing at [command] are removed — a plugin that lost a name
-     * race must not delete the winner's entry. Returns the labels that were removed.
+     * race must not delete the winner's entry. Returns the labels that were **actually** removed.
+     *
+     * [Command.unregister] always runs, even when the map refuses edits: it is the supported API and
+     * on newer servers it is what actually detaches the command.
      */
     @JvmStatic
     @JvmOverloads
     fun unregister(map: CommandMap, command: Command, logger: Logger? = null): List<String> {
-        val known = knownCommands(map, logger) ?: return emptyList()
-        val removed = ArrayList<String>()
-        val iterator = known.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (entry.value === command) {
-                removed.add(entry.key)
-                iterator.remove()
+        val known = knownCommands(map, logger)
+        val removed = if (known == null) emptyList() else removeMatching(known, command, logger)
+        runCatching { command.unregister(map) }
+        return removed
+    }
+
+    /**
+     * Drops every entry of [known] that points at [command] **by identity**, returning the labels
+     * that were really removed.
+     *
+     * Two things this must survive, both seen in the wild:
+     *
+     * 1. **The map refuses edits.** Paper 26.x hands back a `knownCommands` whose entry-set iterator
+     *    does not implement `remove`, so the old mutate-while-iterating loop blew up with
+     *    `UnsupportedOperationException` and took `/rg reload` down with it. Matching labels are
+     *    therefore collected first and removed afterwards, each attempt guarded on its own.
+     * 2. **Removal silently does nothing.** If the map is a copy rather than the live one, the
+     *    entries stay put; the label is then *not* reported as removed, so callers never believe a
+     *    cleanup happened that did not.
+     */
+    @JvmStatic
+    internal fun removeMatching(
+        known: MutableMap<String, Command>,
+        command: Command,
+        logger: Logger? = null,
+    ): List<String> {
+        val labels = known.entries.filter { it.value === command }.map { it.key }
+        if (labels.isEmpty()) return emptyList()
+
+        val removed = ArrayList<String>(labels.size)
+        var refused = false
+        for (label in labels) {
+            val outcome = runCatching { known.remove(label) }
+            if (outcome.isFailure) {
+                refused = true
+                continue
+            }
+            if (!known.containsKey(label)) {
+                removed.add(label)
             }
         }
-        runCatching { command.unregister(map) }
+        if (refused || removed.size < labels.size) {
+            logger?.log(
+                Level.WARNING,
+                "knownCommands refused removal of ${labels - removed.toSet()}; " +
+                    "relying on Command.unregister instead",
+            )
+        }
         return removed
     }
 

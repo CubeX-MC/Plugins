@@ -18,11 +18,12 @@
 | 维度 | 现状 |
 |---|---|
 | 插件数 | 12 个可独立安装：BookLite · FAWEReplacer · MountLicense · Contract · EcoBalancer · RuleGems · Metro · Railway · Clarity · Reputations · Regions · StateCharge |
-| 共享模块 | **9 个**：`cubex-core` · `cubex-config` · `cubex-i18n` · `cubex-scheduler` · `cubex-integrations` · `cubex-database` · `cubex-command` · `cubex-gui` · `cubex-spatial` |
+| 运行时 lib | **CubeXLib**（2026-08-19 新建）：为外置模式插件以原包名提供 10 个 `cubex-*` 与 Kotlin stdlib。不进镜像同步 |
+| 共享模块 | **10 个**：`cubex-core` · `cubex-config` · `cubex-i18n` · `cubex-scheduler` · `cubex-integrations` · `cubex-database` · `cubex-command` · `cubex-gui` · `cubex-spatial` · `cubex-economy`（2026-08-21 新建） |
 | Kotlin 化 | ✅ 2026-08-16 收口。全部插件与模块 opt-in Kotlin 并继承 `CubexPlugin` |
 | 字节码目标 | 全仓 Java 17；**Clarity 例外为 21**（1.21 属性 API）。`jarGate` 按各插件 release 分别校验 |
 | 已发布/待发布 | 已公开：BookLite · MountLicense · Metro · Railway · RuleGems · EcoBalancer · FAWEReplacer。未公开首发：Contract · Regions · StateCharge · Clarity · Reputations |
-| 全仓验收 | `gradlew build jarGateAll` 全绿（12 插件 + 9 模块） |
+| 全仓验收 | `gradlew build jarGateAll` 全绿（12 插件 + CubeXLib + 9 模块，2026-08-19 复跑） |
 
 遗留 `.java` 仅：vendored bStats `Metrics.java`、Reputations 的公开 Java API
 （`org.cubexmc.reputations.api`，3 个文件，**故意保留**）、Metro/Railway 的互操作 shim。
@@ -112,7 +113,7 @@ FoliaLib 不向插件泄漏原 API。
 > 若某标签被别的插件抢先注册，卸载时会把对方的条目一起删掉。
 > `CommandMaps.unregister` 改为**按对象身份**匹配，只删真正属于自己的条目。
 
-### 2.8 `cubex-gui` — 3/12（Contract · Metro · Railway）· 2026-08-17 新建
+### 2.8 `cubex-gui` — 5/12（Contract · Metro · Railway · EcoBalancer · Regions）· 2026-08-17 新建
 
 | 类型 | 能力 |
 |---|---|
@@ -137,22 +138,30 @@ Metro/Railway 各自保留同名 `org.cubexmc.metro.gui.ItemBuilder` 作为**薄
 抽取前已核对 Metro 与 Railway 两侧内容**逐字节一致**（仅换行符不同）。
 按既定纪律**只下沉无状态空间索引**，`StopManager`/`Stop` 留在插件内。
 
-### 2.10 模块接入矩阵
+### 2.10 `cubex-economy` — 1/12（StateCharge）· 2026-08-21 新建
 
-| 插件 | core | config | i18n | scheduler | integrations | database | command | gui | spatial |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| BookLite | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — |
-| FAWEReplacer | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — |
-| MountLicense | ✅ | ✅ | ✅ | — | — | — | — | — | — |
-| Contract | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — |
-| EcoBalancer | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | — |
-| RuleGems | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — |
-| Metro | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| Railway | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| Regions | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — |
-| StateCharge | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
-| Clarity | ✅ | — | — | — | — | — | — | — | — |
-| Reputations | ✅ | — | — | — | — | — | — | — | — |
+`VaultEconomy`（`has`/`balance`/`withdraw`/`deposit`/`charge`/`format` + `useAccount` 入账路由）·
+`EconomyAccount`（`economy.account` 的纯解析：空 / `uuid:<uuid>` / 裸 UUID / `<玩家名>` / `bank:<名字>`）·
+`OfflinePlayerLookup`（在线 → Paper `getOfflinePlayerIfCached` → 有存档的兜底，**不用** `getOfflinePlayers()`）·
+`EconomyResult`（`success()` 只表示扣款侧；`depositFailed()` 是入账侧的旁路信号）。
+两条不变量与取舍见 §7.4 的 `cubex-economy` 小节。
+
+### 2.11 模块接入矩阵
+
+| 插件 | core | config | i18n | scheduler | integrations | database | command | gui | spatial | economy |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| BookLite | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — | — |
+| FAWEReplacer | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | — |
+| MountLicense | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
+| Contract | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — |
+| EcoBalancer | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | — |
+| RuleGems | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — | — |
+| Metro | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | — |
+| Railway | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | — |
+| Regions | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — |
+| StateCharge | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | ✅ |
+| Clarity | ✅ | — | — | — | — | — | — | — | — | — |
+| Reputations | ✅ | — | — | — | — | — | — | — | — | — |
 
 ---
 
@@ -359,7 +368,9 @@ GUI 有完整领取流程。过期的是 `Asset`：`Asset.item()` 只存 `"DIAMO
 - Contract 编译目标是 **paper-api 1.21.11 / 输出 release 17**，shadowJar **不 bundle/relocate Adventure**
   （由 Paper 提供）。Dialog API 仅 1.21.6+ 经 `Class.forName` 探测后启用，旧服回退 GUI+聊天。
   **代价：不再支持纯 Spigot 服**（仍支持 Paper 1.18+）
-- `ChatInputService` 必须同时监听 Paper `AsyncChatEvent` 与旧 `AsyncPlayerChatEvent`
+- `ChatInputService` 必须同时监听 Paper `AsyncChatEvent` 与旧 `AsyncPlayerChatEvent`。
+  **2026-08-19 订正**：这条此前只是"要求"，源码里 Contract 其实**只监听 legacy**。
+  随 §7.4 的 ChatInput 下沉一并补上了现代事件监听，现在名副其实
 
 ### 5.2 Regions（未公开首发）
 
@@ -368,6 +379,11 @@ Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证�
 
 - [x] **`REAL_PLAYER_TEST.md` 真人验证已完成**（2026-08-17）：GUI 创建向导、玩家进出/死亡/断线状态清理、
       异常关服、装备托管恢复、隔离试运行、Lands/RuleGems 授权、多人 Mode 流程
+- [x] **接入 `MigrationRunner`**（2026-08-20）：此前 `RegionBaseline` 只做"版本对不上就抛异常"
+      的校验，**没有任何迁移能力**。版本表仍留在 `RegionBaseline`（5 个文件的单一来源），
+      但备份、原子写、保存失败回滚与失败报告都交给 `cubex-config`。目前没有迁移步骤——
+      首个公开版本就是起点；以后改格式只需版本号 +1 并在那里 `addStep(...)`。
+      至此 Regions 与 Contract 的模块接入完全一致
 - [ ] 校验器与第三方依赖的错误正文仍是英文常量，未拆成翻译键（真人验证中收集到的难懂文案先统一调整）
 - [ ] 子命令升级为强类型 Brigadier 节点（当前 Lifecycle Command API + 权限过滤 + 参数补全已够用）
 - [ ] 第一个公开版本发布后**冻结**数据基线（`config-version: 4`、`regions-version: 4`、
@@ -466,8 +482,18 @@ Railway 的源码包**就是** `org.cubexmc.metro`，主类 `org.cubexmc.metro.M
 Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线暂停、重复购买累加）、互斥组、
 `StateStorage` dirty flush + 损坏回退 `.bak`；测试覆盖配置解析/购买/计时/存储/时长渲染/语言对齐。
 
-- [ ] **v1 范围外，后续可加**：GUI 商店 · BossBar 倒计时 · PlaceholderAPI · MySQL ·
-      现实时间倒计时模式 · bStats（**需先注册服务 ID**）· 跨服(BungeeCord)同步
+- [x] **计费模型重做为"按开启时长计费"**（2026-08-20，用户决策）：
+      不再预购时长。玩家 toggle 开启即计费、关闭即停止并结算零头；`price`/`unit-seconds`
+      读作**费率**（数值含义不变，服主配置几乎不用改，只有 `max-stack-seconds` 作废）。
+      六条已定语义：按比例不取整 · 关闭立即结算 · **离线不计费但开关状态保留** ·
+      扣款失败则强制关闭且已用时长收不回 · 免费状态不受保险影响 · 开启前先查保险。
+      默认值：结算周期 60s、余额保险默认 0（不设）。存档升 v2（`active`/`accrued`/`guard`），
+      v1 预购时长无法换算故明确告警并忽略
+- [x] **GUI 交易页**（2026-08-20）：一状态一按钮、点击 toggle、**只显示有权限的状态**、
+      开着的发光；盾牌按钮设置余额保险（走 `cubex-gui` 的 `ChatInputState` 聊天输入）。
+      StateCharge 因此接入 `cubex-gui`
+- [ ] **v1 范围外，后续可加**：BossBar 倒计时 · PlaceholderAPI · MySQL ·
+      bStats（**需先注册服务 ID**）· 跨服(BungeeCord)同步
 - [ ] **首发前冻结数据基线**（`StateStorage` 存档格式、`config-version`/`lang-version`）：同 §5.2 纪律
 - [ ] 补 `StateCharge/docs/release-checklist.md`
 - [ ] 首发前实服验证
@@ -496,15 +522,41 @@ Vault 模式共享信誉服务，bStats 31877。
 
 ## 6. 仓库级待办
 
-- [ ] **升级 Gradle 到 8.14.3+，再把共享 `run-paper` 从 2.x 升到 3.x**。
-      直接升 run-paper 已确认被当前 **Gradle 8.8** 的 Plugin API 版本阻止。
-      这是工具链工作，不是任何插件的运行能力缺口
+- [x] **Gradle 8.8 → 8.14.3、run-paper 2.3.1 → 3.0.0**（2026-08-20）。
+      `tasks.runServer { minecraftVersion(...) }` 的调用面未变，6 个插件的 runServer 配置一行没动。
+      过程中踩到两处，都记在这里免得重蹈：
+      1. **依赖校验拦住新工具链**：Gradle 8.14.3 换了内嵌的 `kotlin-dsl` 插件（5.2.0 → Kotlin 2.0.21 一族）。
+         用 `--write-verification-metadata sha256` 补齐，新增 36 个 component，**未删除任何既有条目**，
+         也没有运行时依赖混入
+      2. **RuleGems 的 dependency locking 与 Gradle 默认 JaCoCo 冲突**：8.14.3 默认 JaCoCo 0.8.13，
+         而 `RuleGems/gradle.lockfile` 锁在 `{strictly 0.8.11}` → `jacocoAgent` 解析直接失败。
+         锁文件是它安全流程的一部分（见 `rulegems-security.yml`），**不该为跟随 Gradle 默认值就动它**；
+         已在 `RuleGems/build.gradle.kts` 显式 `jacoco { toolVersion = "0.8.11" }`，让升级只动 Gradle 本身
 - [ ] 命令/权限规范文档（R4 收窄后的内容，见 §4）
+- [x] **CI 补跑 `buildSrc` 测试**（2026-08-19）：buildSrc 是独立构建，根构建的 `build` **不会**带上它的
+      测试，`plugin.yml` 的 depend 注入逻辑住在那里；`build.yml` 已加 `./gradlew -p buildSrc test`，
+      并把 CubeXLib 加进按插件构建的矩阵
 - [ ] `jarGate` **不查**的项仍需人工确认：`plugin.yml` 内容、bStats id、sqlite 平台数、adventure 是否单份
 - [x] **修 `jarGate` 的 `sharedModulePrefixes`**（2026-08-19）：原先只列了 9 个模块里的 4 个
       （core/config/i18n/scheduler），缺 integrations/database/command/gui/spatial。缺失的模块类会被拿
       **插件自己的 java release** 去校验字节码——Clarity 是 release 21（major 65），一旦接入其中任何一个
       就会被误判失败。已补全并加注释；`:Clarity:jarGate` / `:Contract:jarGate` 验证通过
+- [x] **本轮重构的实服回归清单**：[`REAL_SERVER_TEST.md`](REAL_SERVER_TEST.md)（2026-08-19）——
+      覆盖外置模式类可见性、5 家聊天输入、MountLicense PDC、RuleGems 冷却、Clarity 槽位遍历、
+      三家 GUI 铺底，以及 §4 R1 与各插件首发验证
+- [x] **阶段一 + 阶段二已跑完**（2026-08-20，Paper 26.1.2）：重构本身**零回归**，
+      但实服暴露出 **3 个既有 bug**，均已修：
+      1. `CommandMaps.unregister` 边遍历边 `iterator.remove()`，Paper 26.x 的 `knownCommands`
+         不支持该操作 → `/rg reload` 整条命令崩溃（**共享模块 bug，影响面最大**，4 条单测锁住）
+      2. `MountLicense/KeyItemListener.onAirInteract` 带 `ignoreCancelled = true`，
+         而空右键的 `PlayerInteractEvent` 恒为"已取消" → 钥匙右键召回**从来没生效过**
+      3. `EcoBalancer/GuiManager` 策略列表的非激活前缀是裸 `"&e"` 字面量，没过 `tr()`
+      顺带确认：legacy `AsyncPlayerChatEvent` 在 Paper 26.1.2 上**仍然存在**，
+      `ModernChatBridge` 目前是防御性的，等 Paper 真移除时才成为承重件
+- [x] **B 轮现代聊天链路已验**（Contract，2026-08-20）：`AsyncChatEvent` 分支确实生效。
+      至此 §2 阶段全部通过 —— **本轮重构零回归**，MountLicense 的损坏 UUID 也确认被安静忽略
+- [ ] EcoBalancer 的 `lang/*.yml` **完全没有 `messages.gui.*` 这组键**，
+      GUI 文案全靠代码里的 fallback，服主无法翻译。属既有缺口，单独修
 - [ ] 给 Contract / StateCharge / Clarity / Reputations 补 `docs/release-checklist.md`
       （Metro/Railway/Regions 已有），内容就是上面那四项人工确认
 - [ ] 明确“未公开”的口径：[`mirror.yml`](.github/workflows/mirror.yml) 每次推 main 都会把 Contract /
@@ -566,15 +618,35 @@ graph TD
 两条路径背后是**同一个运行时实例**。判断规则一句话：
 **这插件会不会发给我们服务器以外的人？会 → 内嵌；不会 → 外置。**
 
-- [ ] 建 `CubeXLib` 子项目，把 9 个 `cubex-*` 不 relocate 打包进去
-- [ ] 约定插件加打包模式开关（编译期代码两边完全一致，只有打包不同）
-- [ ] **`depend: [CubeXLib]` 由构建按模式注入/去掉**，不能手写——手写必然与实际打包模式漂移，
-      而且症状是启动期报错，不是编译期
-- [ ] **jarGate 按模式分支**：内嵌验 `relocatedKotlin > 0` 且 jar 内无 CubeXLib 类；
-      外置验 jar 内 `org/cubexmc/{core,config,i18n,scheduler,integrations,database,command,gui,spatial}/**`
-      条目数为 0
-- [ ] **CubeXLib 是全仓唯一允许携带未 relocate `kotlin/**` 的 jar，且必须是唯一的**——
-      它提供那一份规范的 stdlib；其余插件继续强制 `unrelocatedKotlin=0`
+- [x] **建 `CubeXLib` 子项目**（2026-08-19）：9 个 `cubex-*` 不 relocate 打包进去；
+      Adventure 由 Paper 提供故 `exclude`，FoliaLib relocate 进 `org.cubexmc.cubexlib.libs`
+- [x] **约定插件加打包模式开关**：`cubex { packaging.set(CubexPackagingMode.EXTERNAL) }`。
+      编译期代码两边完全一致，只有打包与 `plugin.yml` 不同
+- [x] **`depend: [CubeXLib]` 由构建注入**（`CubexPluginYml.withDepend`，带 6 条单测）。
+      打包模式已声明为 `processResources` 的 `inputs.property`——否则改了模式而资源没变时任务会
+      UP-TO-DATE，jar 里留着上一次模式的 `plugin.yml`（实际踩到过）
+- [x] **jarGate 按模式分支**：三种模式各自的断言已实现并逐一验证——
+      EMBEDDED（Clarity/Contract 原样通过）、LIB（`unrelocatedKotlin=1029`、9 个模块齐全）、
+      EXTERNAL（由 `cookbook/hello-external` **常驻**验证：`relocatedKotlin=0 cubexModuleEntries=0`，
+      jar 内 `plugin.yml` 末尾出现构建注入的 `depend: [CubeXLib]`，而源文件里没有）
+- [x] **CubeXLib 是全仓唯一允许携带未 relocate `kotlin/**` 的 jar**——LIB 模式还会校验
+      `projectName == CubeXLib`，别的项目想用这个模式会被门禁挡下
+- [x] **实服验证跨插件类可见性已通过**（2026-08-20，**Paper 26.1.2**，
+      记录见 [`REAL_SERVER_TEST.md`](REAL_SERVER_TEST.md) 阶段一）：外置模式插件确实能解析到
+      CubeXLib 以原包名提供的 `cubex-*` 与 Kotlin stdlib；缺 CubeXLib 时 Paper 在**加载期**
+      就以 `UnknownDependencyException` 拒绝（构建注入的 `depend` 生效）；内嵌插件不装 CubeXLib 照常工作。
+      **§7.1 至此完全收口。**
+- [x] **第一个外置模式消费方**（2026-08-19）：`cookbook/hello-external`（cookbook 第一篇）。
+      不等 `createPlugin` 了——EXTERNAL 分支需要一个**常驻**消费方，否则整条外置路径没有任何
+      东西在验证，会静默腐烂。CI 的 `jarGateAll` 覆盖它
+
+**已定实现细节**
+
+- `cubex-database` 在模块里把 sqlite-jdbc 声明为 `compileOnly`，好让**内嵌**插件各自打包。
+  运行时提供方这一侧必须真带一份，否则外置插件调 `SQLiteDatabase` 会 `NoClassDefFoundError`，
+  所以 CubeXLib `implementation(sqliteJdbc)`；约定插件的原生库瘦身护栏同样作用于它。
+- 外置模式的 shadowJar 排除项 = `cubex-*` 模块 + `kotlin/**` + `com/tcoded/**`（FoliaLib）。
+  **Adventure 不在排除之列**——它是各插件自己的取舍（Paper 提供 / Spigot 需自带），构建不替它们决定。
 
 **已定决策**
 
@@ -593,11 +665,18 @@ graph TD
 
 判据：**这层糖明天删掉，队友能不能靠 Bukkit 文档自己写回来？** 能就做。
 
-- [ ] **`onEvent<T> { }`（`cubex-core`）**——保留，但理由不是简洁，是**消灭一整类 bug**：
+- [x] **`onEvent<T> { }`（`cubex-core`）**（2026-08-19，[`CubexEvents.kt`](modules/cubex-core/src/main/kotlin/org/cubexmc/core/CubexEvents.kt)，4 条单测）——理由不是简洁，是**消灭一整类 bug**：
       忘记把监听器绑进 `Terminable` 栈，reload/disable 后监听器还活着，而且**不会立刻报错**；
       自动 `bind()` 让它不可能发生。§3.1 当初"纯投机抽象"的判断在只有我们自己写代码时成立，
       加了队友之后不成立
-- [ ] **GUI 构建糖（`cubex-gui`）**——`cubex-gui` 是我们自己的东西，没有现成标准可收敛，值得做
+- [x] **GUI 构建糖（`cubex-gui`）**（2026-08-19，**范围比原计划小得多**）：
+      按 §3.2 找实测重复，只找到一处——**填充空槽**（Metro / Railway 的 `MainMenuView` 与
+      EcoBalancer 的 `fillBackground` 是逐字相同的 5 行循环，同源算 1，共 **2 家**）。
+      已下沉为 [`Inventory.fillEmpty`](modules/cubex-gui/src/main/kotlin/org/cubexmc/gui/GuiFill.kt)（4 条单测），三处调用点已切换。
+- ❌ ~~完整的声明式 GUI DSL（`gui(title, rows) { slot(x, y) { ... } }`）~~ ——
+      **没有实测支撑**：全仓 `行 * 9 + 列` 这类槽位换算**零命中**，各插件用的都是具名槽位常量。
+      按 §7.2 自己的判据（"这层糖明天删掉，队友能不能靠 Bukkit 文档自己写回来"），
+      槽位下标是 Bukkit 标准知识，自创一套反而让 agent 失去先验。要做也得等真出现重复
 - ❌ ~~自研命令 DSL~~ —— **收敛到 Cloud**。Metro / Railway / RuleGems 已经 shade 了 Cloud（incendo，
       含 annotations），再造第三套是跟自己已经发货的依赖竞争。当前"三家 Cloud + 两家 `cubex-command`
       + 其余裸 Bukkit"的分裂本身才是要消灭的东西
@@ -606,16 +685,33 @@ graph TD
 
 对内 + AI 定位下这两项**杠杆最高**，而且互相验证——脚手架生成的骨架就是 cookbook 的第一篇。
 
-- [ ] **`createPlugin` Gradle 任务**：参数 `--name` / `--package` / `--mode=embedded|external` / `--modules`。
-      要自动完成的正是最容易漏、漏了就炸的几步：`settings.gradle.kts` 注册、
-      `CubexRelocations.kt` 的 pluginId（漏了 shadowJar 报 `Key X missing`）、按模式生成 `plugin.yml`、
-      目录与主类骨架、基础单测。**外置模式下根本不需要 relocation 登记**——这本身就是外置模式的好处之一
-- [ ] **脚手架必须处理 [`mirror.yml`](.github/workflows/mirror.yml) 的 `repos` 数组**：该脚本是
-      `set -euo pipefail`，对不存在的目标 repo 执行 `git ls-remote` 会让整个 job 失败。
-      内部插件通常**不该**进镜像列表，脚手架要默认按"不进"处理并明确告知
-- [ ] **`docs/cookbook/`**：每篇 30–50 行，**可编译、带单测、随 `gradlew build` 一起跑**。
-      这是唯一不会腐烂的 grounding 数据——过期立刻变红。§3.2 (d) 已把它写成新能力的准入条件
-- [ ] 首批范例跟着 §7.4 的下沉项走，一项能力配一篇
+- [x] **`createPlugin` Gradle 任务**（2026-08-19）：
+      `gradlew createPlugin -PpluginName=MyPlugin [-Pmode=embedded|external] [-Pmodules=core,config,i18n] [-Ppackage=...]`。
+      属性名用 `pluginName` 而非 `name`——后者与 Gradle 自己的 `project.name` 相撞。
+      自动完成最容易漏、漏了就炸的几步：`settings.gradle.kts` 登记、`CubexRelocations.kt` 的 pluginId
+      （漏了 shadowJar 报 `Key X missing`）、按模式生成 `plugin.yml`、目录与主类骨架、冒烟单测。
+      纯逻辑在 `buildSrc/CubexScaffold.kt`，**11 条单测**覆盖命名校验、模块归一化、两种模式的产物差异、
+      两处登记的插入与幂等。端到端验证：生成 → 编译 → 单测 → EXTERNAL 门禁全绿，零手工步骤
+- [x] **脚手架对 [`mirror.yml`](.github/workflows/mirror.yml) 的 `repos` 数组只做提醒、不自动改**：
+      该脚本是 `set -euo pipefail`，对不存在的目标 repo 执行 `git ls-remote` 会让整个 job 失败。
+      内部插件**不该**进镜像列表，所以自动添加才是错的；任务在结尾打印这条约束
+- [x] **`cookbook/`**（2026-08-19，路径由 `docs/cookbook/` 改为 `cookbook/`——它是 Gradle 子项目，
+      不是纯文档）：每篇 30–50 行，**可编译、带单测、随 `gradlew build` 一起跑**。
+      这是唯一不会腐烂的 grounding 数据——过期立刻变红。§3.2 (d) 已把它写成新能力的准入条件。
+      已落地第 01 篇 `hello-external`（外置模式 + 配置 + 命令 + 3 条单测），索引见 `cookbook/README.md`
+- [x] **首批范例已补齐**（2026-08-19）：§3.2 (d) 要求每项下沉能力都要有可编译范例，
+      本轮下沉的 6 项能力现在都覆盖到了 ——
+      **03 `daily-reward`**（`onEvent` + `Cooldown`）·
+      **04 `soulbound-tool`**（`CubexPdc` + `PlayerItems`）·
+      **05 `rename-menu`**（`Menu` + `fillEmpty` + `ChatInputState` + `ModernChatBridge`）。
+      连同已有的 01 `hello-external`（外置）与 02 `welcome-back`（**内嵌**，让默认模式也有覆盖）共 5 篇；
+      纯逻辑都抽成不依赖 Bukkit 的对象并配单测
+- [x] **修根构建的聚合任务**（2026-08-19）：`include(":cookbook:hello-external")` 会顺带创建一个
+      **没有构建脚本的容器项目 `:cookbook`**，而 `shadowJarAll`/`jarGateAll`/`buildAllPlugins`/`cleanAll`
+      都假设每个子项目都有对应任务，直接报 `Task with path ':cookbook:jarGate' not found`。
+      已改为先按 `buildFile.isFile` 过滤真实项目
+- [x] **CI 改用 `jarGateAll`**（2026-08-19）：`build.yml` 原先只按**手写的 matrix 清单**逐个跑
+      `jarGate`，新增子项目必然漏。改为在聚合 job 里跑一次 `jarGateAll`，自动覆盖全部子项目
 
 ### 7.4 无状态能力下沉（原 DX-6 + DX-4，按 §3.2 重新筛过）
 
@@ -623,18 +719,131 @@ graph TD
 
 | 能力 | 实测使用方 | 结论 |
 |---|---|---|
-| **ChatInput**（Paper `AsyncChatEvent` + legacy 双监听、去重、超时、提示词） | Contract · EcoBalancer · Regions · Metro/Railway(同源=1) = **4** | ✅ 最该做的一条 |
-| **PDC 读写扩展** | BookLite · MountLicense · RuleGems · Clarity · Metro/Railway = **5** | ✅ |
-| **`Cooldown`**（含剩余时长渲染） | Contract · RuleGems · MountLicense · Metro/Railway 均有冷却逻辑 | ✅ |
-| **时长解析 / 格式化** | StateCharge `TimeFormat` · Contract `formatRemainingTime` = **2** | ✅ 但原条目写的来源不对：EcoBalancer 那处是 `formatTimestamp`（时间戳≠时长），Metro 没有 |
-| **`InventoryWalker`**（递归背包 / 装备 / 末影箱 / 容器） | Clarity = 1，但属通用能力 | ⚠️ 低优先级保留，走 §3.2 (a) 的"下一个插件会用到"分支 |
+| **ChatInput**（Paper `AsyncChatEvent` + legacy 双监听、去重、超时、提示词） | Contract · EcoBalancer · Regions · Metro/Railway(同源=1) = **4** | ✅ 已下沉，Contract 已切换 |
+| **PDC 读写扩展** | BookLite · MountLicense · RuleGems · Clarity · Metro/Railway · Contract = **6** | ✅ 已下沉，MountLicense 已切换 |
+| **`Cooldown`**（含剩余时长渲染） | **订正**：逐个看源码后只有 **RuleGems** 有运行时按玩家冷却（`GemNavigator`、`GemIntelBroadcaster` 两份内存实现 + `RevokeFeature` 一份落盘的）。Contract 里的 "cooldown" 是**领域配置**（`repeat-cooldown-hours`），不是限流器 | ✅ 已下沉（1 个插件 + 2 份内部重复 + 通用能力），RuleGems 两处已切换 |
+| ~~**时长解析 / 格式化**~~ | **订正后不做**：两份**形状不同**——StateCharge `TimeFormat` 由单位标签拼字符串（"1小时1分1秒"），Contract `formatRemainingTime` 是在 3 个 i18n 句子模板里**选一个**（`duration-minutes` / `duration-hours` / `duration-hours-minutes`）。合并必然改掉其中一方的玩家可见文案 | ❌ §3.2 (a) 不满足：可复用的形状只有 1 份 |
+| **`InventoryWalker`**（递归背包 / 装备 / 末影箱 / 容器） | Clarity = 1，但属通用能力 | ✅ 已下沉为 `PlayerItems`，Clarity 已切换 |
 | ~~`SoundUtil.playNoteSequence`~~ | **只有 Metro/Railway，同源同一份代码 = 1** | ❌ 与 §3.1 否决 `MinecraftVersion` 同一条理由 |
 | ~~`FastScoreboard`~~ | Metro/Railway 已 shade **scoreboardlibrary** | ❌ §3.2 (b)：封装已有库，不重造 |
 
-- [ ] 做 ChatInput 时顺手修掉一个实测到的问题：
-      [`EcoBalancer/GuiManager.kt`](EcoBalancer/src/main/java/org/cubexmc/ecobalancer/gui/GuiManager.kt)
-      只监听 legacy `AsyncPlayerChatEvent`，没监听 Paper `AsyncChatEvent`。只要它装着，
-      Paper 就对**全服**走 legacy 聊天链路——这正是 §5.2 决策 11 描述的坑的另一半
+#### `cubex-economy` —— 消费后的钱去哪（2026-08-21 落地）
+
+**问题**：CubeX 的经济是内循环的（玩家消费 → 钱进服务器账户），但按源码数下来
+**六个插件六种做法**：EcoBalancer 有 `tax-account` 并真的入账；Metro/Railway 转给线路 owner、
+没设 owner 就蒸发；Contract 的 `SYSTEM_SINK` 只累加进 `outcome.toSink` 记日志、钱蒸发；
+MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer 外全是漏斗，
+货币总量单向下降。同时 Contract 与 StateCharge 的 `EconomyService` 是**逐行照抄**的两份副本。
+
+**§3.2 判据**：(a) 真实使用方 5~6 个 ✅；(b) Vault 已是经济抽象，本模块只封装不重造 ✅；
+(c) **无状态**——只有"配置解析出的入账目标"，可以 shade ✅；(d) 首个消费方 StateCharge 已切换 ✅。
+
+- [x] **`modules/cubex-economy`**（[`VaultEconomy`](modules/cubex-economy/src/main/kotlin/org/cubexmc/economy/VaultEconomy.kt) ·
+      [`EconomyAccount`](modules/cubex-economy/src/main/kotlin/org/cubexmc/economy/EconomyAccount.kt) ·
+      `OfflinePlayerLookup` · `EconomyResult`，24 条单测）。
+      统一配置键 **`economy.account`**：空 = 销毁（旧行为）· `uuid:<uuid>` / 裸 UUID ·
+      `name:<名字>` · `<玩家名>` · `bank:<名字>`。
+      两条写进类注释与单测的语义：
+      **① `charge()` 扣款成功后一律不回滚**（玩家已消费掉服务，退款等于白送；入账失败记 WARNING +
+      `depositFailed()`，这是唯一让货币总量下降的路径，必须留痕）；
+      **② 按名字解析会识别出"编造的 UUID"并拒绝入账** —— profile 查不到时 Bukkit 不会失败，
+      而是按 `UUID.nameUUIDFromBytes("OfflinePlayer:" + name)` 编造一个 v3 UUID，那是另一个账户。
+      模块复刻了这个算法做比对（比看版本号精确，也不受代理服 `online-mode=false` 但 UUID 是 v4 的情况干扰），
+      只有离线模式服务器上编造的 UUID 才被接受。解析走
+      在线玩家 → Paper `getOfflinePlayerIfCached`（纯查 usercache，反射，Spigot 上跳过）→
+      `getOfflinePlayer(name)`（在线模式下即一次 profile 查询），
+      **不用** `Bukkit.getOfflinePlayers()`（每次调用要列一遍 `playerdata` 目录）
+- [x] **`name:<名字>` 形态**（2026-08-21 追加）：**Vault 的 `Economy` 接口没有任何返回 UUID 的方法**
+      （只有 name 重载与 `OfflinePlayer` 重载），所以"用 Vault 查 UUID"做不到；
+      但反过来可以**根本不查** —— 名字原样进 `depositPlayer(String, double)`，
+      由经济插件用它自己的 name↔账户映射去认（EssentialsX / CMI 都有这张表）。
+      这是**从不登录的虚拟银行账户**（CubeX 的 `cubex_bank` 就是）最短的一条路。
+      代价是无从核对钱进了哪个账户，启动时只能用 `hasAccount(String)` 确认经济插件认得这个名字
+- [x] **`useAccount` 在配置没变且上次解析成功时跳过重解析**：避免每次 `/reload` 都触发一次
+      阻塞的 profile 查询；上次失败则一定重试，服主修好配置或 profile 服务恢复后一次 reload 就能救回来
+- [x] **`toResult` 接受 null 响应**：`Economy` 是第三方实现，返回 null 会让扣款路径抛 NPE，
+      而调用方（按周期结算的计时器）那时已经把累计清掉了 —— 结果是"既没扣到钱也没留下痕迹"。
+      当成失败处理才有日志可查。`format` 同理
+- [x] **StateCharge 已切换**：删掉本地 `economy/EconomyService.kt`，`config.yml` 升到 v2
+      并带 `economy.account` 的迁移步骤；`applyEconomyAccount()` 在 enable 与 reload 各解析一次
+      （名字解析要查 usercache/存档，不能落进每分钟一次的结算里）
+- ⚠️ **包名撞车（已知、暂时无害）**：模块包名由模块名机械推导为 `org/cubexmc/economy/`，
+      而 RuleGems 自带一个同包的 `org.cubexmc.economy.EconomyProvider`。今天不炸
+      （RuleGems 是 EMBEDDED、release 17，`jarGate` 已实测通过），但它会在 RuleGems 改打包模式时炸。
+      RuleGems 迁到本模块时这个类会被删掉，撞车随之消失
+- [ ] **其余消费方迁移**（每个都是独立提交，不要和玩法改动混在一起）：
+      - [ ] **MountLicense**：最简单，一处 `withdraw`，与 StateCharge 同形
+      - [ ] **Metro / Railway**：现有"有 owner 转 owner"的行为要保留，`economy.account` 只接管 owner 缺席的分支
+      - [ ] **RuleGems**：把 `EconomyProvider.transfer` 的补偿回滚语义搬进模块（它是全仓唯一正确处理
+            "Vault 没有跨账户事务"的实现），顺带修掉 `resolveAccounts` 里的
+            `Bukkit.getOfflinePlayers()`（主线程 O(存档数)，且一次转账要扫两遍）
+      - [ ] **EcoBalancer**：已能工作，最后再迁，且必须保持 `tax-account` / `tax-account-name` 键兼容
+      - [ ] **Contract**：`SYSTEM_SINK` 接入本模块 —— **等 §4 R1 真钱故障注入验证之后再动**
+
+#### 已下沉的其余项（2026-08-19）
+
+- [x] **PDC 读写扩展**（[`CubexPdc.kt`](modules/cubex-core/src/main/kotlin/org/cubexmc/core/CubexPdc.kt)，7 条单测）：
+      `hasFlag`/`setFlag`/`clearFlag`（BYTE 当布尔）· `getUuid`/`setUuid` · `getEnum`/`setEnum` ·
+      `getStringOr`/`getIntOr`/`getLongOr`。
+      重点不是少打字，是把"**外部数据不可信**"收敛到一处——PDC 内容可被手改、被别的插件写坏、被迁移留半截。
+      现状是 MountLicense 为此写了**四处一模一样**的 `try/catch UUID.fromString`，而枚举名解析各处**完全没有防护**
+      （`valueOf` 遇到已删除的枚举项会抛）。MountLicense 的 4 处已切换，其余插件的机械替换未做
+- [x] **`Cooldown`**（[`Cooldown.kt`](modules/cubex-core/src/main/kotlin/org/cubexmc/core/Cooldown.kt)，10 条单测）：
+      时长是 supplier（reload 立刻生效）、`<= 0` 表示不设冷却、被拒绝的尝试**不**续期、
+      `remainingSeconds` 向上取整并与下沉前的算法逐值对齐（单测锁住）。RuleGems 两处已切换
+- [x] **`PlayerItems` / `ItemSlot`**（[`PlayerItems.kt`](modules/cubex-core/src/main/kotlin/org/cubexmc/core/PlayerItems.kt)，8 条单测）：
+      枚举玩家身上的物品位置，每个 [`ItemSlot`] **自带写回的 setter** —— 主手、副手、四件盔甲、
+      背包下标、末影箱各有各的 setter，调用方不必再关心"这一格该用哪个 API 放回去"。
+      故意**不**把 Clarity 的 `ItemScope` 枚举一起搬（那是它命令行的语义），模块只出可组合的收集器。
+      标签格式（`hand` / `equipment[helmet]` / `inventory[12]`）逐字保持，因为会出现在命令输出里。
+      Clarity 已切换 —— 顺带成了 §6 那个 jarGate 修复的实证：Clarity 是 release 21(major 65)，
+      现在真的在消费 major 61 的共享模块类，门禁分开校验、通过
+- [x] **`onEvent<T>`**（§7.2）：见上
+
+#### ChatInput 下沉进度（2026-08-19）
+
+**先说一条审计订正**：此前记录以为只有 EcoBalancer 是 legacy-only。按源码逐个数完，实际是
+**5 家里有 4 家只监听 legacy**——Contract、EcoBalancer、Metro、Railway 都只监听
+`AsyncPlayerChatEvent`，**只有 Regions 两个都监听**。这正是把它下沉的最强理由：
+"两个都要听 + 去重"是个每家都要重写、而且四家都写错了的东西。
+
+- [x] **纯状态机下沉到 `cubex-gui`**（[`ChatInputState.kt`](modules/cubex-gui/src/main/kotlin/org/cubexmc/gui/chat/ChatInputState.kt)，11 条单测）：
+      提问、超时、`cancel`/`clear` 关键字、两条链路去重。**不碰 Bukkit**，所以能被完整单测覆盖。
+      去重形状取自 Regions（唯一正确的那份）。按载荷泛型化，回调跟提问一起被顶掉，不会悬挂
+- [x] **平台相关的部分留在插件里**：共享模块编译到 spigot-api 1.18，引不进 Paper 的
+      `AsyncChatEvent`；给模块加 paper-api 会让 1.21 的 API 悄悄漏进所有 1.18 目标的插件。
+      所以模块只出状态机，事件接线与主线程回跳由插件自己写（约 20 行）
+- [x] **5 家全部切换完成**（2026-08-19）：
+
+      | 插件 | 适配层 | 顺带修掉的问题 |
+      |---|---|---|
+      | Contract | `ChatInputService`，36 个调用点 API 一字未改 | **补上了缺失的 `AsyncChatEvent` 监听** |
+      | Metro / Railway | `ChatInputManager`，两边现在**逐字节相同**（原本 import 顺序与花括号风格有别） | 待处理表原是普通 `HashMap` 却被**异步**聊天线程读写 |
+      | EcoBalancer | `GuiManager` 内联段抽成 `deliverChatInput` | 同上的 `HashMap` 并发问题；另补了退出清理 |
+      | Regions | `RegionsGui.capture` | 无（它本来就是对的，去掉的是重复实现） |
+
+      模块为此加了两项能力（各带测试）：**取消关键字做成 supplier**
+      （EcoBalancer 从语言文件读、reload 要跟着变；Metro 还要认本地化的“取消”；Regions 认
+      `gui.prompt.cancel-word`），以及 **`timeoutMillis <= 0` 表示永不超时**
+      （Metro/Railway/EcoBalancer/Regions 的提问本来就没有超时；直接加 `Long.MAX_VALUE` 会溢出成负数、
+      反而立刻判超时）
+- [x] **EcoBalancer / Metro / Railway 也补上了现代事件监听**（2026-08-19，**不需要换编译目标**）：
+      走 [`ModernChatBridge`](modules/cubex-gui/src/main/kotlin/org/cubexmc/gui/chat/ModernChatBridge.kt)
+      的反射注册 —— 事件类 `Class.forName`，`EventExecutor` 收到的是基类 `Event`，
+      全程没有编译期的 Paper 引用。Paper 上两条链路都接住，Spigot 上安静跳过（3 条单测锁住降级行为）。
+
+      **反射不是图省事，是唯一可行的路**：这三家都把 `net.kyori` relocate 进了自己的命名空间，
+      编译期的 `Component` 与服务器传给事件的 `Component` 是**两个不同的类**，
+      就算换成 paper-api 直接调用也会 `NoSuchMethodError`。又一次 **relocate 隔离的是类，不是运行时对象**。
+      模块自己不依赖 Adventure，反射按名字解析到的就是服务器那一份，两边对得上
+
+      > ⚠️ **这不等于"Paper 会改走现代事件"**：只要服务器上还有**任何**插件监听 legacy
+      > （CMI 很常见，这三家自己为了 Spigot 兼容也还在监听），Paper 就对全服走 legacy 链路，
+      > 现代事件一次都不触发。补它换来的是**两条链路哪条来都能接住**，
+      > 以及将来 Paper 移除 legacy 桥接时不会突然失灵
+- [ ] Contract / Regions 维持各自的 `@EventHandler` 直连（它们编译到 paper-api、不 relocate Adventure，
+      直连更清楚）。**不要**为了统一而把它们也改成反射
+- [x] cookbook 范例已补（§3.2 (d)）：04 `rename-menu` 覆盖 `ChatInputState` 与 `ModernChatBridge`
 
 ### 7.5 有状态能力（原 DX-7，改形态并推后）
 
@@ -645,9 +854,12 @@ graph TD
 - [ ] **quest**：行为目标追踪（来源：Contract `ObjectiveListener`）。
       ⚠️ **目前只有 1 个真实使用方**——EcoBalancer 事件税（§4 R2）还没开工，
       在 R2 落地前不满足 §3.2 (a)，先不动
-- [ ] **economy**：事务经济与审计流水（来源：EcoBalancer `TaxLedgerService` + Contract `EconomyEngine`）。
+- [ ] **economy（有状态那一半）**：事务经济与审计流水（来源：EcoBalancer `TaxLedgerService` + Contract `EconomyEngine`）。
       **必须排在 §4 R1 真钱故障注入验证之后**——`EconomyEngine` 承载 §5.1 那四条跨阶段不变量，
-      在唯一的正确性证据到位之前把它抽出来重构，等于把风险最高的代码放在验证最少的时刻动
+      在唯一的正确性证据到位之前把它抽出来重构，等于把风险最高的代码放在验证最少的时刻动。
+      ⚠️ **2026-08-21 拆分**：本条只剩"账本 / 流水"这一半。无状态的那一半
+      （Vault 封装 + `economy.account` 入账路由）已按 §7.4 落成 `modules/cubex-economy`，
+      **不受本条推后约束** —— 它不持有跨插件状态，也不碰 `EconomyEngine` 的不变量
 
 ### 7.6 AI 协作上下文（原 DX-3 改形态）
 

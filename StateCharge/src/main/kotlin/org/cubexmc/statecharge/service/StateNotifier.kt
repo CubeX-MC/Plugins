@@ -1,14 +1,22 @@
 package org.cubexmc.statecharge.service
 
+import java.math.BigDecimal
 import org.bukkit.entity.Player
 
 /**
- * 计时提醒的挂点:服务层只报告剩余秒数变化,由实现决定提醒策略(阈值/actionbar 等)。
+ * 计费过程中**玩家没有主动发起**的那几件事的挂点。
+ *
+ * toggle 开/关的即时反馈由命令层与 GUI 自己发——那是玩家点出来的，不该绕一层。
+ * 这里只管"自己冒出来"的三件：周期扣款、扣款失败、余额保险触发。
  */
 interface StateNotifier {
-    /** 剩余时长变化时回调(每秒一次)。 */
-    fun onTick(player: Player, stateId: String, remainingSeconds: Long)
 
-    /** 状态到期。 */
-    fun expired(player: Player, stateId: String)
+    /** 一次结算成功。[seconds] 是本次结算覆盖的开启时长。 */
+    fun charged(player: Player, stateId: String, seconds: Long, amount: BigDecimal)
+
+    /** 扣款失败，该状态已被强制关闭。 */
+    fun chargeFailed(player: Player, stateId: String)
+
+    /** 余额跌破保险阈值，[turnedOff] 里的状态已被自动关闭。 */
+    fun guardTriggered(player: Player, turnedOff: List<String>)
 }

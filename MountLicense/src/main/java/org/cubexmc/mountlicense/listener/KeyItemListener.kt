@@ -24,7 +24,15 @@ class KeyItemListener(
     private val recall: RecallService,
     private val lang: LanguageManager,
 ) : Listener {
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    /**
+     * 朝天右键钥匙 → 召回载具。
+     *
+     * **不能加 `ignoreCancelled = true`**:`PlayerInteractEvent.isCancelled()` 返回的是
+     * `useInteractedBlock() == DENY`,而空右键根本没有方块可交互、该值默认就是 DENY——
+     * 事件因此恒为"已取消",带 `ignoreCancelled` 的处理器一次都不会触发。
+     * 这里已经用 action 与 isKey 做了足够收窄,不需要再靠 ignoreCancelled 过滤。
+     */
+    @EventHandler(priority = EventPriority.HIGH)
     fun onAirInteract(event: PlayerInteractEvent) {
         if (event.hand != EquipmentSlot.HAND) return
         if (event.action != Action.RIGHT_CLICK_AIR) return
