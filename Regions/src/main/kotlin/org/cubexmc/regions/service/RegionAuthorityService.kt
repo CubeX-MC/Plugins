@@ -47,9 +47,22 @@ class RegionAuthorityService(
         return AuthorityDecision.deny(AuthorityDenial.NOT_RULER)
     }
 
-    fun canUseGlobalAdministration(sender: CommandSender): AuthorityDecision =
-        if (isSuperAdmin(sender)) AuthorityDecision.allow()
-        else AuthorityDecision.deny(AuthorityDenial.SUPERADMIN_REQUIRED)
+    /**
+     * 全服级管理操作(reload / inspect / cleanup / doctor)。
+     *
+     * 超管始终通过。此外可以只发 [permission] 这**一个**细粒度节点做定向授权 ——
+     * `plugin.yml` 早就声明了 `regions.reload` / `regions.inspect` / `regions.cleanup`,
+     * 但此前这里只看超管,给这几个节点等于什么都没给(与 `regions.use` 是同一类死节点)。
+     *
+     * **不给统治者开口子**:这些是全服级操作,和 [canManage] 的"能管自己的场地"不是一回事。
+     * 传 null 表示该操作没有细粒度节点,只有超管能用。
+     */
+    fun canUseGlobalAdministration(sender: CommandSender, permission: String? = null): AuthorityDecision =
+        if (isSuperAdmin(sender) || (permission != null && sender.hasPermission(permission))) {
+            AuthorityDecision.allow()
+        } else {
+            AuthorityDecision.deny(AuthorityDenial.SUPERADMIN_REQUIRED)
+        }
 
     fun canCreate(sender: CommandSender, sourceRef: RegionSourceRef): AuthorityDecision =
         authorizeSource(sender, sourceRef)

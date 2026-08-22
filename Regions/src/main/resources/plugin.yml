@@ -24,7 +24,6 @@ permissions:
       regions.region.remove: true
       regions.region.enable: true
       regions.region.bind: true
-      regions.template.apply: true
       regions.validate: true
       regions.region.publish: true
       regions.region.rollback: true
@@ -41,7 +40,9 @@ permissions:
       regions.bypass.flags: true
   regions.reload:
     default: op
-    description: Reload Regions.
+    description: >-
+      Reload Regions. Grantable on its own: holders do not need the full
+      regions.superadmin. Rulers do NOT get it implicitly.
   regions.region.create:
     default: op
     description: Create Regions.
@@ -66,15 +67,16 @@ permissions:
   regions.region.archive:
     default: op
     description: Archive owned Regions.
-  regions.template.apply:
-    default: op
-    description: Apply Region templates.
   regions.inspect:
     default: op
-    description: Inspect player Region sessions.
+    description: >-
+      Inspect player Region sessions. Grantable on its own: holders do not need
+      the full regions.superadmin. Rulers do NOT get it implicitly.
   regions.cleanup:
     default: op
-    description: Cleanup player Region state.
+    description: >-
+      Cleanup player Region state. Grantable on its own: holders do not need the
+      full regions.superadmin. Rulers do NOT get it implicitly.
   regions.validate:
     default: op
     description: Validate Region configuration.

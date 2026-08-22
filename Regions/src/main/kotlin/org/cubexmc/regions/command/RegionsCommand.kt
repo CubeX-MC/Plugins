@@ -659,7 +659,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
     }
 
     private fun reload(sender: CommandSender): Boolean {
-        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
+        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender, RELOAD_PERMISSION))) {
             return true
         }
         val report = plugin.reloadRegions()
@@ -702,7 +702,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
     }
 
     private fun inspect(sender: CommandSender, args: Array<String>): Boolean {
-        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
+        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender, INSPECT_PERMISSION))) {
             return true
         }
         if (args.size < 2) {
@@ -734,7 +734,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
     }
 
     private fun cleanup(sender: CommandSender, args: Array<String>): Boolean {
-        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
+        if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender, CLEANUP_PERMISSION))) {
             return true
         }
         if (args.size < 2) {
@@ -755,6 +755,7 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         return true
     }
 
+    // doctor 没有自己的细粒度节点(plugin.yml 里也没声明过),所以只有超管能用。
     private fun doctor(sender: CommandSender): Boolean {
         if (!allow(sender, plugin.authority().canUseGlobalAdministration(sender))) {
             return true
@@ -949,6 +950,11 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
         /** 玩家侧总开关:没有它就不能参与别人场地的活动。 */
         const val USE_PERMISSION = "regions.use"
 
+        // 全服级操作的细粒度节点:发了其中一个就能只做那一件事,不必给整个 regions.superadmin。
+        const val RELOAD_PERMISSION = "regions.reload"
+        const val INSPECT_PERMISSION = "regions.inspect"
+        const val CLEANUP_PERMISSION = "regions.cleanup"
+
         private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
             .withZone(ZoneId.systemDefault())
     }
@@ -957,7 +963,6 @@ class RegionsCommand(private val plugin: RegionsPlugin) : BasicCommand {
 internal fun regionRootSuggestions(canManage: Boolean, args: Array<out String>): List<String>? {
     val commands = if (canManage) MANAGEMENT_ROOT_COMMANDS else PLAYER_ROOT_COMMANDS
     return CubexCommandSuggestions.root(args, commands)?.sorted()?.take(20)
-
 }
 
 private val MANAGEMENT_ROOT_COMMANDS = listOf(
