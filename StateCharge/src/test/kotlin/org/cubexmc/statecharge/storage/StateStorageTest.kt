@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -210,5 +211,16 @@ class StateStorageTest {
         recovered.load()
 
         assertTrue(recovered.isActive(player, "small"))
+    }
+
+    @Test
+    fun `unreadable primary and backup fail closed and preserve live state`() {
+        val storage = storage()
+        storage.setActive(player, "fly", true)
+        File(tempDir, StateStorage.FILE_NAME).writeText("{broken", StandardCharsets.UTF_8)
+        File(tempDir, StateStorage.FILE_NAME + ".bak").writeText("{also-broken", StandardCharsets.UTF_8)
+
+        assertThrows(IllegalStateException::class.java) { storage.load() }
+        assertTrue(storage.isActive(player, "fly"))
     }
 }

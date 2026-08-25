@@ -38,7 +38,7 @@
 | `cubex-core` | `CubexPlugin` 生命周期；store 经 `bind()` 走 `Terminable`；`log()`/`messager()`/`text()` |
 | `cubex-config` | `ResourceFiles` 保存默认文件；`MigrationRunner` 跑 config/lang 迁移；`ReloadChain` 做 `/statecharge admin reload` |
 | `cubex-i18n` | 一个 `I18nService`（MiniMessage 渲染成 legacy § 输出，与 Contract 相同，`player.sendMessage(String)` 直接可用） |
-| `cubex-scheduler` | `CubexScheduler`：1s 全局计时器 + 所有实体操作经 `runAtEntity`（Folia 安全） |
+| `cubex-scheduler` | `CubexScheduler`：全局计时器只枚举在线玩家；累计、Vault 交易和实体操作均经 `runAtEntity`（Folia 安全） |
 | `cubex-economy` | `VaultEconomy`：Vault 封装 + `economy.account` 入账路由；StateCharge 是它的首个消费方 |
 
 包结构（`org.cubexmc.statecharge`）：
@@ -87,11 +87,11 @@ interface StateEffect {
 }
 ```
 
-- `ScaleEffect(scale)`：start/reapply = `Attribute.SCALE.baseValue = scale`；remove = 恢复 1.0。
+- `ScaleEffect(id, scale)`：经 `PlayerStateLeaseStack` 写入 `scale` 层；remove 只弹出自己的层，
+  恢复下一层或首次施加前的基线。
   值域校验 0.1..16.0(属性本身的 clamp 范围 0.0625..16)。
-- `FlightEffect(autoStart)`：start = `allowFlight = true`（autoStart 时再 `isFlying = true`）；
-  reapply 只补 `allowFlight`（不强制玩家保持飞行，玩家可自行落地）；remove 时
-  creative/spectator 或持有 `statecharge.fly.keep` 权限的玩家保留飞行，否则双开关关闭。
+- `FlightEffect(id, autoStart)`：`allowFlight` 同样走共享 lease 栈；autoStart 只在首次开启时起飞，
+  reapply 不强迫玩家保持飞行。移除后仍遵守 creative/spectator 与 `statecharge.fly.keep`。
 
 ### 4.3 计时模型
 

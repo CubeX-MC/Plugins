@@ -4,6 +4,7 @@ main: org.cubexmc.reputations.ReputationsPlugin
 api-version: '1.18'
 author: CubeX-MC
 description: Shared player reputation service. Other plugins register fields and update them via the API (Vault-style, ServicesManager).
+softdepend: [PlaceholderAPI]
 
 commands:
   reputation:
@@ -14,7 +15,7 @@ commands:
 permissions:
   reputation.use:
     default: true
-    description: View reputation profiles.
+    description: View reputation profiles and leaderboards.
   reputation.admin:
     default: op
     description: Set, add or reset reputation values and reload.

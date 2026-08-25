@@ -46,7 +46,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 - **跨插件 API 面不得出现任何 Kotlin 类型**：jarGate 强制每个插件把 `kotlin/**` relocate 进自己的命名空间，
   因此 `kotlin.Unit`、Kotlin 函数类型（**所有 lambda / 回调**）、`Result` 在两侧是**不同的类**，连接必然失败。
   只能用 `String`/`double`/`UUID`/`java.util.*`/Bukkit 类型/provider 自己包里的接口与 data class——
-  这就是 `org.cubexmc.reputations.api` 那 3 个文件是 Java 的原因。
+  这就是 `org.cubexmc.reputations.api` 这些文件是 Java 的原因。
   **回调式 API 跨不过这条边界**；需要通知就用 Bukkit 事件或轮询。
 - **可选连接不是依赖**：通过 `cubex-integrations` 使用提供方插件 ClassLoader 解析 Bukkit service；消费方不 `implementation`/`compileOnly` 另一个插件，也不 shade 对方 API。`softdepend` 只用于可选加载顺序。
 - **新插件要加进 `buildSrc/src/main/kotlin/CubexRelocations.kt` 的 pluginIds**，否则 shadowJar 报 `Key X missing`。
@@ -82,7 +82,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 ## 已定决策（别"顺手修"）
 
 - **Railway 的源码包就是 `org.cubexmc.metro`，主类 `org.cubexmc.metro.Metro`，与 Metro 完全同名——这是有意保留的**（2026-08-02 用户确认）。理由：Metro 的线路控制等功能更新可以直接搬到 Railway；Metro 与 Railway **本就不支持同时安装**。同理 Railway 的 `build.gradle.kts` 把 cloud / scoreboardlibrary / geantyref relocate 到 `org.cubexmc.metro.lib.*` 也**不要改**。
-- **Reputations 的 3 个 `.java` 是故意的 Java API 面**（`org.cubexmc.reputations.api`），不要迁 Kotlin。
+- **Reputations 的 4 个 `.java` 是故意的 Java API 面**（`org.cubexmc.reputations.api`），不要迁 Kotlin。
 - **Contract 的 Regions escrow API 是 provider-owned Kotlin API 面**：Regions 只能经 `cubex-integrations` 反射连接，不能增加 Contract 项目依赖；资金 operation id 和两边 lease/metadata 不得绕过。
 - **Clarity 编译到 Java 21**（用 1.21 属性 API），全仓其余插件是 17；`jarGate` 已按各插件的 java release 分别校验。
 

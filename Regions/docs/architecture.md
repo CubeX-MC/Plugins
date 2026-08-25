@@ -12,7 +12,7 @@
 
 ## 状态所有权
 
-- `ScopedEffectService` 是临时属性、药水、飞行、发光和隐身抑制的唯一所有者。每次应用都会记录原值和 scope；lease 原子写入 `effect-escrow.yml`。一次解析出的整组 Effect 合并为一次 escrow 写入，任一失败则整组回滚，玩家不会停留在半应用状态。
+- `ScopedEffectService` 是 Regions 临时属性、药水、飞行、发光和隐身抑制的唯一所有者。每次应用都会记录原值和 scope；lease 原子写入 `effect-escrow.yml`。`scale` 与 `allow_flight` 还通过玩家 PDC 中的 CubeX lease 栈和其他内嵌插件协调，移除非顶层 lease 不会覆盖仍生效的控制方。一次解析出的整组 Effect 合并为一次 escrow 写入，任一失败则整组回滚，玩家不会停留在半应用状态。
 - 没有可取消事件的 `deny` Flag 由 `RegionOverlapResolver` 合成对应 Effect 再交给 `ScopedEffectService` 托管：`fly: deny` 合成 `allow_flight=false`，`vanish: deny` 合成 `invisibility_suppression`。这类合成 Effect 遵循与 Flag 相同的豁免（`regions.bypass.flags`），且不与创造/旁观模式的飞行争夺控制权。`pvp`、`item_drop`、`item_pickup`、`commands` 由监听器取消事件，不需要 lease。
 - `CombatModeService` 与 `RoundModeService` 在修改装备前把快照原子写入各自 escrow。死亡、退出、强制结束、reload、停服后重启/登录都可恢复。
 - `RaceModeService`、`RoundModeService` 和 `CombatModeService` 的任务闭包持有具体 state 实例。任务执行时重新核对实例，避免旧任务污染新局。
@@ -27,7 +27,7 @@
 
 ## 故障模型
 
-磁盘写入采用临时文件加原子替换（不支持时安全降级）。持久化失败会回滚对应内存变更或玩家变更。Effect 组合只在整组成功后缓存签名，失败组会清理并在下一次刷新重试。审计保存发布、强制操作、模式结束和比赛结果等关键事件。
+磁盘写入采用临时文件加原子替换（不支持时安全降级）。`regions.yml` 与 `reward-funding.yml` 先完整解析到临时快照；任一记录损坏都会使 reload 失败并保留当前内存，禁止跳过坏记录后覆盖原文件。持久化失败会回滚对应内存变更或玩家变更。Effect 组合只在整组成功后缓存签名，失败组会清理并在下一次刷新重试。审计保存发布、强制操作、模式结束和比赛结果等关键事件。
 
-资金 lease 在调用 Contract 前写入 PREPARING/SETTLING/REFUNDING；重启后使用同一 operation id 重放。Contract 返回 `REVIEW_REQUIRED` 时 lease 保留，禁止自动换 operation id 重试。
+资金 lease 在调用 Contract 前写入 PREPARING/SETTLING/REFUNDING；进入 SETTLING 时先持久化比赛类型与获胜方线索，再查询 provider。Contract 暂时不可用时重启/reload 可使用同一 operation id 继续解析胜者并 settle，不会把已经结束的比赛误走退款。Contract 返回 `REVIEW_REQUIRED` 时 lease 保留，禁止自动换 operation id 重试。
 

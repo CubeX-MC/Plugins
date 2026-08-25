@@ -43,6 +43,8 @@ Contract 同样只是可选连接。`dual_pvp` 和 `union_war` 可在 Mode 中�
 
 日常场地变更遵循：创建草稿 → GUI/命令编辑 → `validate`/`preview` → 隔离 `trial` → `publish`。运行时只读取已发布 revision；回滚会生成新 revision，不覆盖历史。
 
+已有场地也可以在详情页点击“应用模板”重新选择预设。确认后，模板会整体替换草稿中的 Mode、Flags、Effects 与 Triggers，不会把上一个模板的提醒或效果带过去；Region ID、名称、来源、所有权、优先级和版本历史保持不变。重新预览并发布前，运行态不会变化。
+
 常用入口：
 
 - `/regions gui`：管理界面

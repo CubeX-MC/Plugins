@@ -135,13 +135,30 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
         }
     }
 
+    fun openTemplatesForRegion(player: Player, regionId: String) {
+        val region = gui.editable(regionId) ?: return gui.openMain(player)
+        if (!gui.canManageRegion(player, region)) return
+        openTemplates(
+            player,
+            TemplateContext(region.id, region.name, region.source, purpose = TemplatePurpose.APPLY),
+        )
+    }
+
     private fun openTemplates(player: Player, context: TemplateContext) {
+        val currentContext = if (context.purpose == TemplatePurpose.APPLY) {
+            val region = gui.editable(context.targetId) ?: return gui.openMain(player)
+            if (!gui.canManageRegion(player, region)) return
+            context.copy(targetName = region.name, source = region.source)
+        } else {
+            context
+        }
         val templates = plugin.templates().all()
         val pageCount = ((templates.size + GuiSlots.TEMPLATE_PAGE_SIZE - 1) / GuiSlots.TEMPLATE_PAGE_SIZE).coerceAtLeast(1)
-        val page = context.page.coerceIn(0, pageCount - 1)
-        val shownContext = context.copy(page = page)
+        val page = currentContext.page.coerceIn(0, pageCount - 1)
+        val shownContext = currentContext.copy(page = page)
+        val holderRegion = currentContext.targetId.takeIf { currentContext.purpose == TemplatePurpose.APPLY }
         val inventory = Bukkit.createInventory(
-            RegionsHolder(View.TEMPLATES, null, template = shownContext),
+            RegionsHolder(View.TEMPLATES, holderRegion, template = shownContext),
             54,
             text.component("gui.template.title", mapOf("page" to (page + 1).toString(), "pages" to pageCount.toString())),
         )
@@ -161,7 +178,13 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
                 listOf(text.text("gui.template.parameters", mapOf("keys" to template.parameters.keys.joinToString(", "))))
             } else {
                 emptyList()
-            }
+            } + text.text(
+                if (currentContext.purpose == TemplatePurpose.APPLY) {
+                    "gui.template.entry.apply-hint"
+                } else {
+                    "gui.template.entry.create-hint"
+                },
+            )
             val item = text.named(
                 items.templateMaterial(template.mode?.type),
                 text.text("gui.template.entry.name", mapOf("name" to template.name)),
@@ -185,7 +208,19 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
                 mapOf("count" to templates.size.toString(), "page" to (page + 1).toString(), "pages" to pageCount.toString()),
             ),
         )
-        inventory.setItem(50, text.named(GuiIcons.BACK, text.text("gui.template.back-to-areas")))
+        inventory.setItem(
+            50,
+            text.named(
+                GuiIcons.BACK,
+                text.text(
+                    if (currentContext.purpose == TemplatePurpose.APPLY) {
+                        "gui.template.back-to-detail"
+                    } else {
+                        "gui.template.back-to-areas"
+                    },
+                ),
+            ),
+        )
         if (page + 1 < pageCount) inventory.setItem(53, text.named(Material.ARROW, text.text("gui.common.next-page")))
         player.openInventory(inventory)
     }
@@ -195,24 +230,33 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
         when (slot) {
             45 -> return openTemplates(player, context.copy(page = context.page - 1))
             53 -> return openTemplates(player, context.copy(page = context.page + 1))
-            50 -> return openOwnedAreas(
-                player,
-                OwnedAreaContext(OwnedAreaPurpose.CREATE, context.targetId, context.targetName),
-            )
+            50 -> return if (context.purpose == TemplatePurpose.APPLY) {
+                gui.openDetail(player, context.targetId)
+            } else {
+                openOwnedAreas(
+                    player,
+                    OwnedAreaContext(OwnedAreaPurpose.CREATE, context.targetId, context.targetName),
+                )
+            }
         }
         if (slot !in 0 until GuiSlots.TEMPLATE_PAGE_SIZE) return
         val templateId = item?.itemMeta?.persistentDataContainer
             ?.get(gui.keys.template, PersistentDataType.STRING) ?: return
-        if (!gui.allow(player, plugin.authority().canCreate(player, context.source))) {
-            text.send(player, "gui.template.owner-changed")
-            return openOwnedAreas(
-                player,
-                OwnedAreaContext(OwnedAreaPurpose.CREATE, context.targetId, context.targetName),
-            )
-        }
-        if (gui.editable(context.targetId) != null) {
-            text.send(player, "gui.create.exists", mapOf("id" to context.targetId))
-            return gui.openMain(player)
+        if (context.purpose == TemplatePurpose.CREATE) {
+            if (!gui.allow(player, plugin.authority().canCreate(player, context.source))) {
+                text.send(player, "gui.template.owner-changed")
+                return openOwnedAreas(
+                    player,
+                    OwnedAreaContext(OwnedAreaPurpose.CREATE, context.targetId, context.targetName),
+                )
+            }
+            if (gui.editable(context.targetId) != null) {
+                text.send(player, "gui.create.exists", mapOf("id" to context.targetId))
+                return gui.openMain(player)
+            }
+        } else {
+            val region = gui.editable(context.targetId) ?: return gui.openMain(player)
+            if (!gui.canManageRegion(player, region)) return
         }
         val template = plugin.templates().find(templateId)
         if (template == null) {
@@ -236,7 +280,7 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
         pending: List<TemplateParameter>,
         collected: Map<String, String>,
     ) {
-        val parameter = pending.firstOrNull() ?: return applyTemplate(player, context, template, collected)
+        val parameter = pending.firstOrNull() ?: return finishTemplateSelection(player, context, template, collected)
         val promptKey = if (parameter.type == TemplateParameterType.LOCATION) {
             "gui.prompt.template-location"
         } else {
@@ -264,12 +308,15 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
         return "${location.world?.name},${location.blockX},${location.blockY},${location.blockZ}"
     }
 
-    private fun applyTemplate(
+    private fun finishTemplateSelection(
         player: Player,
         context: TemplateContext,
         template: RegionTemplate,
         supplied: Map<String, String>,
     ) {
+        if (context.purpose == TemplatePurpose.APPLY) {
+            return openTemplateConfirmation(player, context, template, supplied)
+        }
         // 问参数期间玩家可能已经被撤权，或者这块地被别人先绑走了——写之前重新核一次。
         if (!gui.allow(player, plugin.authority().canCreate(player, context.source))) {
             text.send(player, "gui.template.owner-changed")
@@ -287,6 +334,67 @@ internal class RegionCreationMenu(private val gui: RegionsGui) {
             mode = ModeConfig("free_event"),
         )
         val applied = plugin.templates().apply(template.id, base, supplied)
+        val region = applied.region
+        if (!applied.success || region == null) {
+            text.send(player, "gui.template.failed", mapOf("errors" to applied.errors.joinToString("; ")))
+            return openTemplates(player, context)
+        }
+        gui.saveAndReopen(player, region) { gui.openDetail(player, region.id) }
+    }
+
+    private fun openTemplateConfirmation(
+        player: Player,
+        context: TemplateContext,
+        template: RegionTemplate,
+        supplied: Map<String, String>,
+    ) {
+        val current = gui.editable(context.targetId) ?: return gui.openMain(player)
+        if (!gui.canManageRegion(player, current)) return
+        val applied = plugin.templates().apply(template.id, current, supplied)
+        val candidate = applied.region
+        if (!applied.success || candidate == null) {
+            text.send(player, "gui.template.failed", mapOf("errors" to applied.errors.joinToString("; ")))
+            return openTemplates(player, context)
+        }
+        val inventory = Bukkit.createInventory(
+            RegionsHolder(
+                View.TEMPLATE_CONFIRM,
+                current.id,
+                template = context,
+                templateConfirmation = TemplateConfirmation(template.id, supplied),
+            ),
+            27,
+            text.component("gui.template.confirm.title", mapOf("id" to current.id)),
+        )
+        inventory.setItem(4, items.region(current))
+        inventory.setItem(
+            11,
+            text.item(
+                items.templateMaterial(candidate.mode?.type),
+                "gui.template.confirm.summary",
+                mapOf(
+                    "name" to template.name,
+                    "mode" to (candidate.mode?.type ?: text.text("gui.common.none")),
+                    "flags" to candidate.flags.size.toString(),
+                    "effects" to candidate.effects.size.toString(),
+                    "triggers" to candidate.triggers.values.sumOf { it.size }.toString(),
+                ),
+            ),
+        )
+        inventory.setItem(13, text.item(Material.REDSTONE_BLOCK, "gui.template.confirm.warning"))
+        inventory.setItem(15, text.item(Material.LIME_CONCRETE, "gui.template.confirm.apply"))
+        inventory.setItem(22, items.back())
+        player.openInventory(inventory)
+    }
+
+    fun clickTemplateConfirmation(player: Player, holder: RegionsHolder, slot: Int) {
+        val context = holder.template ?: return gui.openMain(player)
+        if (slot == 22) return openTemplates(player, context)
+        if (slot != 15) return
+        val confirmation = holder.templateConfirmation ?: return openTemplates(player, context)
+        val current = gui.editable(context.targetId) ?: return gui.openMain(player)
+        if (!gui.canManageRegion(player, current)) return
+        val applied = plugin.templates().apply(confirmation.templateId, current, confirmation.supplied)
         val region = applied.region
         if (!applied.success || region == null) {
             text.send(player, "gui.template.failed", mapOf("errors" to applied.errors.joinToString("; ")))

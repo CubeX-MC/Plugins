@@ -26,7 +26,7 @@
 | 全仓验收 | `gradlew build jarGateAll` 全绿（12 插件 + CubeXLib + 9 模块，2026-08-19 复跑） |
 
 遗留 `.java` 仅：vendored bStats `Metrics.java`、Reputations 的公开 Java API
-（`org.cubexmc.reputations.api`，3 个文件，**故意保留**）、Metro/Railway 的互操作 shim。
+（`org.cubexmc.reputations.api`，4 个文件，**故意保留**）、Metro/Railway 的互操作 shim。
 **不要为文件计数迁掉它们。**
 
 ---
@@ -261,7 +261,11 @@ Reputations 目前**只有 Contract 一个消费方**，且尚未公开发布。
 按"可扩展性"预建抽象正是各设计文档反复警告的投机性设计。
 
 保留：
-- [ ] 排行榜 + 信誉变动事件广播 + PlaceholderAPI 占位符（玩家/服主直接可见，单消费方即可验证）
+- [x] 排行榜 + 信誉变动事件广播 + PlaceholderAPI 占位符（2026-08-24）：
+      `/reputation top <field> [page]` 按 `higherIsBetter` 排序，同值共享名次，只纳入该字段已有持久化值的玩家；
+      `ReputationChangeEvent` 是 Java Bukkit 事件，异步调用服务时事件也标记为异步；PAPI identifier
+      为 `reputations`，提供玩家 value/rank 与全服 top name/value，占位查询由 store revision 缓存失效。
+      PlaceholderAPI 维持可选，缺席或注册失败只降级；依赖排除其 Adventure 副本。
 
 移除：
 - ❌ ~~外部属性 provider SPI + 软依赖适配器（Lands 国家/领袖）~~ —— 没有第二个提供方，
@@ -495,7 +499,7 @@ Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线�
 - [ ] **v1 范围外，后续可加**：BossBar 倒计时 · PlaceholderAPI · MySQL ·
       bStats（**需先注册服务 ID**）· 跨服(BungeeCord)同步
 - [ ] **首发前冻结数据基线**（`StateStorage` 存档格式、`config-version`/`lang-version`）：同 §5.2 纪律
-- [ ] 补 `StateCharge/docs/release-checklist.md`
+- [x] 补 `StateCharge/docs/release-checklist.md` 与 `StateCharge/REAL_SERVER_TEST.md`（2026-08-21）
 - [ ] 首发前实服验证
 
 ### 5.9 Clarity（未公开首发）
@@ -510,8 +514,8 @@ Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线�
 
 Vault 模式共享信誉服务，bStats 31877。
 
-- [ ] R3 收窄后的内容：排行榜 + 变动事件广播 + PAPI（见 §4）
-- [ ] **`org.cubexmc.reputations.api` 的 3 个 `.java` 是故意的 Java API 面，不要迁 Kotlin**
+- [x] R3 收窄后的内容：排行榜 + 变动事件广播 + PAPI（2026-08-24，见 §4）
+- [x] **`org.cubexmc.reputations.api` 的 4 个 `.java` 是故意的 Java API 面，不要迁 Kotlin**
 
 ### 5.11 FAWEReplacer（已公开）
 

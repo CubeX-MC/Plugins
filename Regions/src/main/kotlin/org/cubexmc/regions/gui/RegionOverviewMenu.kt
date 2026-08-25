@@ -91,6 +91,7 @@ internal class RegionOverviewMenu(private val gui: RegionsGui) {
             22,
             text.item(GuiIcons.TRIGGER, "gui.detail.triggers", mapOf("count" to region.triggers.values.sumOf { it.size }.toString())),
         )
+        inventory.setItem(24, text.item(Material.KNOWLEDGE_BOOK, "gui.detail.apply-template"))
         inventory.setItem(
             28,
             text.named(
@@ -136,6 +137,7 @@ internal class RegionOverviewMenu(private val gui: RegionsGui) {
             14 -> gui.openFlags(player, region.id)
             16 -> gui.openEffects(player, region.id)
             22 -> gui.openTriggers(player, region.id)
+            24 -> gui.openTemplatesForRegion(player, region.id)
             28 -> gui.saveAndReopen(player, region.copy(enabled = !region.enabled)) { openDetail(player, regionId) }
             30 -> gui.sendValidation(player, region)
             32 -> {

@@ -2,16 +2,18 @@ package org.cubexmc.regions.integration
 
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.UnionRef
+import org.bukkit.plugin.Plugin
 import java.lang.reflect.Method
 import java.util.UUID
 
 class LandsUnionProvider(private val plugin: RegionsPlugin) : UnionProvider {
     override val type: String = "lands"
     private var cachedIntegration: Any? = null
+    private var cachedProvider: Plugin? = null
     private var warnedUnavailableApi = false
 
     override fun isAvailable(): Boolean =
-        plugin.server.pluginManager.getPlugin("Lands") != null && integration() != null
+        plugin.server.pluginManager.getPlugin("Lands")?.isEnabled == true && integration() != null
 
     override fun getUnion(playerId: UUID): UnionRef? {
         val holder = memberHolder(playerId) ?: return null
@@ -65,9 +67,17 @@ class LandsUnionProvider(private val plugin: RegionsPlugin) : UnionProvider {
     }
 
     private fun integration(): Any? {
-        cachedIntegration?.let { return it }
-        val type = classOrNull("me.angeschossen.lands.api.LandsIntegration")
-            ?: classOrNull("me.angeschossen.lands.api.integration.LandsIntegration")
+        val provider = plugin.server.pluginManager.getPlugin("Lands")?.takeIf(Plugin::isEnabled)
+        if (provider == null) {
+            cachedProvider = null
+            cachedIntegration = null
+            return null
+        }
+        if (cachedProvider === provider) cachedIntegration?.let { return it }
+        cachedProvider = null
+        cachedIntegration = null
+        val type = classOrNull(provider, "me.angeschossen.lands.api.LandsIntegration")
+            ?: classOrNull(provider, "me.angeschossen.lands.api.integration.LandsIntegration")
             ?: run {
                 warnApi("Lands is installed, but LandsIntegration API class was not found.")
                 return null
@@ -80,6 +90,7 @@ class LandsUnionProvider(private val plugin: RegionsPlugin) : UnionProvider {
                 return null
             }
         cachedIntegration = integration
+        cachedProvider = provider
         return integration
     }
 
@@ -115,9 +126,9 @@ class LandsUnionProvider(private val plugin: RegionsPlugin) : UnionProvider {
         }
     }
 
-    private fun classOrNull(name: String): Class<*>? =
+    private fun classOrNull(provider: Plugin, name: String): Class<*>? =
         try {
-            Class.forName(name)
+            Class.forName(name, true, provider.javaClass.classLoader)
         } catch (ex: ClassNotFoundException) {
             null
         }

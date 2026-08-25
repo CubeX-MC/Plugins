@@ -73,6 +73,9 @@ class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
     internal fun openOwnedAreas(player: Player, context: OwnedAreaContext) =
         creation.openOwnedAreas(player, context)
 
+    internal fun openTemplatesForRegion(player: Player, regionId: String) =
+        creation.openTemplatesForRegion(player, regionId)
+
     @EventHandler
     fun onClick(event: InventoryClickEvent) {
         val holder = event.inventory.holder as? RegionsHolder ?: return
@@ -105,6 +108,7 @@ class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
             View.PUBLISH_PREVIEW -> publish.click(player, holder.regionId ?: return, slot)
             View.OWNED_AREAS -> creation.clickOwnedArea(player, holder, event.currentItem, slot)
             View.TEMPLATES -> creation.clickTemplate(player, holder, event.currentItem, slot)
+            View.TEMPLATE_CONFIRM -> creation.clickTemplateConfirmation(player, holder, slot)
         }
     }
 

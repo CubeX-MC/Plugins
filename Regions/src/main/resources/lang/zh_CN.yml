@@ -1,4 +1,4 @@
-lang-version: 6
+lang-version: 7
 
 prefix: "<#69DB7C>[Regions] "
 help: |
@@ -263,6 +263,11 @@ gui:
       lore:
         - "<gray><count> 个 action block"
         - "<dark_gray>点击配置进入/离开/开赛/完赛行为。"
+    apply-template:
+      name: "<yellow>应用模板"
+      lore:
+        - "<gray>为这个领地重新选择一套完整场地预设。"
+        - "<yellow>确认后会整体替换 Mode、Flags、Effects 和 Triggers。"
     enable: "<green>点击启用"
     disable: "<yellow>点击禁用"
     validate:
@@ -650,7 +655,8 @@ gui:
         - "<gray>Flags: <flags>"
         - "<gray>Effects: <effects>"
         - "<gray>Triggers: <triggers>"
-        - "<green>点击验证并创建场地。"
+      create-hint: "<green>点击验证并创建场地。"
+      apply-hint: "<yellow>点击检查并替换当前配置。"
     parameters: "<yellow>参数: <keys>"
     parameter-invalid: "<red>这个值不行：<reason>"
     empty:
@@ -663,8 +669,27 @@ gui:
         - "<gray>页面 <page>/<pages>"
         - "<gray>模板会先经过能力 schema 和完整 Region 校验。"
     back-to-areas: "<red>返回选择 Area"
+    back-to-detail: "<red>返回领地详情"
     owner-changed: "<yellow>该 Lands area 的主人身份已变化，请重新选择。"
     failed: "<red>模板无法应用: <errors>"
+    confirm:
+      title: "<dark_green>应用模板: <id>"
+      summary:
+        name: "<aqua>新预设: <name>"
+        lore:
+          - "<gray>Mode: <mode>"
+          - "<gray>Flags: <flags>"
+          - "<gray>Effects: <effects>"
+          - "<gray>Triggers: <triggers>"
+      warning:
+        name: "<red>替换当前玩法配置"
+        lore:
+          - "<red>当前 Mode、Flags、Effects 和 Triggers 会被清空。"
+          - "<gray>领地 ID、来源、主人、优先级和历史版本保持不变。"
+      apply:
+        name: "<green>确认并保存为草稿"
+        lore:
+          - "<gray>在预览并发布这个草稿前，线上场地不会改变。"
   vehicle:
     on-foot: "步行"
     any: "任意载具"

@@ -13,6 +13,7 @@ import org.cubexmc.regions.model.EffectScope
 import org.cubexmc.regions.model.PlayerStateSnapshot
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.service.ServiceResult
+import org.cubexmc.core.PlayerStateLeaseStack
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -39,12 +40,14 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         applicationSequence.set(persisted.maxOfOrNull { it.applicationOrder } ?: 0L)
     }
 
+    @Synchronized
     fun register(type: String) {
         if (type.isNotBlank()) {
             effectTypes.add(type.lowercase())
         }
     }
 
+    @Synchronized
     fun registerDefaults() {
         listOf(
             "scale",
@@ -57,14 +60,18 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         ).forEach { register(it) }
     }
 
+    @Synchronized
     fun isRegistered(type: String): Boolean = effectTypes.contains(type.lowercase())
 
+    @Synchronized
     fun allTypes(): Set<String> = effectTypes.toSet()
 
+    @Synchronized
     fun apply(player: Player, region: RegionDefinition, config: EffectConfig): ServiceResult {
         return applyInternal(player, region, config, emptyMap())
     }
 
+    @Synchronized
     fun applyDeclared(player: Player, region: RegionDefinition, config: EffectConfig): ServiceResult {
         return applyInternal(player, region, config, mapOf(ORIGIN_KEY to DECLARED_ORIGIN))
     }
@@ -74,6 +81,7 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
      * failure every effect already applied in the set is rolled back. Callers get all of the region's
      * declared state or none of it, never a half-applied player.
      */
+    @Synchronized
     fun applyDeclaredSet(player: Player, requests: List<DeclaredEffect>): ServiceResult {
         if (requests.isEmpty()) return ServiceResult.ok()
         var failure: ServiceResult? = null
@@ -122,12 +130,14 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         return result
     }
 
+    @Synchronized
     fun restoreLease(leaseId: UUID): ServiceResult {
         val lease = leases[leaseId] ?: return ServiceResult.ok()
         val player = plugin.server.getPlayer(lease.playerId) ?: return ServiceResult.ok()
         return restoreKnownPlayer(player, leaseId)
     }
 
+    @Synchronized
     fun restoreIfPending(player: Player, reason: String): Int {
         val count = cleanupPlayer(player, reason)
         if (count > 0) {
@@ -136,20 +146,25 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         return count
     }
 
+    @Synchronized
     internal fun pendingLeaseCount(playerId: UUID? = null): Int =
         if (playerId == null) leases.size else leases.values.count { it.playerId == playerId }
 
+    @Synchronized
     fun cleanupPlayer(player: Player, reason: String): Int =
         restoreMatching(player, reason, "effect lease(s)") { true }
 
+    @Synchronized
     fun cleanupRegion(player: Player, regionId: String, reason: String): Int =
         restoreMatching(player, reason, "effect lease(s) in $regionId") { it.regionId == regionId }
 
+    @Synchronized
     fun cleanupModeEffects(player: Player, regionId: String, reason: String): Int =
         restoreMatching(player, reason, "mode effect lease(s) in $regionId") {
             it.regionId == regionId && it.scope == EffectScope.UNTIL_MODE_END
         }
 
+    @Synchronized
     fun cleanupDeclaredEffects(player: Player, reason: String): Int =
         restoreMatching(player, reason, "declared effect lease(s)") {
             it.metadata[ORIGIN_KEY] == DECLARED_ORIGIN
@@ -188,14 +203,15 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
 
     fun refreshAll() {
         val now = System.currentTimeMillis()
-        for (lease in leases.values.toList()) {
-            val player = plugin.server.getPlayer(lease.playerId) ?: continue
+        for (playerId in leases.values.mapTo(LinkedHashSet()) { it.playerId }) {
+            val player = plugin.server.getPlayer(playerId) ?: continue
             plugin.regionScheduler().runAtEntity(player, Runnable {
-                refreshLease(player, lease, now)
+                refreshPlayer(player, now)
             })
         }
     }
 
+    @Synchronized
     fun refreshPlayer(player: Player, nowMillis: Long = System.currentTimeMillis()) {
         val owned = leases.values.filter { it.playerId == player.uniqueId }
         if (owned.isEmpty()) return
@@ -255,15 +271,24 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         val instance = scaleAttributeInstance(player)
             ?: return ServiceResult.fail("Current server does not expose the scale attribute.")
         val previous = instance.baseValue
-        instance.baseValue = safeValue
-        return trackApplied(player, createLease(
+        val lease = createLease(
             player,
             region,
             config,
             "scale",
             PlayerStateSnapshot(mapOf("base" to previous.toString())),
-            leaseMetadata,
-        ))
+            leaseMetadata + (STACK_KEY to "true"),
+        )
+        val coordinated = PlayerStateLeaseStack.apply(
+            player,
+            SCALE_CHANNEL,
+            lease.id.toString(),
+            safeValue.toString(),
+            { instance.baseValue.toString() },
+            { instance.baseValue = it.toDouble() },
+        )
+        if (!coordinated) instance.baseValue = safeValue
+        return trackApplied(player, lease)
     }
 
     private fun applyPotion(
@@ -328,11 +353,27 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
                 "flying" to player.isFlying.toString(),
             ),
         )
-        player.allowFlight = allow
+        val lease = createLease(
+            player,
+            region,
+            config,
+            "allow_flight",
+            snapshot,
+            leaseMetadata + (STACK_KEY to "true"),
+        )
+        val coordinated = PlayerStateLeaseStack.apply(
+            player,
+            FLIGHT_CHANNEL,
+            lease.id.toString(),
+            allow.toString(),
+            { player.allowFlight.toString() },
+            { player.allowFlight = it.toBoolean() },
+        )
+        if (!coordinated) player.allowFlight = allow
         if (!allow && player.isFlying) {
             player.isFlying = false
         }
-        return trackApplied(player, createLease(player, region, config, "allow_flight", snapshot, leaseMetadata))
+        return trackApplied(player, lease)
     }
 
     private fun applyWalkSpeed(
@@ -426,6 +467,7 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
      * Returns false when the deferred write failed. The caller must then roll back the player state
      * it applied inside the block, exactly as it would for a failed individual apply.
      */
+    @Synchronized
     fun batched(block: () -> Unit): Boolean {
         batchDepth++
         try {
@@ -492,6 +534,13 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         }
 
     private fun restoreScale(player: Player, lease: EffectLease): ServiceResult {
+        if (lease.metadata[STACK_KEY] == "true" && PlayerStateLeaseStack.remove(
+                player,
+                SCALE_CHANNEL,
+                lease.id.toString(),
+                { value -> scaleAttributeInstance(player)?.baseValue = value.toDouble() },
+            )
+        ) return ServiceResult.ok()
         val previous = lease.snapshot.values["base"]?.toDoubleOrNull() ?: return ServiceResult.ok()
         val instance = scaleAttributeInstance(player) ?: return ServiceResult.ok()
         instance.baseValue = previous
@@ -516,8 +565,18 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
     private fun restoreAllowFlight(player: Player, lease: EffectLease): ServiceResult {
         val allowFlight = lease.snapshot.values["allowFlight"]?.toBooleanStrictOrNull() ?: return ServiceResult.ok()
         val flying = lease.snapshot.values["flying"]?.toBooleanStrictOrNull() ?: false
-        player.allowFlight = allowFlight
-        player.isFlying = allowFlight && flying
+        val coordinated = lease.metadata[STACK_KEY] == "true" && PlayerStateLeaseStack.remove(
+            player,
+            FLIGHT_CHANNEL,
+            lease.id.toString(),
+            { value -> player.allowFlight = value.toBoolean() },
+        )
+        if (!coordinated) {
+            player.allowFlight = allowFlight
+            player.isFlying = allowFlight && flying
+        } else if (!player.allowFlight) {
+            player.isFlying = false
+        }
         return ServiceResult.ok()
     }
 
@@ -584,5 +643,8 @@ class ScopedEffectService(private val plugin: RegionsPlugin) {
         const val TICK_MILLIS = 50L
         const val ORIGIN_KEY = "regions-origin"
         const val DECLARED_ORIGIN = "region-definition"
+        const val STACK_KEY = "cubex-state-stack"
+        const val SCALE_CHANNEL = "scale"
+        const val FLIGHT_CHANNEL = "allow-flight"
     }
 }

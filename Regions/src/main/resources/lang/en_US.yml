@@ -1,4 +1,4 @@
-lang-version: 6
+lang-version: 7
 
 prefix: "<#69DB7C>[Regions] "
 help: |
@@ -263,6 +263,11 @@ gui:
       lore:
         - "<gray><count> action block(s)"
         - "<dark_gray>Click to configure enter/leave/start/finish behaviour."
+    apply-template:
+      name: "<yellow>Apply a template"
+      lore:
+        - "<gray>Choose a complete venue preset for this region."
+        - "<yellow>Mode, Flags, Effects and Triggers will be replaced after confirmation."
     enable: "<green>Click to enable"
     disable: "<yellow>Click to disable"
     validate:
@@ -650,7 +655,8 @@ gui:
         - "<gray>Flags: <flags>"
         - "<gray>Effects: <effects>"
         - "<gray>Triggers: <triggers>"
-        - "<green>Click to validate and create the venue."
+      create-hint: "<green>Click to validate and create the venue."
+      apply-hint: "<yellow>Click to review replacing the current configuration."
     parameters: "<yellow>Parameters: <keys>"
     parameter-invalid: "<red>That value does not work: <reason>"
     empty:
@@ -663,8 +669,27 @@ gui:
         - "<gray>Page <page>/<pages>"
         - "<gray>Templates pass the capability schema and full region validation first."
     back-to-areas: "<red>Back to area selection"
+    back-to-detail: "<red>Back to region details"
     owner-changed: "<yellow>Ownership of that Lands area changed; please pick again."
     failed: "<red>The template could not be applied: <errors>"
+    confirm:
+      title: "<dark_green>Apply template: <id>"
+      summary:
+        name: "<aqua>New preset: <name>"
+        lore:
+          - "<gray>Mode: <mode>"
+          - "<gray>Flags: <flags>"
+          - "<gray>Effects: <effects>"
+          - "<gray>Triggers: <triggers>"
+      warning:
+        name: "<red>Replace current gameplay configuration"
+        lore:
+          - "<red>The current Mode, Flags, Effects and Triggers will be cleared."
+          - "<gray>Region identity, source, owner, priority and history stay unchanged."
+      apply:
+        name: "<green>Confirm and save as draft"
+        lore:
+          - "<gray>The live region is unchanged until you preview and publish this draft."
   vehicle:
     on-foot: "on foot"
     any: "any vehicle"

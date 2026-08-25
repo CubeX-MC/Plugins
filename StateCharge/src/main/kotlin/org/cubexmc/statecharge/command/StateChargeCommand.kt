@@ -217,17 +217,18 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
     // ---- 管理员 ----
 
     private fun admin(sender: CommandSender, args: Array<String>) {
-        if (!requirePermission(sender, ADMIN_PERMISSION)) {
-            return
-        }
         if (args.size < 2) {
+            if (!hasAnyAdminPermission(sender)) {
+                requirePermission(sender, ADMIN_PERMISSION)
+                return
+            }
             sender.sendMessage(plugin.lang().ui("usage-admin-off"))
             sender.sendMessage(plugin.lang().ui("usage-admin-reload"))
             return
         }
         when (args[1].lowercase()) {
-            "off", "clear" -> adminOff(sender, args)
-            "reload" -> adminReload(sender)
+            "off", "clear" -> if (requirePermission(sender, ADMIN_OFF_PERMISSION)) adminOff(sender, args)
+            "reload" -> if (requirePermission(sender, ADMIN_RELOAD_PERMISSION)) adminReload(sender)
             else -> {
                 sender.sendMessage(plugin.lang().ui("usage-admin-off"))
                 sender.sendMessage(plugin.lang().ui("usage-admin-reload"))
@@ -283,7 +284,9 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
         args: Array<String>,
     ): List<String>? {
         if (args.size <= 1) {
-            val subs = SUBCOMMANDS.filter { sender.hasPermission(permissionFor(it)) }
+            val subs = SUBCOMMANDS.filter {
+                if (it == "admin") hasAnyAdminPermission(sender) else sender.hasPermission(permissionFor(it))
+            }
             return CubexCommandSuggestions.root(args, subs)
         }
         val sub = args[0].lowercase()
@@ -295,9 +298,13 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
         }
         if (sub == "admin") {
             if (args.size == 2) {
-                return CubexCommandSuggestions.matching(listOf("off", "reload"), args[1])
+                val options = buildList {
+                    if (sender.hasPermission(ADMIN_OFF_PERMISSION)) add("off")
+                    if (sender.hasPermission(ADMIN_RELOAD_PERMISSION)) add("reload")
+                }
+                return CubexCommandSuggestions.matching(options, args[1])
             }
-            if (args.size == 3 && args[1].lowercase() in setOf("off", "clear")) {
+            if (args.size == 3 && sender.hasPermission(ADMIN_OFF_PERMISSION) && args[1].lowercase() in setOf("off", "clear")) {
                 return CubexCommandSuggestions.matching(Bukkit.getOnlinePlayers().map { it.name }, args[2])
             }
             if (args.size == 4 && args[1].lowercase() in setOf("off", "clear")) {
@@ -329,6 +336,10 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
 
     private fun permissionFor(sub: String): String = if (sub == "admin") ADMIN_PERMISSION else USE_PERMISSION
 
+    private fun hasAnyAdminPermission(sender: CommandSender): Boolean =
+        sender.hasPermission(ADMIN_PERMISSION) || sender.hasPermission(ADMIN_OFF_PERMISSION) ||
+            sender.hasPermission(ADMIN_RELOAD_PERMISSION)
+
     private fun String.toBigDecimalOrNull(): BigDecimal? =
         try {
             BigDecimal(this)
@@ -339,6 +350,8 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
     private companion object {
         const val USE_PERMISSION = "statecharge.use"
         const val ADMIN_PERMISSION = "statecharge.admin"
+        const val ADMIN_OFF_PERMISSION = "statecharge.admin.off"
+        const val ADMIN_RELOAD_PERMISSION = "statecharge.admin.reload"
 
         val SUBCOMMANDS = listOf("help", "gui", "list", "status", "toggle", "on", "off", "guard", "admin")
         val STATE_SUBCOMMANDS = setOf("toggle", "on", "off")

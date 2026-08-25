@@ -17,6 +17,7 @@ import org.cubexmc.core.Reloadable
 import org.cubexmc.economy.EconomyAccount
 import org.cubexmc.economy.VaultEconomy
 import org.cubexmc.scheduler.CubexScheduler
+import org.cubexmc.scheduler.CubexTask
 import org.cubexmc.statecharge.command.StateChargeCommand
 import org.cubexmc.statecharge.config.LanguageManager
 import org.cubexmc.statecharge.config.StateDefinitions
@@ -28,6 +29,8 @@ import org.cubexmc.statecharge.storage.StateStorage
 import org.cubexmc.statecharge.util.TimeFormat
 import java.io.IOException
 import java.math.BigDecimal
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 /**
@@ -45,6 +48,8 @@ class StateChargePlugin : CubexPlugin() {
     private var notifier: I18nStateNotifier? = null
     private var service: StateChargeService? = null
     private var shopGui: StateShopGui? = null
+    private var tickTask: CubexTask? = null
+    private var flushTask: CubexTask? = null
 
     override fun enablePlugin() {
         cubexScheduler = CubexScheduler.bindTo(this)
@@ -102,6 +107,7 @@ class StateChargePlugin : CubexPlugin() {
     }
 
     override fun disablePlugin() {
+        suspendOnlineEffectsForDisable()
     }
 
     /**
@@ -114,31 +120,33 @@ class StateChargePlugin : CubexPlugin() {
      * 返回报告,命令层据此告诉服主哪一段炸了。
      */
     fun reloadStates(): ReloadReport {
-        var flushed = true
-
         val report = ReloadChain.create()
             .failurePolicy(ReloadFailurePolicy.ABORT)
-            .add("flush-store", Reloadable {
-                try {
-                    storage().flushIfDirty()
-                } catch (ex: IOException) {
-                    flushed = false
-                    log().warn("Reload: could not flush states.yml; keeping in-memory state and skipping the store stage. ${ex.message}")
-                }
+            .add("flush-store", Reloadable { storage().flushIfDirty() })
+            .add("suspend-effects", Reloadable {
+                for (player in Bukkit.getOnlinePlayers()) scheduleAtPlayer(player) { states().suspendAll(it) }
             })
             .add("default-files", Reloadable { saveDefaultFiles() })
             .add("migrations", Reloadable { migrateConfigAndLang() })
             .add("config", ConfigReload.bukkitConfig(this))
             .add("economy-account", Reloadable { applyEconomyAccount() })
             .add("language", lang())
-            .add("definitions", definitions())
-            .addIf("store", { flushed }, storage())
-            .add("reapply", Reloadable {
-                for (player in Bukkit.getOnlinePlayers()) {
-                    scheduleAtPlayer(player) { states().applyAll(it) }
-                }
+            .add("definitions", Reloadable {
+                definitions().reload()
+                states().rememberDefinitions()
+            })
+            .add("store", storage())
+            .add("timers", Reloadable {
+                scheduleTick()
+                scheduleFlush()
             })
             .run()
+
+        // Even a later reload stage can fail after effects were suspended. Always restore from the
+        // last in-memory state so a failed admin reload does not leave online players half-disabled.
+        for (player in Bukkit.getOnlinePlayers()) {
+            scheduleAtPlayer(player) { states().applyAll(it) }
+        }
 
         for (summary in report.failureSummaries()) {
             log().severe("StateCharge reload stage failed — $summary")
@@ -249,8 +257,9 @@ class StateChargePlugin : CubexPlugin() {
     }
 
     private fun scheduleTick() {
+        tickTask?.cancel()
         val tickSeconds = max(1L, config.getLong("timing.tick-seconds", 1L))
-        scheduler().runGlobalTimer(Runnable {
+        tickTask = scheduler().runGlobalTimer(Runnable {
             try {
                 states().tick(tickSeconds)
             } catch (ex: Exception) {
@@ -260,13 +269,42 @@ class StateChargePlugin : CubexPlugin() {
     }
 
     private fun scheduleFlush() {
+        flushTask?.cancel()
         val intervalSeconds = max(5L, config.getLong("storage.flush-interval-seconds", 60L))
-        scheduler().runGlobalTimer(Runnable {
+        flushTask = scheduler().runGlobalTimer(Runnable {
             try {
                 storage().flushIfDirty()
             } catch (ex: IOException) {
                 log().warn("StateCharge flush failed: ${ex.message}")
             }
         }, intervalSeconds * 20L, intervalSeconds * 20L)
+    }
+
+    private fun suspendOnlineEffectsForDisable() {
+        val players = Bukkit.getOnlinePlayers().toList()
+        if (!scheduler().isFolia) {
+            players.forEach(states()::suspendAll)
+            return
+        }
+        val completed = CountDownLatch(players.size)
+        for (player in players) {
+            scheduler().runAtEntity(player, Runnable {
+                try {
+                    states().suspendAll(player)
+                } finally {
+                    completed.countDown()
+                }
+            })
+        }
+        if (!completed.await(DISABLE_EFFECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            log().warn(
+                "Timed out waiting for ${completed.count} Folia player effect cleanup task(s); " +
+                    "their persisted leases will be recovered on the next enable.",
+            )
+        }
+    }
+
+    private companion object {
+        const val DISABLE_EFFECT_TIMEOUT_SECONDS = 5L
     }
 }

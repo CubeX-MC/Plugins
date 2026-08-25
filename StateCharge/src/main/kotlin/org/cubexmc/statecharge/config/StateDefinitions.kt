@@ -115,10 +115,10 @@ class StateDefinitions(private val plugin: StateChargePlugin) : Reloadable, Stat
                     problem(id, "effect.scale must be in [$MIN_SCALE, $MAX_SCALE]")
                     null
                 } else {
-                    ScaleEffect(scale)
+                    ScaleEffect(id, scale)
                 }
             }
-            "fly" -> FlightEffect(effect.getBoolean("auto-start", true))
+            "fly" -> FlightEffect(id, effect.getBoolean("auto-start", true))
             else -> {
                 problem(id, "unknown effect type '${effect.getString("type")}'")
                 null

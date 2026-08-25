@@ -14,6 +14,7 @@ import org.cubexmc.regions.model.RegionTrigger
 import org.cubexmc.regions.model.TriggerExecution
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.mockito.Mockito.mock
@@ -78,6 +79,18 @@ class RegionStorageRevisionTest {
         storage.close()
 
         assertEquals("Published", RegionStorage(plugin()).apply { load() }.find("arena")?.name)
+    }
+
+    @Test
+    fun `malformed reload fails closed and keeps the live snapshot`() {
+        val storage = RegionStorage(plugin())
+        storage.put(region(1, "Live"))
+        tempDir.resolve("regions.yml").toFile().writeText(
+            "regions-version: 4\nhistory:\n  arena:\n    not-a-revision: invalid\n",
+        )
+
+        assertThrows(IllegalArgumentException::class.java) { storage.load() }
+        assertEquals("Live", storage.find("arena")?.name)
     }
 
     private fun plugin(): RegionsPlugin {

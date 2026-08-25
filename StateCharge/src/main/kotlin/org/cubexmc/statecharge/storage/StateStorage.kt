@@ -243,9 +243,10 @@ class StateStorage : Reloadable, Terminable {
                     return recovered
                 } catch (backup: Exception) {
                     logger.severe("Backup ${backupFile.name} is also unreadable: ${backup.message}")
+                    primary.addSuppressed(backup)
                 }
             }
-            return Snapshot()
+            throw IllegalStateException("Neither $FILE_NAME nor its backup could be read; live state was preserved.", primary)
         }
     }
 
@@ -262,6 +263,10 @@ class StateStorage : Reloadable, Terminable {
         val players = yaml.getConfigurationSection("players") ?: return snapshot
         val version = yaml.getInt("storage-version", 1)
 
+        require(version <= STORAGE_VERSION) {
+            "$FILE_NAME uses future storage version $version (supported: $STORAGE_VERSION)."
+        }
+
         if (version < STORAGE_VERSION) {
             // v1 存的是"预购的剩余时长"。计费模型已改为按实际开启时长收费,两者无法换算——
             // 与其猜一个折算比例,不如明确告知并忽略。
@@ -276,13 +281,8 @@ class StateStorage : Reloadable, Terminable {
         }
 
         for (key in players.getKeys(false)) {
-            val uuid = try {
-                UUID.fromString(key)
-            } catch (ex: IllegalArgumentException) {
-                logger.warn("Skipping invalid player id in $FILE_NAME: $key")
-                continue
-            }
-            val section = players.getConfigurationSection(key) ?: continue
+            val uuid = UUID.fromString(key)
+            val section = requireNotNull(players.getConfigurationSection(key)) { "Player $key is not a section." }
 
             val states = section.getStringList("active").filter { it.isNotBlank() }
             if (states.isNotEmpty()) {
