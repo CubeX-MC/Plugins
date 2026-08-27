@@ -19,9 +19,12 @@ internal enum class View {
     PUBLISH_PREVIEW,
     OWNED_AREAS,
     TEMPLATES,
+    TEMPLATE_CONFIRM,
 }
 
 internal enum class OwnedAreaPurpose { CREATE, BIND }
+
+internal enum class TemplatePurpose { CREATE, APPLY }
 
 internal data class OwnedAreaContext(
     val purpose: OwnedAreaPurpose,
@@ -35,6 +38,12 @@ internal data class TemplateContext(
     val targetName: String,
     val source: RegionSourceRef,
     val page: Int = 0,
+    val purpose: TemplatePurpose = TemplatePurpose.CREATE,
+)
+
+internal data class TemplateConfirmation(
+    val templateId: String,
+    val supplied: Map<String, String>,
 )
 
 internal class RegionsHolder(
@@ -42,11 +51,11 @@ internal class RegionsHolder(
     val regionId: String? = null,
     val ownedArea: OwnedAreaContext? = null,
     val template: TemplateContext? = null,
+    val templateConfirmation: TemplateConfirmation? = null,
 ) : InventoryHolder {
     override fun getInventory(): Inventory = Bukkit.createInventory(null, 9)
 }
 
-internal class PendingInput(val onSubmit: (String) -> Unit)
 
 /**
  * Icons shared by several menus.

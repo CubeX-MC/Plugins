@@ -94,6 +94,8 @@ class EcoBalancer : CubexPlugin() {
         }
 
         guiManager = GuiManager(this)
+        // Paper 上再补一条现代聊天事件监听(Spigot 上是空操作),两条链路都能接住。
+        guiManager.registerModernChat()
         taxRunService = TaxRunService()
         taxLedgerService = TaxLedgerService(this)
         setupPermissions()

@@ -1,0 +1,15 @@
+name: CookbookRenameMenu
+version: '${version}'
+main: org.cubexmc.cookbook.renamemenu.RenameMenuPlugin
+api-version: '1.18'
+author: CubeX
+description: Cookbook 04 - a chest menu that renames the held item via chat input.
+commands:
+  renamemenu:
+    description: Open the rename menu.
+    usage: /renamemenu
+    permission: cookbook.rename
+permissions:
+  cookbook.rename:
+    description: Allows using the rename menu.
+    default: true

@@ -46,6 +46,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             "resolve" -> resolve(sender, args)
             "mediate" -> mediate(sender, args)
             "partner" -> partner(sender, args)
+            "sale" -> sale(sender, args)
             "gui" -> gui(sender)
             "list" -> list(sender, args, false)
             "all" -> list(sender, args, true)
@@ -162,6 +163,36 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
             "partner" to partnerName,
             "stake" to plugin.economy().format(result.amount()),
         )))
+        return true
+    }
+
+    private fun sale(sender: CommandSender, args: Array<String>): Boolean {
+        val player = requirePlayer(sender)
+        if (player == null || !requirePermission(player, "contract.create")) return true
+        if (args.size < 5) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-sale"))))
+            return true
+        }
+        val price = parseDouble(args[2])
+        val days = parseInt(args[3])
+        if (price == null || days == null) {
+            send(sender, plugin.lang().message("invalid-number"))
+            return true
+        }
+        val text = parseContractText(args, 4, true)
+        if (text == null) {
+            send(sender, plugin.lang().message("invalid-usage", mapOf("usage" to plugin.lang().ui("usage-sale"))))
+            return true
+        }
+        plugin.gui().confirmSaleCommand(
+            player,
+            args[1],
+            price,
+            days,
+            text.title(),
+            text.description(),
+            text.mediatorName(),
+        )
         return true
     }
 
@@ -590,6 +621,10 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         if (contract.hasRewardItems()) {
             send(sender, plugin.lang().ui("info-stored-reward", mapOf("count" to contract.rewardItemCount().toString())))
         }
+        if (contract.hasItemClaims()) {
+            val count = contract.itemClaims().values.flatMap { it.values }.flatten().sumOf { it.amount }
+            send(sender, plugin.lang().ui("info-item-claims", mapOf("count" to count.toString())))
+        }
     }
 
     private fun batchRepeatSummary(contract: Contract): String? {
@@ -906,7 +941,7 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<String>): List<String> {
         if (args.size == 1) {
-            return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "list", "all", "my", "rep", "info", "accept", "submit", "claim", "approve", "cancel", "dispute", "withdraw", "admin", "help"), args[0])
+            return startsWith(listOf("gui", "service", "wager", "resolve", "mediate", "partner", "sale", "list", "all", "my", "rep", "info", "accept", "submit", "claim", "approve", "cancel", "dispute", "withdraw", "admin", "help"), args[0])
         }
         if (args.size == 4 && args[0].equals("service", ignoreCase = true)) {
             val flags = ArrayList(listOf("--mediator", "--objective"))
@@ -923,6 +958,9 @@ class ContractCommand(private val plugin: ContractPlugin) : CommandExecutor, Tab
         }
         if (args.size == 6 && args[0].equals("partner", ignoreCase = true)) {
             return startsWith(listOf("--mediator"), args[5])
+        }
+        if (args.size == 5 && args[0].equals("sale", ignoreCase = true)) {
+            return startsWith(listOf("--mediator"), args[4])
         }
         if (args.size == 3 && args[0].equals("mediate", ignoreCase = true)) {
             return startsWith(listOf("accept", "pay", "refund", "owner", "contractor", "a", "b"), args[2])

@@ -103,6 +103,10 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         if (contract.hasRewardItems()) {
             lore.add(ui("detail-stored-reward", mapOf("count" to contract.rewardItemCount().toString())))
         }
+        if (contract.hasItemClaims()) {
+            val count = contract.itemClaims().values.flatMap { it.values }.flatten().sumOf { it.amount }
+            lore.add(ui("detail-item-claims", mapOf("count" to count.toString())))
+        }
         contract.publishAt()?.let { lore.add(ui("schedule-publish-at", mapOf("time" to DATE_FORMAT.format(Instant.ofEpochMilli(it))))) }
         lore.add(ui("detail-deadline", mapOf("time" to DATE_FORMAT.format(Instant.ofEpochMilli(contract.expiresAt())))))
         lore.add("")
@@ -115,7 +119,7 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
         return named(materialFor(contract.type(), contract.status()), ui("item-title", mapOf("value" to contract.title())), lore)
     }
 
-    fun draftPreview(draft: CreateDraft): List<String> {
+    fun draftPreview(draft: CreateDraft, saleOffer: ItemStack? = null): List<String> {
         val lines = ArrayList<String>()
         lines.add(ui("preview-type", mapOf("value" to plugin.lang().type(draft.type()))))
         lines.add(ui("preview-title-line", mapOf("value" to valueOr(draft.title()))))
@@ -168,10 +172,20 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
             lines.add(ui("preview-my-stake", mapOf("value" to valueOr(num(draft.amount())))))
             lines.add(ui("preview-wager-match"))
             lines.add(ui("preview-deduct-now", mapOf("value" to valueOr(num(draft.amount())))))
-        } else {
+        } else if (draft.type() == ContractType.PARTNERSHIP) {
             lines.add(ui("preview-my-stake", mapOf("value" to valueOr(num(draft.amount())))))
             lines.add(ui("preview-partner-stake", mapOf("value" to valueOr(num(draft.partnerStake())))))
             lines.add(ui("preview-deduct-mine", mapOf("value" to valueOr(num(draft.amount())))))
+        } else if (draft.type() == ContractType.SALE) {
+            val item = saleOffer
+            val offer = if (item == null || item.type == Material.AIR || item.amount <= 0) {
+                unset()
+            } else {
+                ui("sale-item-value", mapOf("material" to item.type.name, "count" to item.amount.toString()))
+            }
+            lines.add(ui("preview-sale-offer", mapOf("value" to offer)))
+            lines.add(ui("preview-sale-price", mapOf("value" to valueOr(num(draft.amount())))))
+            lines.add(ui("preview-sale-escrow"))
         }
         lines.add(ui("preview-escrow-note"))
         return lines
@@ -276,7 +290,7 @@ internal class ContractRenderer(private val plugin: ContractPlugin) {
             ContractStatus.CANCELLED -> GuiIcons.INACTIVE
             ContractStatus.EXPIRED -> Material.CLOCK
             ContractStatus.DISPUTED -> Material.REDSTONE
-            ContractStatus.PENDING_ACCEPT -> Material.YELLOW_BANNER
+            ContractStatus.PENDING_ACCEPT, ContractStatus.PENDING_ACCEPT_MULTI -> Material.YELLOW_BANNER
             else -> when (type) {
                 ContractType.SERVICE -> Material.PAPER
                 ContractType.WAGER -> Material.TARGET

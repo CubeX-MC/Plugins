@@ -24,23 +24,24 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         gearStore.load()
     }
 
-    fun onEnter(player: Player, region: RegionDefinition) {
+    @Synchronized
+    fun onEnter(player: Player, region: RegionDefinition): Boolean {
         if (!isCombatMode(region)) {
-            return
+            return false
         }
         if (endingRegions.contains(region.id)) {
             plugin.sendGame(player, plugin.gameText("game.combat.restoring", mapOf("name" to region.name)))
-            return
+            return false
         }
         val state = state(region)
         if (state.active) {
             plugin.sendGame(player, plugin.gameText("game.combat.in-progress", mapOf("name" to region.name)))
-            return
+            return false
         }
         val maxPlayers = maxPlayers(region)
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
             plugin.sendGame(player, plugin.gameText("game.combat.full", mapOf("name" to region.name)))
-            return
+            return false
         }
         state.players.add(player.uniqueId)
         state.ready.remove(player.uniqueId)
@@ -51,8 +52,10 @@ class CombatModeService(private val plugin: RegionsPlugin) {
                 start(region, state)
             }
         }
+        return true
     }
 
+    @Synchronized
     fun onLeave(player: Player, regionId: String, reason: String) {
         val state = states[regionId] ?: return
         state.players.remove(player.uniqueId)
@@ -68,6 +71,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     fun ready(player: Player, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isCombatMode(region)) {
@@ -95,6 +99,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun forceEnd(regionId: String, reason: String): Boolean {
         if (!states.containsKey(regionId)) {
             return false
@@ -103,6 +108,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun onDeath(event: PlayerDeathEvent): Boolean {
         val player = event.entity
         val state = states.values.firstOrNull { it.players.contains(player.uniqueId) && it.active } ?: return false
@@ -119,12 +125,14 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun onRespawn(event: PlayerRespawnEvent) {
         val snapshot = pendingRespawnRestores.remove(event.player.uniqueId) ?: return
         restoreSnapshot(event.player, snapshot)
         snapshot.respawn?.let { event.respawnLocation = it }
     }
 
+    @Synchronized
     fun cleanupAll(reason: String, shuttingDown: Boolean = false) {
         val immediate = !plugin.regionScheduler().isFolia
         for (regionId in states.keys.toList()) {
@@ -150,9 +158,11 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         if (shuttingDown) pendingRespawnRestores.clear()
     }
 
+    @Synchronized
     fun restoreIfPending(player: Player, reason: String): Boolean =
         restoreStored(player, reason)
 
+    @Synchronized
     fun status(regionId: String): String {
         val state = states[regionId] ?: return "idle"
         val region = plugin.regions().find(regionId)
@@ -160,6 +170,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         return if (state.active) "active players=${state.players.size}$unions" else "waiting ready=${state.ready.size}/${state.players.size}$unions"
     }
 
+    @Synchronized
     private fun start(region: RegionDefinition, state: CombatState) {
         if (state.active) {
             return
@@ -199,6 +210,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     private fun end(
         regionId: String,
         reason: String,
@@ -431,7 +443,7 @@ class CombatModeService(private val plugin: RegionsPlugin) {
         return Location(world, x, y, z, yaw, pitch)
     }
 
-    private fun isCombatMode(region: RegionDefinition): Boolean =
+    fun isCombatMode(region: RegionDefinition): Boolean =
         region.mode?.type.equals("dual_pvp", ignoreCase = true) ||
             region.mode?.type.equals("union_war", ignoreCase = true)
 

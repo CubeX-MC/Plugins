@@ -32,6 +32,7 @@ import java.time.format.DateTimeParseException
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import org.cubexmc.gui.chat.ChatOutcome
 
 /**
  * Drives the contract GUI. The hall (`openHall`) is the landing screen; contracts are grouped by
@@ -63,6 +64,27 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
     /** Opens the hall landing screen (public board). */
     fun open(player: Player) {
         openHall(player, HallView.OPEN, 1)
+    }
+
+    /** Prefills a SALE from the command surface, then uses the same signed GUI confirmation. */
+    fun confirmSaleCommand(
+        player: Player,
+        counterparty: String,
+        price: Double,
+        days: Int,
+        title: String,
+        description: String,
+        mediator: String?,
+    ) {
+        drafts[player.uniqueId] = CreateDraft(ContractType.SALE).also {
+            it.counterparty(counterparty)
+            it.amount(price)
+            it.days(days)
+            it.title(title)
+            it.description(description)
+            it.mediator(mediator)
+        }
+        submitCreateForm(player)
     }
 
     /**
@@ -244,13 +266,18 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         fun action(slot: Int, icon: ItemStack) = menu.button(slot, icon, participantHandler(player, contractId, slot, back))
 
         val mediator = isArbiter(contract, player.uniqueId)
+        val myRole = contract.participantByUuid(player.uniqueId).map { it.role() }.orElse(null)
+        if (myRole != null && contract.status().isFinal() && contract.hasItemClaims(myRole)) {
+            val count = contract.itemClaims(myRole).sumOf { it.amount }
+            action(10, button(Material.CHEST, ui("action-claim-entitlement"), ui("action-claim-stored", mapOf("count" to count.toString())), ui("action-claim-space")))
+        }
         if (contract.type() != ContractType.WAGER && mediator && !contract.arbiterAccepted()) {
             action(10, button(Material.LECTERN, ui("action-mediate-accept"), ui("action-mediate-accept-detail")))
         } else if (contract.type() != ContractType.WAGER && mediator && canMediate(contract)) {
             if (contract.type() == ContractType.SERVICE) {
                 action(10, button(Material.EMERALD, ui("action-mediate-pay"), ui("action-mediate-pay-detail")))
                 action(11, button(Material.REDSTONE, ui("action-mediate-refund"), ui("action-mediate-refund-detail")))
-            } else if (contract.type() == ContractType.PARTNERSHIP) {
+            } else if (contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) {
                 action(10, button(Material.LIME_WOOL, ui("action-mediate-a"), ui("action-mediate-a-detail")))
                 action(11, button(Material.RED_WOOL, ui("action-mediate-b"), ui("action-mediate-b-detail")))
                 action(12, button(Material.GOLD_INGOT, ui("action-mediate-return"), ui("action-mediate-return-detail")))
@@ -325,8 +352,9 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
                 ),
             )
         }
-        if (contract.type() == ContractType.PARTNERSHIP && contract.status() == ContractStatus.IN_PROGRESS && isParty(contract, player.uniqueId)) {
-            action(10, button(Material.EMERALD, ui("action-partner-approve"), ui("action-partner-approve-detail"), ui("sign-required")))
+        if ((contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) && contract.status() == ContractStatus.IN_PROGRESS && isParty(contract, player.uniqueId)) {
+            val sale = contract.type() == ContractType.SALE
+            action(10, button(Material.EMERALD, ui(if (sale) "action-sale-approve" else "action-partner-approve"), ui(if (sale) "action-sale-approve-detail" else "action-partner-approve-detail"), ui("sign-required")))
         }
         if (contract.type() == ContractType.WAGER && (contract.status() == ContractStatus.IN_PROGRESS || contract.status() == ContractStatus.SUBMITTED) && isArbiter(contract, player.uniqueId)) {
             action(10, button(Material.LIME_WOOL, ui("action-resolve-a"), ui("action-resolve-a-detail")))
@@ -359,6 +387,9 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             val id = player.uniqueId
             val mediator = isArbiter(contract, id)
             when {
+                slot == 10 && contract.status().isFinal() &&
+                    contract.participantByUuid(id).map { contract.hasItemClaims(it.role()) }.orElse(false) ->
+                    runDirect(player, plugin.contracts().claimDeliveryItems(player, contract), contract, false, back)
                 slot == 10 && contract.type() != ContractType.WAGER && mediator && !contract.arbiterAccepted() ->
                     runDirect(player, plugin.contracts().acceptMediation(player, contract), contract, false, back)
                 slot == 10 && contract.type() == ContractType.SERVICE && contract.status() == ContractStatus.IN_PROGRESS && id == contract.contractorUuid() ->
@@ -436,8 +467,15 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
                     listOf(ui("confirm-approve-early-1"), ui("confirm-approve-1", payout), ui("confirm-approve-2", commission)),
                 )
             }
-            if (contract.type() == ContractType.PARTNERSHIP && status == ContractStatus.IN_PROGRESS && isParty(contract, player.uniqueId)) {
-                return PendingAction.simple(PendingAction.Kind.APPROVE, contract, null, ui("confirm-partner-title", id), listOf(ui("confirm-partner-1"), ui("confirm-partner-2")))
+            if ((contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) && status == ContractStatus.IN_PROGRESS && isParty(contract, player.uniqueId)) {
+                val sale = contract.type() == ContractType.SALE
+                return PendingAction.simple(
+                    PendingAction.Kind.APPROVE,
+                    contract,
+                    null,
+                    ui(if (sale) "confirm-sale-title" else "confirm-partner-title", id),
+                    listOf(ui(if (sale) "confirm-sale-1" else "confirm-partner-1"), ui(if (sale) "confirm-sale-2" else "confirm-partner-2")),
+                )
             }
             if (contract.type() == ContractType.WAGER && isArbiter(contract, player.uniqueId) && (status == ContractStatus.IN_PROGRESS || status == ContractStatus.SUBMITTED)) {
                 return PendingAction.simple(PendingAction.Kind.RESOLVE, contract, "a", ui("confirm-resolve-a-title", id), listOf(ui("confirm-resolve-a-1")))
@@ -450,11 +488,11 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             if (contract.type() == ContractType.SERVICE && canMediate(contract)) {
                 return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "refund", ui("confirm-mediate-refund-title", id), listOf(ui("confirm-mediate-refund-1")))
             }
-            if (contract.type() == ContractType.PARTNERSHIP && canMediate(contract)) {
+            if ((contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) && canMediate(contract)) {
                 return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "b", ui("confirm-mediate-b-title", id), listOf(ui("confirm-mediate-b-1")))
             }
         }
-        if (slot == 12 && contract.type() == ContractType.PARTNERSHIP && isArbiter(contract, player.uniqueId) && canMediate(contract)) {
+        if (slot == 12 && (contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) && isArbiter(contract, player.uniqueId) && canMediate(contract)) {
             return PendingAction.simple(PendingAction.Kind.MEDIATE, contract, "refund", ui("confirm-mediate-return-title", id), listOf(ui("confirm-mediate-return-1")))
         }
         if (slot == 15 && !contract.status().isFinal() && canCancel(player, contract)) {
@@ -586,9 +624,10 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
     fun openWizardType(player: Player) {
         val menu = Menu(ui("wizard-type-title"), 3)
         fillBorder(menu.inventory)
-        menu.button(11, button(Material.PAPER, ui("wizard-type-service"), ui("wizard-type-service-1"), ui("wizard-type-service-2"))) { startDraft(player, ContractType.SERVICE) }
-        menu.button(13, button(Material.TARGET, ui("wizard-type-wager"), ui("wizard-type-wager-1"))) { startDraft(player, ContractType.WAGER) }
-        menu.button(15, button(Material.AMETHYST_CLUSTER, ui("wizard-type-partnership"), ui("wizard-type-partnership-1"), ui("wizard-type-partnership-2"))) { startDraft(player, ContractType.PARTNERSHIP) }
+        menu.button(10, button(Material.PAPER, ui("wizard-type-service"), ui("wizard-type-service-1"), ui("wizard-type-service-2"))) { startDraft(player, ContractType.SERVICE) }
+        menu.button(12, button(Material.TARGET, ui("wizard-type-wager"), ui("wizard-type-wager-1"))) { startDraft(player, ContractType.WAGER) }
+        menu.button(14, button(Material.AMETHYST_CLUSTER, ui("wizard-type-partnership"), ui("wizard-type-partnership-1"), ui("wizard-type-partnership-2"))) { startDraft(player, ContractType.PARTNERSHIP) }
+        menu.button(16, button(Material.CHEST, ui("wizard-type-sale"), ui("wizard-type-sale-1"), ui("wizard-type-sale-2"))) { startDraft(player, ContractType.SALE) }
         menu.button(22, button(Material.ARROW, ui("nav-back-hall-button"), ui("nav-back-hall"))) { cancelDraft(player) }
         registry.open(player, menu)
     }
@@ -633,9 +672,18 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         if (draft.type() == ContractType.SERVICE && draft.itemReward()) {
             menu.decoration(22, button(Material.CHEST, ui("reward-item-title"), ui("reward-item-1"), ui("reward-item-2")))
         } else {
-            val service = draft.type() == ContractType.SERVICE
-            menu.button(22, fieldButton(Material.GOLD_INGOT, ui(if (service) "field-reward" else "field-my-stake"), draft.amount()?.let { render.trimNumber(it) })) {
-                promptNumberField(player, ui(if (service) "prompt-reward" else "prompt-my-stake")) { draft.amount(it) }
+            val amountKey = when (draft.type()) {
+                ContractType.SERVICE -> "field-reward"
+                ContractType.SALE -> "field-sale-price"
+                else -> "field-my-stake"
+            }
+            val promptKey = when (draft.type()) {
+                ContractType.SERVICE -> "prompt-reward"
+                ContractType.SALE -> "prompt-sale-price"
+                else -> "prompt-my-stake"
+            }
+            menu.button(22, fieldButton(Material.GOLD_INGOT, ui(amountKey), draft.amount()?.let { render.trimNumber(it) })) {
+                promptNumberField(player, ui(promptKey)) { draft.amount(it) }
             }
         }
         val mediatorRequired = draft.mediatorRequired()
@@ -644,6 +692,11 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         }
         if (draft.needsPartnerStake()) {
             menu.button(29, fieldButton(Material.GOLD_NUGGET, ui("field-partner-stake"), draft.partnerStake()?.let { render.trimNumber(it) })) { promptNumberField(player, ui("prompt-partner-stake")) { draft.partnerStake(it) } }
+        }
+        if (draft.type() == ContractType.SALE) {
+            val offer = saleOffer(player)
+            val value = offer?.let { ui("sale-item-value", mapOf("material" to it.type.name, "count" to it.amount.toString())) } ?: ui("value-unset")
+            menu.decoration(29, button(Material.CHEST, ui("field-sale-item"), ui("field-current", mapOf("value" to value)), ui("sale-item-hold")))
         }
         if (draft.type() == ContractType.SERVICE) {
             menu.button(29, verificationButton(draft)) { toggleVerification(player, draft) }
@@ -685,7 +738,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         }
         menu.button(31, fieldButton(Material.CLOCK, ui("field-days"), draft.days()?.toString())) { promptNumberField(player, ui("prompt-days")) { draft.days(Math.round(it).toInt()) } }
 
-        menu.decoration(33, button(Material.MAP, ui("preview-title"), *render.draftPreview(draft).toTypedArray()))
+        menu.decoration(33, button(Material.MAP, ui("preview-title"), *render.draftPreview(draft, saleOffer(player)).toTypedArray()))
         if (draft.type() == ContractType.SERVICE && player.hasPermission(SCHEDULE_CREATE_PERMISSION)) {
             menu.button(43, scheduleButton(draft)) { promptSchedule(player, draft) }
         }
@@ -702,7 +755,8 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
                 if (recheck != null) {
                     player.sendMessage(problemText(recheck))
                 } else {
-                    openConfirm(player, createAction(draft)) { openWizardForm(player) }
+                    val action = createAction(player, draft)
+                    if (action != null) openConfirm(player, action) { openWizardForm(player) }
                 }
             }
         } else {
@@ -713,8 +767,19 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
     }
 
     /** Wraps the draft preview in a localized confirmation page. */
-    private fun createAction(draft: CreateDraft): PendingAction =
-        PendingAction.create(ui("confirm-create-title"), ui("confirm-create-lead", mapOf("type" to plugin.lang().type(draft.type()))), render.draftPreview(draft))
+    private fun createAction(player: Player, draft: CreateDraft): PendingAction? {
+        val offer = if (draft.type() == ContractType.SALE) saleOffer(player) else null
+        if (draft.type() == ContractType.SALE && offer == null) {
+            player.sendMessage(ui("err-sale-item-in-hand"))
+            return null
+        }
+        return PendingAction.create(
+            ui("confirm-create-title"),
+            ui("confirm-create-lead", mapOf("type" to plugin.lang().type(draft.type()))),
+            render.draftPreview(draft, offer),
+            offer,
+        )
+    }
 
     // ---- Confirm + execute ---------------------------------------------------------------------
 
@@ -729,7 +794,8 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             player.sendMessage(problemText(validation))
             openWizardForm(player)
         } else {
-            openConfirm(player, createAction(draft)) { openWizardForm(player) }
+            val action = createAction(player, draft)
+            if (action != null) openConfirm(player, action) { openWizardForm(player) }
         }
     }
 
@@ -760,9 +826,13 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             val activeDraft = drafts[player.uniqueId]
             val contractCount = activeDraft?.contractCount() ?: 1
             val scheduled = activeDraft?.publishAt() != null
-            val result = executeCreate(player)
+            val result = executeCreate(player, action.expectedSaleItem())
             if (result.success()) {
-                val key = if (scheduled) "schedule-created" else "result-created"
+                val key = when {
+                    scheduled -> "schedule-created"
+                    activeDraft?.type() == ContractType.SALE -> "result-sale-created"
+                    else -> "result-created"
+                }
                 player.sendMessage(ui(key, mapOf("count" to contractCount.toString())))
                 drafts.remove(player.uniqueId)
                 val done = result.contract()
@@ -810,7 +880,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
         onReturn()
     }
 
-    private fun executeCreate(player: Player): ServiceResult {
+    private fun executeCreate(player: Player, expectedSaleItem: ItemStack?): ServiceResult {
         val draft = drafts[player.uniqueId] ?: return ServiceResult.fail(ui("draft-expired"))
         val validation = draft.validate(minAmount(), maxAmount(), minDays(), maxDays(), maxBatchContracts(), maxRepeatCooldownHours())
         if (validation != null) {
@@ -862,6 +932,20 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
                 val counterparty = draft.counterparty() ?: return ServiceResult.fail(ui("draft-need-counterparty"))
                 val partnerStake = draft.partnerStake() ?: return ServiceResult.fail(ui("draft-need-partner-stake"))
                 plugin.contracts().createPartnership(player, counterparty, BigDecimal.valueOf(amount), BigDecimal.valueOf(partnerStake), days, title, description, emptyToNull(draft.mediator()))
+            }
+            ContractType.SALE -> {
+                val price = draft.amount() ?: return ServiceResult.fail(ui("draft-need-amount"))
+                val counterparty = draft.counterparty() ?: return ServiceResult.fail(ui("draft-need-counterparty"))
+                plugin.contracts().createSale(
+                    player,
+                    counterparty,
+                    BigDecimal.valueOf(price),
+                    days,
+                    title,
+                    description,
+                    emptyToNull(draft.mediator()),
+                    expectedSaleItem,
+                )
             }
             else -> ServiceResult.fail(ui("draft-unsupported-type"))
         }
@@ -1122,6 +1206,8 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             if (contract.type() != ContractType.WAGER && status == ContractStatus.DISPUTED) return ui("inbox-dispute-resolve")
         }
         if (status == ContractStatus.PENDING_ACCEPT && id == contract.contractorUuid()) return ui("inbox-accept-invite")
+        val role = contract.participantByUuid(id).map { it.role() }.orElse(null)
+        if (role != null && status.isFinal() && contract.hasItemClaims(role)) return ui("inbox-claim-entitlement")
         if (contract.type() == ContractType.SERVICE) {
             if (status == ContractStatus.COMPLETED && id == contract.ownerUuid() && contract.hasDeliveryItems()) return ui("inbox-claim-delivery")
             if (status == ContractStatus.COMPLETED && id == contract.contractorUuid() && contract.hasRewardItems()) return ui("inbox-claim-reward")
@@ -1137,7 +1223,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             }
             if (!contract.systemVerifiedService() && status == ContractStatus.SUBMITTED && id == contract.ownerUuid()) return ui("inbox-approve")
         }
-        if (contract.type() == ContractType.PARTNERSHIP && status == ContractStatus.IN_PROGRESS && isParty(contract, id)) {
+        if ((contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) && status == ContractStatus.IN_PROGRESS && isParty(contract, id)) {
             val approved = contract.metadata.getOrDefault("approved-roles", "")
             val me = contract.participantByUuid(id)
             if (me.isPresent && !approved.contains(me.get().role().name)) return ui("inbox-partner-approve")
@@ -1146,6 +1232,11 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             return if (isDisputeInitiator(contract, id)) ui("inbox-dispute-own") else ui("inbox-dispute-other")
         }
         return null
+    }
+
+    private fun saleOffer(player: Player): ItemStack? {
+        val hand = player.inventory.itemInMainHand
+        return if (hand.type == Material.AIR || hand.amount <= 0) null else hand.clone()
     }
 
     private fun progressLabel(player: Player, contract: Contract): String {
@@ -1166,6 +1257,7 @@ class ContractGui(private val plugin: ContractPlugin) : Listener, Terminable {
             ContractStatus.SCHEDULED -> ui("schedule-state")
             ContractStatus.OPEN -> ui("progress-open")
             ContractStatus.PENDING_ACCEPT -> ui("progress-pending-accept")
+            ContractStatus.PENDING_ACCEPT_MULTI -> ui("progress-pending-accept-multi")
             ContractStatus.IN_PROGRESS -> ui("progress-in-progress")
             ContractStatus.SUBMITTED -> ui("progress-submitted")
             ContractStatus.DISPUTED -> ui("progress-disputed")

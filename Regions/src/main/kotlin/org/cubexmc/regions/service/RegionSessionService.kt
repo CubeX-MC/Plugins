@@ -34,7 +34,7 @@ class RegionSessionService(
         if (!created) {
             return session
         }
-        if (modeActive) activateMode(player, region)
+        if (modeActive) session.metadata[MODE_ACTIVE_METADATA] = activateMode(player, region).toString()
         return session
     }
 
@@ -76,8 +76,7 @@ class RegionSessionService(
         val session = activeSession(player.uniqueId, primary.id) ?: return
         val active = session.metadata[MODE_ACTIVE_METADATA]?.toBooleanStrictOrNull() ?: false
         if (!active) {
-            activateMode(player, primary)
-            session.metadata[MODE_ACTIVE_METADATA] = true.toString()
+            session.metadata[MODE_ACTIVE_METADATA] = activateMode(player, primary).toString()
         }
     }
 
@@ -206,10 +205,11 @@ class RegionSessionService(
         return !(flag == "fly" && (player.gameMode == GameMode.CREATIVE || player.gameMode == GameMode.SPECTATOR))
     }
 
-    private fun activateMode(player: Player, region: RegionDefinition) {
-        plugin.combatModes().onEnter(player, region)
-        plugin.raceModes().onEnter(player, region)
-        plugin.roundModes().onEnter(player, region)
+    private fun activateMode(player: Player, region: RegionDefinition): Boolean = when {
+        plugin.combatModes().isCombatMode(region) -> plugin.combatModes().onEnter(player, region)
+        plugin.raceModes().isRaceMode(region) -> plugin.raceModes().onEnter(player, region)
+        plugin.roundModes().isRoundMode(region) -> plugin.roundModes().onEnter(player, region)
+        else -> true
     }
 
     private fun deactivateMode(player: Player, regionId: String, reason: String) {

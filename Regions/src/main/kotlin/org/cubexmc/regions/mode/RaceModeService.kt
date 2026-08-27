@@ -24,29 +24,32 @@ class RaceModeService(private val plugin: RegionsPlugin) {
             type.equals("boat_race", ignoreCase = true) ||
             type.equals("horse_race", ignoreCase = true)
 
-    fun onEnter(player: Player, region: RegionDefinition) {
+    @Synchronized
+    fun onEnter(player: Player, region: RegionDefinition): Boolean {
         if (!isRaceMode(region)) {
-            return
+            return false
         }
         if (endingRegions.contains(region.id)) {
             plugin.sendGame(player, plugin.gameText("game.race.restoring", mapOf("name" to region.name)))
-            return
+            return false
         }
         val state = state(region)
         if (state.active) {
             plugin.sendGame(player, plugin.gameText("game.race.in-progress", mapOf("name" to region.name)))
-            return
+            return false
         }
         val maxPlayers = region.mode?.values?.get("max-players")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
             plugin.sendGame(player, plugin.gameText("game.race.full", mapOf("name" to region.name)))
-            return
+            return false
         }
         state.players.add(player.uniqueId)
         state.ready.remove(player.uniqueId)
         plugin.sendGame(player, plugin.gameText("game.race.joined", mapOf("name" to region.name, "id" to region.id)))
+        return true
     }
 
+    @Synchronized
     fun onLeave(player: Player, regionId: String, reason: String) {
         val state = states[regionId] ?: return
         state.players.remove(player.uniqueId)
@@ -59,6 +62,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     fun onMove(player: Player) {
         for (session in plugin.sessions().activeSessions(player.uniqueId)) {
             val region = plugin.regions().find(session.regionId) ?: continue
@@ -73,6 +77,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     fun ready(player: Player, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isRaceMode(region)) {
@@ -104,6 +109,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun startCommand(sender: CommandSender, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isRaceMode(region)) {
@@ -117,6 +123,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun forceEnd(sender: CommandSender, regionId: String, reason: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isRaceMode(region)) {
@@ -130,12 +137,14 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun forceEnd(regionId: String, reason: String): Boolean {
         if (!states.containsKey(regionId)) return false
         end(regionId, reason)
         return true
     }
 
+    @Synchronized
     fun cleanupAll(reason: String, shuttingDown: Boolean = false) {
         val immediate = !plugin.regionScheduler().isFolia
         for (regionId in states.keys.toList()) {
@@ -143,6 +152,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     fun status(regionId: String): String {
         val state = states[regionId] ?: return "race idle"
         return if (state.active) {
@@ -152,6 +162,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     private fun start(region: RegionDefinition, state: RaceState, reason: String) {
         if (state.active || state.starting) {
             return
@@ -188,6 +199,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     private fun finalizeStart(
         region: RegionDefinition,
         state: RaceState,
@@ -243,6 +255,7 @@ class RaceModeService(private val plugin: RegionsPlugin) {
         plugin.log().debug("Started race ${region.id}: $reason")
     }
 
+    @Synchronized
     private fun end(
         regionId: String,
         reason: String,

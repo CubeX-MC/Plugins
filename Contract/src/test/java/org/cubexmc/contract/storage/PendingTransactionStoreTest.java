@@ -12,6 +12,8 @@ import org.cubexmc.core.CubexLogger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PendingTransactionStoreTest {
     @TempDir
@@ -70,6 +72,47 @@ class PendingTransactionStoreTest {
         assertEquals(player, entry.playerUuid());
         assertEquals(new BigDecimal("250.00"), entry.amount());
         assertEquals("contract-xyz", entry.contractId());
+    }
+
+    @Test
+    void allianceFundingPhasesSurviveReloadAndRejectStaleTransitions() throws Exception {
+        var file = tempDir.resolve("pending-transactions.yml").toFile();
+        var logger = new CubexLogger(Logger.getAnonymousLogger());
+        PendingTransactionStore store = new PendingTransactionStore(file, logger);
+        UUID player = UUID.randomUUID();
+        String legacy = store.beginWithdraw(player, new BigDecimal("1.00"), "contract-create");
+        String id = store.beginAllianceWithdraw(player, new BigDecimal("12.34"), "alliance-accept", "alliance");
+        var reloaded = new PendingTransactionStore(file, logger);
+        assertEquals(PendingTransactionStore.FundingPhase.PREPARED, find(reloaded.loadAll(), id).fundingPhase());
+        assertNull(find(reloaded.loadAll(), legacy).fundingPhase());
+        reloaded.advanceFunding(id, PendingTransactionStore.FundingPhase.PREPARED, PendingTransactionStore.FundingPhase.WITHDRAWN);
+        assertThrows(IllegalArgumentException.class, () -> reloaded.advanceFunding(id,
+            PendingTransactionStore.FundingPhase.PREPARED, PendingTransactionStore.FundingPhase.REJECTED));
+        reloaded.advanceFunding(id, PendingTransactionStore.FundingPhase.WITHDRAWN, PendingTransactionStore.FundingPhase.REFUNDING);
+        reloaded.advanceFunding(id, PendingTransactionStore.FundingPhase.REFUNDING, PendingTransactionStore.FundingPhase.REFUNDED);
+        assertEquals(PendingTransactionStore.FundingPhase.REFUNDED, find(store.loadAll(), id).fundingPhase());
+        assertThrows(IllegalArgumentException.class, () -> store.advanceFunding(id,
+            PendingTransactionStore.FundingPhase.REFUNDED, PendingTransactionStore.FundingPhase.WITHDRAWN));
+        assertThrows(IllegalArgumentException.class, () -> store.beginWithdraw(player, BigDecimal.ONE, "alliance-accept", "a"));
+        assertThrows(IllegalArgumentException.class, () -> store.beginAllianceWithdraw(player, new BigDecimal("0.001"), "alliance-create", "a"));
+    }
+
+    @Test
+    void malformedFundingOrYamlCannotSilentlyBecomeAnEmptyJournal() throws Exception {
+        var file = tempDir.resolve("pending-transactions.yml").toFile();
+        PendingTransactionStore store = new PendingTransactionStore(file, new CubexLogger(Logger.getAnonymousLogger()));
+        String id = store.beginAllianceWithdraw(UUID.randomUUID(), BigDecimal.ONE, "alliance-create", "a");
+        var yaml = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+        yaml.set("pending." + id + ".funding-phase", null);
+        yaml.save(file);
+        assertThrows(IllegalStateException.class, store::loadAll);
+        java.nio.file.Files.writeString(file.toPath(), "pending: [invalid");
+        String before = java.nio.file.Files.readString(file.toPath());
+        assertThrows(Exception.class, () -> store.beginAllianceWithdraw(UUID.randomUUID(), BigDecimal.ONE, "alliance-create", "b"));
+        assertEquals(before, java.nio.file.Files.readString(file.toPath()));
+        try (var entries = java.nio.file.Files.list(tempDir)) {
+            assertTrue(entries.noneMatch(p -> p.toString().endsWith(".tmp")));
+        }
     }
 
     private PendingTransactionStore.PendingEntry find(List<PendingTransactionStore.PendingEntry> entries, String id) {

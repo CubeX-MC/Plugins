@@ -10,6 +10,9 @@ import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.cubexmc.gui.chat.AcceptResult
+import org.cubexmc.gui.chat.ChatInputState
+import org.cubexmc.gui.chat.ChatOutcome
 import org.cubexmc.regions.RegionsPlugin
 import org.cubexmc.regions.model.RegionDefinition
 import org.cubexmc.regions.service.AuthorityDecision
@@ -24,10 +27,14 @@ import java.util.concurrent.ConcurrentHashMap
  * lives in its own class and navigates through the `open*` methods here.
  */
 class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
-    private val pendingInputs: MutableMap<UUID, PendingInput> = ConcurrentHashMap()
-
-    /** Lines already taken by a prompt, so a server firing both chat events never leaks the input. */
-    private val consumedLines: MutableMap<UUID, String> = ConcurrentHashMap()
+    /**
+     * Prompt bookkeeping — timeout, cancel keyword and the de-duplication between the two chat event
+     * chains — lives in `cubex-gui`'s [ChatInputState] (11 unit tests). Regions was the only plugin
+     * that handled both chains correctly, so its shape is the one that was lifted into the module.
+     */
+    private val chatInputs = ChatInputState<(String) -> Unit>(
+        cancelKeywords = { listOf(CANCEL_WORD, text.text("gui.prompt.cancel-word")) },
+    )
 
     internal val text = GuiText(plugin)
     internal val keys = GuiKeys(plugin)
@@ -66,6 +73,9 @@ class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
     internal fun openOwnedAreas(player: Player, context: OwnedAreaContext) =
         creation.openOwnedAreas(player, context)
 
+    internal fun openTemplatesForRegion(player: Player, regionId: String) =
+        creation.openTemplatesForRegion(player, regionId)
+
     @EventHandler
     fun onClick(event: InventoryClickEvent) {
         val holder = event.inventory.holder as? RegionsHolder ?: return
@@ -98,6 +108,7 @@ class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
             View.PUBLISH_PREVIEW -> publish.click(player, holder.regionId ?: return, slot)
             View.OWNED_AREAS -> creation.clickOwnedArea(player, holder, event.currentItem, slot)
             View.TEMPLATES -> creation.clickTemplate(player, holder, event.currentItem, slot)
+            View.TEMPLATE_CONFIRM -> creation.clickTemplateConfirmation(player, holder, slot)
         }
     }
 
@@ -136,28 +147,37 @@ class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
      */
     private fun capture(player: Player, message: String): Boolean {
         val playerId = player.uniqueId
-        val pending = pendingInputs.remove(playerId) ?: return consumedLines.remove(playerId) == message
-        consumedLines[playerId] = message
-        plugin.regionScheduler().runAtEntity(player, Runnable {
-            consumedLines.remove(playerId)
-            if (isCancelWord(message.trim())) {
-                text.send(player, "gui.prompt.cancelled")
-                openMain(player)
-                return@Runnable
+        return when (val result = chatInputs.accept(playerId, message)) {
+            AcceptResult.NotOurs -> false
+            AcceptResult.AlreadyTaken -> true
+            is AcceptResult.Accepted -> {
+                plugin.regionScheduler().runAtEntity(player, Runnable {
+                    chatInputs.settle(playerId)
+                    when (val outcome = result.outcome) {
+                        ChatOutcome.Cancelled -> {
+                            text.send(player, "gui.prompt.cancelled")
+                            openMain(player)
+                        }
+
+                        is ChatOutcome.Submitted -> result.payload(outcome.text)
+
+                        // Regions offers neither a clear keyword nor a timeout, so these cannot occur.
+                        else -> Unit
+                    }
+                })
+                true
             }
-            pending.onSubmit(message)
-        })
-        return true
+        }
     }
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
-        pendingInputs.remove(event.player.uniqueId)
-        consumedLines.remove(event.player.uniqueId)
+        chatInputs.forget(event.player.uniqueId)
     }
 
     internal fun promptLine(player: Player, promptKey: String, placeholders: Map<String, String> = emptyMap(), onSubmit: (String) -> Unit) {
-        pendingInputs[player.uniqueId] = PendingInput(onSubmit)
+        // Regions prompts never time out; 0 means "no deadline".
+        chatInputs.open(player.uniqueId, allowClear = false, timeoutMillis = 0L, payload = onSubmit)
         player.closeInventory()
         text.send(player, promptKey, placeholders)
         text.send(player, "gui.prompt.hint")
@@ -211,7 +231,7 @@ class RegionsGui(internal val plugin: RegionsPlugin) : Listener {
         return false
     }
 
-    private fun isCancelWord(message: String): Boolean =
-        message.equals("cancel", ignoreCase = true) ||
-            message.equals(text.text("gui.prompt.cancel-word"), ignoreCase = true)
+    private companion object {
+        const val CANCEL_WORD = "cancel"
+    }
 }

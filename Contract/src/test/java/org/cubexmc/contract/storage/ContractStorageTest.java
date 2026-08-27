@@ -2,9 +2,16 @@ package org.cubexmc.contract.storage;
 
 import org.cubexmc.contract.model.Contract;
 import org.cubexmc.contract.model.ContractObjective;
+import org.cubexmc.contract.model.Asset;
+import org.cubexmc.contract.model.ItemClaimPlan;
 import org.cubexmc.contract.model.ObjectiveType;
+import org.cubexmc.contract.model.ParticipantRole;
+import org.cubexmc.contract.model.PayoutCondition;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -13,11 +20,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.logging.Logger;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.cubexmc.core.CubexLogger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 /** Covers crash-safe persistence of the contract database (C1): atomic save, rolling backup, recovery. */
 class ContractStorageTest {
@@ -114,6 +127,51 @@ class ContractStorageTest {
         assertEquals("ZOMBIE", loaded.objective().target());
         assertEquals(10, loaded.objective().required());
         assertEquals(4, loaded.objective().progress());
+    }
+
+    private ItemStack stack(Material material, int amount) {
+        ItemStack stack = mock(ItemStack.class);
+        Map<String, Object> serialized = new LinkedHashMap<>();
+        serialized.put("type", material.name());
+        serialized.put("amount", amount);
+        when(stack.getType()).thenReturn(material);
+        when(stack.getAmount()).thenReturn(amount);
+        when(stack.clone()).thenReturn(stack);
+        when(stack.serialize()).thenReturn(serialized);
+        return stack;
+    }
+
+    @Test
+    void savesAndReloadsRoleOwnedItemClaims() throws IOException {
+        ItemStack emeralds = stack(Material.EMERALD, 7);
+        Contract contract = Contract.createSale(
+            "sale-storage",
+            UUID.randomUUID(), "Alice",
+            UUID.randomUUID(), "Bob",
+            java.util.List.of(Asset.item(emeralds)),
+            java.util.List.of(Asset.money(new BigDecimal("40.00"))),
+            "Emerald sale", "description", 1_000L, 2_000L
+        );
+        contract.itemClaims(ItemClaimPlan.route(
+            contract,
+            contract.payoutsFor(PayoutCondition.SUCCESS)
+        ).claims());
+        ContractStorage storage = newStorage();
+        storage.put(contract);
+        storage.save();
+
+        Contract loaded;
+        try (MockedStatic<ItemStack> statics = mockStatic(ItemStack.class)) {
+            statics.when(() -> ItemStack.deserialize(anyMap())).thenReturn(emeralds);
+            ContractStorage reloaded = newStorage();
+            reloaded.load();
+            loaded = reloaded.findById("sale-storage").orElseThrow();
+        }
+
+        assertEquals(java.util.Set.of(ParticipantRole.PARTY_A),
+            loaded.itemClaimSources(ParticipantRole.PARTY_B));
+        assertEquals(Material.EMERALD, loaded.itemClaims(ParticipantRole.PARTY_B).get(0).getType());
+        assertEquals(7, loaded.itemClaims(ParticipantRole.PARTY_B).get(0).getAmount());
     }
 
 }

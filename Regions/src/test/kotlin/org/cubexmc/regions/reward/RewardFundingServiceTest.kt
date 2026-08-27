@@ -87,6 +87,127 @@ class RewardFundingServiceTest {
         assertEquals(0, provider.locks)
     }
 
+    @Test
+    fun `provider outage after match records settlement intent and retries instead of refunding`() {
+        val partyA = UUID.randomUUID()
+        val provider = FakeProvider(partyA, UUID.randomUUID())
+        val store = store()
+        val service = service(provider, store)
+        val region = region("dual_pvp")
+        assertTrue(service.reserve(region).successful)
+        val operationId = provider.operations.single()
+
+        provider.checkAvailable = false
+        val unavailable = service.settle(region, setOf(partyA))
+        assertFalse(unavailable.successful)
+        assertEquals(LeaseState.SETTLING, store.get("arena")?.state)
+        assertEquals(setOf(partyA.toString()), store.get("arena")?.winnerKeys)
+
+        provider.checkAvailable = true
+        val results = service(provider, store).reconcile()
+
+        assertTrue(results.single().successful)
+        assertEquals(0, provider.refunds)
+        assertEquals(listOf(partyA), provider.winners)
+        assertEquals(operationId, provider.operations.last())
+        assertTrue(store.all().isEmpty())
+    }
+
+    @Test
+    fun `settlement intent survives store reload and replays the same operation id`() {
+        val partyA = UUID.randomUUID()
+        val provider = FakeProvider(partyA, UUID.randomUUID())
+        val firstStore = store()
+        val region = region("dual_pvp")
+        val firstService = service(provider, firstStore)
+        assertTrue(firstService.reserve(region).successful)
+        val operationId = provider.operations.single()
+
+        provider.checkAvailable = false
+        val interrupted = firstService.settle(region, setOf(partyA))
+        assertFalse(interrupted.successful)
+
+        val reloadedStore = RewardFundingStore(
+            tempDir.resolve("reward-funding.yml").toFile(),
+            logger(),
+        ).apply { reload() }
+        assertEquals(LeaseState.SETTLING, reloadedStore.get("arena")?.state)
+        assertEquals(operationId, reloadedStore.get("arena")?.operationId)
+
+        provider.checkAvailable = true
+        val recovered = service(provider, reloadedStore).reconcile()
+
+        assertTrue(recovered.single().successful)
+        assertEquals(operationId, provider.operations.last())
+        assertEquals(listOf(partyA), provider.winners)
+        assertEquals(0, provider.refunds)
+        assertTrue(reloadedStore.all().isEmpty())
+    }
+
+    @Test
+    fun `review-required settlement remains durable and never falls back to refund`() {
+        val partyA = UUID.randomUUID()
+        val provider = FakeProvider(partyA, UUID.randomUUID())
+        val firstStore = store()
+        val region = region("dual_pvp")
+        val firstService = service(provider, firstStore)
+        assertTrue(firstService.reserve(region).successful)
+        val operationId = provider.operations.single()
+        provider.settlementFailure = FundingResult.fail("REVIEW_REQUIRED", "partial payout")
+
+        val failed = firstService.settle(region, setOf(partyA))
+        assertEquals("REVIEW_REQUIRED", failed.code)
+
+        val reloadedStore = RewardFundingStore(
+            tempDir.resolve("reward-funding.yml").toFile(),
+            logger(),
+        ).apply { reload() }
+        val replay = service(provider, reloadedStore).reconcile()
+
+        assertEquals("REVIEW_REQUIRED", replay.single().code)
+        assertEquals(LeaseState.SETTLING, reloadedStore.get("arena")?.state)
+        assertTrue(provider.operations.all { it == operationId })
+        assertEquals(0, provider.refunds)
+    }
+
+    @Test
+    fun `union lookup outage retains raw winner candidates for later reconciliation`() {
+        val partyA = UUID.randomUUID()
+        val partyB = UUID.randomUUID()
+        val winner = UUID.randomUUID()
+        val provider = FakeProvider(partyA, partyB)
+        val store = store()
+        var unionsAvailable = false
+        val resolver: (UUID) -> String? = { id ->
+            if (!unionsAvailable) null else mapOf(partyA to "red", partyB to "blue", winner to "blue")[id]
+        }
+        val region = region("union_war")
+        val service = RewardFundingService(provider, store, resolver, logger())
+        assertTrue(service.reserve(region).successful)
+
+        val unavailable = service.settle(region, setOf(winner))
+        assertEquals("WINNER_CONTEXT_UNAVAILABLE", unavailable.code)
+        assertEquals(setOf(winner.toString()), store.get("arena")?.winnerKeys)
+
+        unionsAvailable = true
+        val recovered = RewardFundingService(provider, store, resolver, logger()).reconcile()
+        assertTrue(recovered.single().successful)
+        assertEquals(listOf(partyB), provider.winners)
+        assertEquals(0, provider.refunds)
+    }
+
+    @Test
+    fun `malformed durable lease fails closed without replacing live leases`() {
+        val store = store()
+        store.put(Lease("live", "wager-live", "operation-live", LeaseState.LOCKED))
+        tempDir.resolve("reward-funding.yml").toFile().writeText(
+            "funding-version: 1\nleases:\n  broken:\n    state: LOCKED\n",
+        )
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) { store.reload() }
+        assertEquals("operation-live", store.get("live")?.operationId)
+    }
+
     private fun store(): RewardFundingStore = RewardFundingStore(
         tempDir.resolve("reward-funding.yml").toFile(),
         logger(),
@@ -109,9 +230,12 @@ class RewardFundingServiceTest {
         var refunds = 0
         val winners = mutableListOf<UUID>()
         val operations = mutableListOf<String>()
+        var checkAvailable = true
+        var settlementFailure: FundingResult? = null
 
         override fun check(contractId: String, regionId: String): FundingResult =
-            FundingResult.ok(contractId, partyA, partyB)
+            if (checkAvailable) FundingResult.ok(contractId, partyA, partyB)
+            else FundingResult.fail("PROVIDER_UNAVAILABLE", "temporary outage")
 
         override fun lock(operationId: String, contractId: String, regionId: String): FundingResult {
             locks++
@@ -127,7 +251,7 @@ class RewardFundingServiceTest {
         ): FundingResult {
             operations += operationId
             winners += winnerId
-            return FundingResult.ok(contractId, partyA, partyB)
+            return settlementFailure ?: FundingResult.ok(contractId, partyA, partyB)
         }
 
         override fun refund(

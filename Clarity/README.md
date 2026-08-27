@@ -37,12 +37,12 @@ Clarity 专门处理这一类残留：走 Bukkit Attribute API 按**服主显式
 
 ## 安装
 
-1. 把 `clarity-<version>.jar` 放进服务器 `plugins/`。
+1. 把 `Clarity-<version>.jar` 放进服务器 `plugins/`。
 2. 启动服务器生成默认配置。
 3. **先用 `/clarity player scan` 看清楚要清什么**，把实际 modifier id 填进 `attributes.remove-modifier-ids`，
    保持 `dry-run: true` 观察几天，确认命中无误后再关掉 dry-run。
 
-> 部署用的是 `build/libs/clarity-<version>.jar`；同目录的 `*-plain.jar` **不要**部署。
+> 部署用的是 `build/libs/Clarity-<version>.jar`；同目录的 `*-plain.jar` **不要**部署。
 
 ## 命令
 
@@ -99,3 +99,4 @@ Windows 必须用 PowerShell 跑 `.\gradlew.bat`（仓库路径含空格）。
 ## 相关文档
 
 - 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
+- 发布检查：[`docs/release-checklist.md`](docs/release-checklist.md)

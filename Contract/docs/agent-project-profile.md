@@ -12,9 +12,9 @@ agent pipeline must not duplicate these details.
   shaded into the deployable plugin jar.
 - Main class: `org.cubexmc.contract.ContractPlugin`.
 - Version: `0.1.0`, from `Contract/build.gradle.kts`.
-- Core promise: a player-to-player contract board with Vault-backed escrow,
-  batch SERVICE publication, submissions, approval, cancellation, disputes,
-  mediation, and admin settlement.
+- Core promise: a player-to-player contract board with Vault/item escrow,
+  batch SERVICE publication, SALE item-for-money exchange, submissions,
+  approval, cancellation, disputes, mediation, and admin settlement.
 - Active feature artifact:
   `docs/batch-template-scheduling-artifact.md`. Read it before changing batch
   display, templates, publication scheduling, or their persistence model.
@@ -103,6 +103,12 @@ Keep platform and artifact claims synchronized across:
   implementation accepts only funded `IN_PROGRESS` WAGERs and persists lock/
   terminal operation metadata inside `contract.yml`.
 - Models: `model/*`.
+- ALLIANCE (player creation not enabled): `model/AllianceAgreement` holds immutable
+  UUID-scoped funded signatures/approvals; `model/AlliancePayoutPlan` computes explicit
+  source/recipient UUID principal allocations. It does not call Vault or write a journal.
+  `Contract.createAlliance` is a model factory; `ContractService.createAlliance` and
+  its ALLIANCE accept dispatch call `service/AllianceFundingService` under the service
+  monitor for actual creator/member escrow. Terminal payout execution is not connected.
 - Localization: `config/LanguageManager`, `resources/lang/zh_CN.yml`, and
   `resources/lang/en_US.yml`.
 - Shared scheduling/config/i18n/runtime support: shaded `modules/cubex-*`.
@@ -173,6 +179,55 @@ Current runtime data:
 - `plugins/Contract/reputation.yml`
 - `plugins/Contract/events.log`
 
+`contract.yml` stores live physical escrow in participant ITEM assets for new
+records. Terminal item entitlements use the optional nested shape
+`item-claims.<recipient-role>.<source-role>`. Legacy SERVICE
+`delivery-items`/`reward-items` pools remain readable and writable so existing
+saves and a downgrade to the pre-entitlement `0.1.0` behavior still retain the
+SERVICE items it understands. An older runtime ignores `item-claims`; therefore
+do not downgrade while any role-owned terminal claim outside those SERVICE
+pools remains unresolved. SALE uses these role-owned claims for success,
+refund, timeout, and mediated outcomes.
+
+ALLIANCE model records add `alliance.version: 1`, `alliance.signatures` entries
+(`uuid`, `accepted-at`), and an `alliance.approvals` UUID list. Participant MONEY
+assets remain the sole principal terms; signatures distinguish funded members
+from invitees. Only OWNER plus two or more distinct ALLY members are accepted.
+Amounts are positive whole cents. Every signature precedes the acceptance deadline;
+the creator signature matches `created-at`. Malformed ALLIANCE records stop loading
+without dropping the record or selecting a stale backup; the previous in-memory
+database remains untouched. Existing SERVICE/WAGER/PARTNERSHIP/SALE records gain no
+new required fields. Do not downgrade a save containing ALLIANCE records: earlier
+runtimes cannot read `PENDING_ACCEPT_MULTI` / `ALL_APPROVE` and may skip them.
+
+Principal plans return each funded member's own stake on refund, require unanimous
+signing and approval for success, and split a named defaulter's stake among all other
+members on a disputed breach. Integer-cent division plus UUID-sorted remainder
+allocation conserves every source pool; fees/commission policy and terminal execution
+remain outside this calculation. Funding now persists the signature plus matching
+`metadata.alliance-funding-op-<uuid>`; the final signature activates the contract.
+An already funded invited member counts toward `limits.max-active-accepted-contracts`
+even while other signatures are pending. Creation uses `limits.max-open-contracts`;
+the service checks existing `contract.create` / `contract.accept` permissions.
+
+ALLIANCE WITHDRAW journal entries add `funding-phase`: PREPARED before Vault,
+WITHDRAWN after confirmed withdrawal, REFUNDING before compensation, REFUNDED after
+confirmed compensation, or REJECTED after a definite withdrawal failure. Recovery
+matches the member UUID, amount and operation ID against a persisted signature;
+it never relies on global contract status alone. Confirmed uncommitted withdrawal
+can be refunded; PREPARED/REFUNDING are ambiguous and remain for manual review with
+further funding blocked for that player/contract. Missing acceptance contracts or
+operation/signature conflicts also remain for review. Legacy unphased entries keep
+their existing recovery behavior and constructor shape. The shared journal uses
+strict YAML reads and same-directory atomic replacement without stale-backup fallback;
+unsupported atomic moves fail the write rather than downgrading to an unsafe overwrite.
+Do not downgrade with phased entries: older recovery cannot interpret them safely.
+
+Terminal service work must persist settlement intent before external effects and
+block settlement/retention while funding is unresolved; the old role-based executor
+must not execute ALLIANCE. See PLAN §5.1, `alliance-model-evidence.md`, and
+`alliance-funding-evidence.md`.
+
 The active artifact defines the shipped batch/template/scheduling invariants.
 Recurring schedules, replenishment and bulk settlement remain out of scope.
 
@@ -190,6 +245,8 @@ Any schema change requires:
 - Contract hall, status views, details, creation, confirmation, inbox, and
   admin workbench.
 - SERVICE batch count and repeat-policy controls.
+- SALE creation from the seller's complete main-hand stack, named-buyer
+  acceptance, mutual approval, and item claim discovery.
 - Accept, submit, claim, approve, cancel, dispute, mediate, and admin-settlement
   actions.
 - Dialog API on supported Paper versions; inventory/chat fallback elsewhere.

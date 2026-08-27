@@ -8,6 +8,8 @@ import java.util.UUID;
  * Consumer plugins obtain it via
  * {@code getServer().getServicesManager().load(ReputationService.class)}, register their fields
  * once on enable, then update values as gameplay happens. Mutation is keyed by {@code namespace:id}.
+ * Mutations that change the effective value broadcast a {@link ReputationChangeEvent} after the
+ * store has been updated.
  */
 public interface ReputationService {
 

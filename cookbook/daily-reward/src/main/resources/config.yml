@@ -1,0 +1,4 @@
+# 两次签到之间至少间隔多少小时。
+cooldown-hours: 24
+reward-message: "&a签到成功!&f明天再来。"
+wait-message: "&e今天已经签到过了,还要等 &f{time}&e。"

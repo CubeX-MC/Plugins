@@ -1,0 +1,6 @@
+name: CookbookWelcomeBack
+version: '${version}'
+main: org.cubexmc.cookbook.welcomeback.WelcomeBackPlugin
+api-version: '1.18'
+author: CubeX
+description: Cookbook 02 - onEvent auto-binds the listener to the plugin resource stack.

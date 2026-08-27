@@ -37,12 +37,15 @@ class RewardFundingStore(
     @Synchronized
     fun save(): Boolean {
         val yaml = YamlConfiguration()
+        yaml["funding-version"] = FUNDING_VERSION
         for (lease in leases.values) {
             val path = "leases.${lease.regionId}"
             yaml["$path.contract-id"] = lease.contractId
             yaml["$path.operation-id"] = lease.operationId
             yaml["$path.state"] = lease.state.name
             yaml["$path.winner-id"] = lease.winnerId?.toString()
+            yaml["$path.winner-mode"] = lease.winnerMode
+            yaml["$path.winner-keys"] = lease.winnerKeys.toList()
             yaml["$path.reason"] = lease.reason
             yaml["$path.created-at"] = lease.createdAt
         }
@@ -72,22 +75,30 @@ class RewardFundingStore(
     override fun reload() {
         val loaded = LinkedHashMap<String, Lease>()
         if (file.exists()) {
-            val root = YamlConfiguration.loadConfiguration(file).getConfigurationSection("leases")
+            val yaml = YamlConfiguration().apply { load(file) }
+            val version = yaml.getInt("funding-version", FUNDING_VERSION)
+            require(version == FUNDING_VERSION) {
+                "Unsupported reward funding version $version (expected $FUNDING_VERSION)."
+            }
+            val root = yaml.getConfigurationSection("leases")
             if (root != null) {
                 for (regionId in root.getKeys(false)) {
-                    val section = root.getConfigurationSection(regionId) ?: continue
-                    runCatching {
-                        Lease(
-                            regionId,
-                            section.getString("contract-id") ?: error("contract-id missing"),
-                            section.getString("operation-id") ?: error("operation-id missing"),
-                            LeaseState.valueOf(section.getString("state", LeaseState.PREPARING.name)!!),
-                            section.getString("winner-id")?.takeIf(String::isNotBlank)?.let(UUID::fromString),
-                            section.getString("reason", "") ?: "",
-                            section.getLong("created-at"),
-                        )
-                    }.onSuccess { loaded[regionId] = it }
-                        .onFailure { logger.warn("Skipping malformed reward funding lease $regionId: ${it.message}") }
+                    val section = requireNotNull(root.getConfigurationSection(regionId)) {
+                        "Reward funding lease $regionId is not a section."
+                    }
+                    val winnerKeys = section.getStringList("winner-keys")
+                    winnerKeys.forEach { UUID.fromString(it) }
+                    loaded[regionId] = Lease(
+                        regionId,
+                        section.getString("contract-id") ?: error("Lease $regionId: contract-id missing"),
+                        section.getString("operation-id") ?: error("Lease $regionId: operation-id missing"),
+                        LeaseState.valueOf(section.getString("state") ?: error("Lease $regionId: state missing")),
+                        section.getString("winner-id")?.takeIf(String::isNotBlank)?.let(UUID::fromString),
+                        section.getString("winner-mode", "") ?: "",
+                        LinkedHashSet(winnerKeys),
+                        section.getString("reason", "") ?: "",
+                        section.getLong("created-at"),
+                    )
                 }
             }
         }
@@ -107,6 +118,8 @@ class RewardFundingStore(
         val operationId: String,
         var state: LeaseState,
         var winnerId: UUID? = null,
+        var winnerMode: String = "",
+        var winnerKeys: Set<String> = emptySet(),
         var reason: String = "",
         val createdAt: Long = System.currentTimeMillis(),
     )
@@ -117,5 +130,9 @@ class RewardFundingStore(
         SETTLING,
         REFUNDING,
         TERMINAL,
+    }
+
+    private companion object {
+        const val FUNDING_VERSION = 1
     }
 }

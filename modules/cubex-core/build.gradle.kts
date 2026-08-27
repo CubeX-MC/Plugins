@@ -17,6 +17,8 @@ java {
 dependencies {
     compileOnly(CubexDeps.spigotApi("1.18.2-R0.1-SNAPSHOT"))
     testImplementation(CubexDeps.junitJupiter)
+    // PlayerItems 的槽位枚举要 mock PlayerInventory 才测得动
+    testImplementation(CubexDeps.mockitoCore)
     testImplementation(CubexDeps.spigotApi("1.18.2-R0.1-SNAPSHOT"))
 }
 

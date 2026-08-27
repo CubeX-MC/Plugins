@@ -23,6 +23,7 @@ import org.cubexmc.mountlicense.util.CooldownTracker
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
 import java.util.logging.Level
+import org.cubexmc.core.getUuid
 
 class RegistryService(
     private val plugin: MountLicensePlugin,
@@ -286,12 +287,7 @@ class RegistryService(
 
     fun readVehicleId(entity: Entity?): UUID? {
         if (entity == null) return null
-        val raw = entity.persistentDataContainer.get(keys.vehicleId(), PersistentDataType.STRING)
-        return try {
-            if (raw == null) null else UUID.fromString(raw)
-        } catch (ex: IllegalArgumentException) {
-            null
-        }
+        return entity.persistentDataContainer.getUuid(keys.vehicleId())
     }
 
     fun reindexLoadedEntities(): ReindexResult {

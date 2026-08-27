@@ -57,13 +57,22 @@ class RewardFundingService(
     override fun settle(region: RegionDefinition, winnerCandidates: Set<UUID>): FundingResult {
         if (configuredContract(region) == null) return FundingResult.ok()
         val lease = store.get(region.id) ?: return FundingResult.fail("LEASE_MISSING", "No reward funding lease exists.")
-        val winner = if (lease.state == LeaseState.SETTLING) lease.winnerId else selectWinner(region, lease, winnerCandidates)
-        if (winner == null) return FundingResult.fail("WINNER_NOT_FUNDED", "The match winner does not map to exactly one WAGER party.")
-
-        lease.state = LeaseState.SETTLING
-        lease.winnerId = winner
-        store.put(lease)
-        if (!store.save()) return FundingResult.fail("LEASE_PERSISTENCE_FAILED")
+        if (lease.state != LeaseState.SETTLING) {
+            lease.state = LeaseState.SETTLING
+            lease.winnerMode = region.mode?.type?.lowercase().orEmpty()
+            lease.winnerKeys = winnerCandidates.mapTo(LinkedHashSet(), UUID::toString)
+            store.put(lease)
+            if (!store.save()) return FundingResult.fail("LEASE_PERSISTENCE_FAILED")
+        }
+        val resolved = resolveWinner(lease)
+        if (!resolved.result.successful) return resolved.result
+        val winner = resolved.winner
+            ?: return FundingResult.fail("WINNER_NOT_FUNDED", "The match winner does not map to exactly one WAGER party.")
+        if (lease.winnerId != winner) {
+            lease.winnerId = winner
+            store.put(lease)
+            if (!store.save()) return FundingResult.fail("LEASE_PERSISTENCE_FAILED")
+        }
         val result = provider.settle(lease.operationId, lease.contractId, lease.regionId, winner)
         return if (result.successful) finalize(lease, result) else result
     }
@@ -85,10 +94,18 @@ class RewardFundingService(
             }
             LeaseState.LOCKED -> refundLease(lease, "restart-recovery")
             LeaseState.SETTLING -> {
-                val winner = lease.winnerId
-                if (winner == null) {
-                    FundingResult.fail("LEASE_MALFORMED", "Settling lease has no winner.")
+                val resolved = if (lease.winnerId != null) WinnerResolution(lease.winnerId, FundingResult.ok()) else resolveWinner(lease)
+                val winner = resolved.winner
+                if (!resolved.result.successful) {
+                    resolved.result
+                } else if (winner == null) {
+                    FundingResult.fail("LEASE_MALFORMED", "Settling lease has no recoverable winner evidence.")
                 } else {
+                    if (lease.winnerId != winner) {
+                        lease.winnerId = winner
+                        store.put(lease)
+                        if (!store.save()) return@map FundingResult.fail("LEASE_PERSISTENCE_FAILED")
+                    }
                     val result = provider.settle(lease.operationId, lease.contractId, lease.regionId, winner)
                     if (result.successful) finalize(lease, result) else result
                 }
@@ -101,18 +118,31 @@ class RewardFundingService(
         }
     }
 
-    private fun selectWinner(region: RegionDefinition, lease: Lease, candidates: Set<UUID>): UUID? {
-        val checked = provider.check(lease.contractId, region.id)
-        if (!checked.successful) return null
+    private fun resolveWinner(lease: Lease): WinnerResolution {
+        if (lease.winnerKeys.isEmpty()) {
+            return WinnerResolution(null, FundingResult.fail("WINNER_NOT_FUNDED", "No winner evidence was recorded."))
+        }
+        val checked = provider.check(lease.contractId, lease.regionId)
+        if (!checked.successful) return WinnerResolution(null, checked)
         val fundedParties = listOfNotNull(checked.partyA, checked.partyB)
-        val matches = if (region.mode?.type.equals("union_war", ignoreCase = true)) {
-            val winningUnions = candidates.mapNotNull(unionId).toSet()
+        val matches = if (lease.winnerMode == "union_war") {
+            val winningUnions = lease.winnerKeys
+                .mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+                .mapNotNullTo(LinkedHashSet(), unionId)
+            if (winningUnions.isEmpty()) {
+                return WinnerResolution(
+                    null,
+                    FundingResult.fail("WINNER_CONTEXT_UNAVAILABLE", "Winning union could not currently be resolved."),
+                )
+            }
             fundedParties.filter { unionId(it) in winningUnions }
         } else {
-            fundedParties.filter(candidates::contains)
+            fundedParties.filter { it.toString() in lease.winnerKeys }
         }
-        return matches.distinct().singleOrNull()
+        return WinnerResolution(matches.distinct().singleOrNull(), FundingResult.ok(lease.contractId))
     }
+
+    private data class WinnerResolution(val winner: UUID?, val result: FundingResult)
 
     private fun refundLease(lease: Lease, reason: String): FundingResult {
         lease.state = LeaseState.REFUNDING

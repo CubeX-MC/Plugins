@@ -140,6 +140,19 @@ class CreateDraftTest {
     }
 
     @Test
+    void saleRequiresBuyerAndPriceButNotPartnerStake() {
+        CreateDraft draft = new CreateDraft(ContractType.SALE);
+        draft.title("Diamond sale");
+        draft.days(3);
+        draft.amount(500.0);
+        assertTrue(draft.needsCounterparty());
+        assertFalse(draft.needsPartnerStake());
+        assertNotNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
+        draft.counterparty("Alex");
+        assertNull(draft.validate(MIN, MAX, MIN_DAYS, MAX_DAYS));
+    }
+
+    @Test
     void serviceDoesNotRequireCounterparty() {
         CreateDraft draft = new CreateDraft(ContractType.SERVICE);
         assertFalse(draft.needsCounterparty());

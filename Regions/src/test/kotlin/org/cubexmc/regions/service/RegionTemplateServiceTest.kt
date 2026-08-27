@@ -2,6 +2,7 @@ package org.cubexmc.regions.service
 
 import org.bukkit.configuration.file.YamlConfiguration
 import org.cubexmc.regions.model.RegionDefinition
+import org.cubexmc.regions.model.RegionLifecycle
 import org.cubexmc.regions.model.RegionSourceRef
 import org.cubexmc.regions.model.RegionTrigger
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -54,6 +55,49 @@ class RegionTemplateServiceTest {
         assertEquals("allow", result.region?.flags?.get("pvp")?.value)
         assertEquals("permission", result.region?.triggers?.get(RegionTrigger.ON_ENTER)?.first()?.conditions?.first()?.type)
         assertEquals("duel", result.region?.metadata?.get("template-id"))
+    }
+
+    @Test
+    fun `applying hide and seek after mini kingdom replaces the old preset completely`() {
+        val service = loadShippedTemplates()
+        val source = RegionSourceRef("lands", mapOf("land" to "Capital", "area" to "arena"))
+        val base = RegionDefinition(
+            id = "venue",
+            name = "Venue",
+            source = source,
+            enabled = false,
+            lifecycle = RegionLifecycle.DRAFT,
+            revision = 8,
+            publishedRevision = 7,
+            priority = 12,
+            metadata = mapOf("owner-note" to "keep"),
+        )
+
+        val miniature = requireNotNull(service.apply("mini_kingdom", base).region)
+        assertTrue(miniature.effects.any { it.type == "scale" })
+        assertTrue(miniature.triggers.containsKey(RegionTrigger.ON_ENTER))
+
+        val hideAndSeek = requireNotNull(
+            service.apply("hide_and_seek", miniature, mapOf("respawn" to "arena,12,64,-30")).region,
+        )
+
+        assertEquals("hide_and_seek", hideAndSeek.mode?.type)
+        assertTrue(hideAndSeek.effects.isEmpty(), "mini_kingdom scale effect leaked into hide_and_seek")
+        assertFalse(
+            hideAndSeek.triggers.containsKey(RegionTrigger.ON_ENTER),
+            "mini_kingdom enter reminder leaked into hide_and_seek",
+        )
+        assertEquals(service.find("hide_and_seek")?.flags?.keys, hideAndSeek.flags.keys)
+        assertEquals("hide_and_seek", hideAndSeek.metadata["template-id"])
+        assertEquals("keep", hideAndSeek.metadata["owner-note"])
+        assertEquals(base.id, hideAndSeek.id)
+        assertEquals(base.name, hideAndSeek.name)
+        assertEquals(source, hideAndSeek.source)
+        assertEquals(base.enabled, hideAndSeek.enabled)
+        assertEquals(base.lifecycle, hideAndSeek.lifecycle)
+        assertEquals(base.revision, hideAndSeek.revision)
+        assertEquals(base.publishedRevision, hideAndSeek.publishedRevision)
+        assertEquals(base.priority, hideAndSeek.priority)
     }
 
     /**

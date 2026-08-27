@@ -1,5 +1,6 @@
 package org.cubexmc.statecharge.command
 
+import java.math.BigDecimal
 import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
@@ -9,21 +10,29 @@ import org.bukkit.entity.Player
 import org.cubexmc.core.CubexCommandSuggestions
 import org.cubexmc.statecharge.StateChargePlugin
 import org.cubexmc.statecharge.model.StateSpec
-import org.cubexmc.statecharge.service.BuyResult
-import org.cubexmc.statecharge.service.GiveResult
+import org.cubexmc.statecharge.service.ToggleResult
 
 class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecutor, TabCompleter {
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {
         if (args.isEmpty()) {
-            sendHelp(sender)
+            // 空参直接开交易页:玩家最常做的就是开关状态。
+            if (sender is Player && sender.hasPermission(USE_PERMISSION)) {
+                plugin.shop().open(sender)
+            } else {
+                sendHelp(sender)
+            }
             return true
         }
         when (args[0].lowercase()) {
             "help" -> sendHelp(sender)
+            "gui", "shop" -> gui(sender)
             "list" -> list(sender)
             "status" -> status(sender)
-            "buy" -> buy(sender, args)
+            "toggle" -> toggle(sender, args)
+            "on" -> switch(sender, args, on = true)
+            "off" -> switch(sender, args, on = false)
+            "guard" -> guard(sender, args)
             "admin" -> admin(sender, args)
             else -> sendHelp(sender)
         }
@@ -33,14 +42,22 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
     // ---- 玩家命令 ----
 
     private fun sendHelp(sender: CommandSender) {
-        if (!requirePermission(sender, "statecharge.use")) {
+        if (!requirePermission(sender, USE_PERMISSION)) {
             return
         }
         sender.sendMessage(plugin.lang().message("help"))
     }
 
+    private fun gui(sender: CommandSender) {
+        if (!requirePermission(sender, USE_PERMISSION)) {
+            return
+        }
+        val player = requirePlayer(sender) ?: return
+        plugin.shop().open(player)
+    }
+
     private fun list(sender: CommandSender) {
-        if (!requirePermission(sender, "statecharge.use")) {
+        if (!requirePermission(sender, USE_PERMISSION)) {
             return
         }
         val specs = plugin.definitions().purchasable()
@@ -50,16 +67,14 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
         }
         sender.sendMessage(plugin.lang().ui("list-header"))
         for (spec in specs) {
-            val key = if (spec.maxStackSeconds() > 0) "list-line-limited" else "list-line"
             sender.sendMessage(
                 plugin.lang().ui(
-                    key,
+                    "list-line",
                     mapOf(
                         "id" to spec.id(),
                         "state" to spec.display(),
                         "price" to plugin.economy().format(spec.price()),
                         "duration" to plugin.durationText(spec.unitSeconds()),
-                        "max" to plugin.durationText(spec.maxStackSeconds()),
                     ),
                 ),
             )
@@ -67,213 +82,239 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
     }
 
     private fun status(sender: CommandSender) {
-        if (!requirePermission(sender, "statecharge.use")) {
+        if (!requirePermission(sender, USE_PERMISSION)) {
             return
         }
         val player = requirePlayer(sender) ?: return
-        val active = plugin.storage().active(player.uniqueId)
+        val active = plugin.storage().activeStates(player.uniqueId)
         if (active.isEmpty()) {
             sender.sendMessage(plugin.lang().ui("status-empty"))
-            return
+        } else {
+            sender.sendMessage(plugin.lang().ui("status-header"))
+            for (stateId in active) {
+                val spec = plugin.definitions().byId(stateId)
+                sender.sendMessage(
+                    plugin.lang().ui(
+                        "status-line",
+                        mapOf(
+                            "state" to displayOf(spec, stateId),
+                            "price" to plugin.economy().format(spec?.price() ?: BigDecimal.ZERO),
+                            "duration" to plugin.durationText(spec?.unitSeconds() ?: 0L),
+                        ),
+                    ),
+                )
+            }
         }
-        sender.sendMessage(plugin.lang().ui("status-header"))
-        for ((stateId, remaining) in active) {
-            val display = plugin.definitions().byId(stateId)?.display() ?: stateId
-            sender.sendMessage(
-                plugin.lang().ui(
-                    "status-line",
-                    mapOf("state" to display, "time" to plugin.durationText(remaining)),
-                ),
-            )
-        }
+        sender.sendMessage(
+            plugin.lang().ui(
+                "status-guard",
+                mapOf("amount" to plugin.economy().format(plugin.states().guardOf(player.uniqueId))),
+            ),
+        )
     }
 
-    private fun buy(sender: CommandSender, args: Array<String>) {
-        if (!requirePermission(sender, "statecharge.use")) {
+    private fun toggle(sender: CommandSender, args: Array<String>) {
+        if (!requirePermission(sender, USE_PERMISSION)) {
             return
         }
         val player = requirePlayer(sender) ?: return
-        val stateId = args.getOrNull(1)
-        if (stateId == null) {
-            sender.sendMessage(plugin.lang().ui("usage-buy"))
+        if (args.size < 2) {
+            sender.sendMessage(plugin.lang().ui("usage-toggle"))
             return
         }
-        val count = args.getOrNull(2)?.toIntOrNull() ?: 1
-        val result = plugin.states().buy(player, stateId, count)
-        val spec = result.spec()
-        if (spec != null) {
+        report(player, plugin.states().toggle(player, args[1].lowercase()), args[1])
+    }
+
+    private fun switch(sender: CommandSender, args: Array<String>, on: Boolean) {
+        if (!requirePermission(sender, USE_PERMISSION)) {
+            return
+        }
+        val player = requirePlayer(sender) ?: return
+        if (args.size < 2) {
+            sender.sendMessage(plugin.lang().ui(if (on) "usage-on" else "usage-off"))
+            return
+        }
+        val stateId = args[1].lowercase()
+        val spec = plugin.definitions().byId(stateId)
+        if (spec == null) {
+            sender.sendMessage(plugin.lang().message("toggle-unknown-state", mapOf("state" to stateId)))
+            return
+        }
+        // 已经是目标状态就什么都不做,避免 on 一个开着的状态反而把它关掉。
+        if (plugin.storage().isActive(player.uniqueId, stateId) == on) {
             sender.sendMessage(
                 plugin.lang().message(
-                    "buy-success",
-                    mapOf(
-                        "state" to spec.display(),
-                        "time" to plugin.durationText(result.addedSeconds()),
-                        "total" to plugin.durationText(result.remainingSeconds()),
-                        "price" to plugin.economy().format(result.price()),
-                    ),
+                    if (on) "toggle-already-on" else "toggle-already-off",
+                    mapOf("state" to spec.display()),
                 ),
             )
             return
         }
-        val otherSpec = plugin.definitions().byId(stateId)
-        when (result.failure()) {
-            BuyResult.Failure.UNKNOWN_STATE ->
-                sender.sendMessage(plugin.lang().message("buy-unknown-state", mapOf("state" to stateId)))
-            BuyResult.Failure.DISABLED ->
-                sender.sendMessage(plugin.lang().message("buy-disabled", mapOf("state" to displayOf(otherSpec, stateId))))
-            BuyResult.Failure.NO_PERMISSION ->
-                sender.sendMessage(plugin.lang().message("buy-no-permission"))
-            BuyResult.Failure.CONFLICT -> {
-                val otherId = result.conflictStateId() ?: ""
-                val other = plugin.definitions().byId(otherId)?.display() ?: otherId
-                sender.sendMessage(plugin.lang().message("buy-conflict", mapOf("other" to other)))
-            }
-            BuyResult.Failure.MAX_STACK -> {
-                val maxText = otherSpec?.let { plugin.durationText(it.maxStackSeconds()) } ?: "?"
-                sender.sendMessage(plugin.lang().message("buy-max-stack", mapOf("max" to maxText)))
-            }
-            BuyResult.Failure.INVALID_COUNT ->
-                sender.sendMessage(plugin.lang().message("buy-invalid-count"))
-            BuyResult.Failure.INSUFFICIENT_FUNDS ->
-                sender.sendMessage(
-                    plugin.lang().message("buy-insufficient", mapOf("price" to plugin.economy().format(result.price()))),
-                )
-            BuyResult.Failure.ECONOMY_FAILED ->
-                sender.sendMessage(plugin.lang().message("buy-economy-failed", mapOf("reason" to (result.reason() ?: ""))))
-            null -> Unit
-        }
+        val result = if (on) plugin.states().turnOn(player, spec) else plugin.states().turnOff(player, spec)
+        report(player, result, stateId)
     }
 
-    // ---- 管理命令 ----
+    private fun guard(sender: CommandSender, args: Array<String>) {
+        if (!requirePermission(sender, USE_PERMISSION)) {
+            return
+        }
+        val player = requirePlayer(sender) ?: return
+        if (args.size < 2) {
+            sender.sendMessage(
+                plugin.lang().ui(
+                    "status-guard",
+                    mapOf("amount" to plugin.economy().format(plugin.states().guardOf(player.uniqueId))),
+                ),
+            )
+            sender.sendMessage(plugin.lang().ui("usage-guard"))
+            return
+        }
+        if (args[1].equals("off", ignoreCase = true) || args[1].equals("reset", ignoreCase = true)) {
+            plugin.states().setGuard(player.uniqueId, null)
+            sender.sendMessage(
+                plugin.lang().message(
+                    "guard-reset",
+                    mapOf("amount" to plugin.economy().format(plugin.defaultGuard())),
+                ),
+            )
+            return
+        }
+        val amount = args[1].toBigDecimalOrNull()
+        if (amount == null || amount.signum() < 0) {
+            sender.sendMessage(plugin.lang().message("guard-invalid"))
+            return
+        }
+        plugin.states().setGuard(player.uniqueId, amount)
+        sender.sendMessage(
+            plugin.lang().message("guard-set", mapOf("amount" to plugin.economy().format(amount))),
+        )
+    }
+
+    private fun report(player: Player, result: ToggleResult, fallbackId: String) {
+        val display = displayOf(result.spec(), fallbackId)
+        if (result.success()) {
+            val message = if (result.nowActive()) {
+                plugin.lang().message("toggle-on", mapOf("state" to display))
+            } else {
+                plugin.lang().message(
+                    "toggle-off",
+                    mapOf("state" to display, "price" to plugin.economy().format(result.charged())),
+                )
+            }
+            player.sendMessage(message)
+            return
+        }
+        val key = when (result.failure()) {
+            ToggleResult.Failure.UNKNOWN_STATE -> "toggle-unknown-state"
+            ToggleResult.Failure.DISABLED -> "toggle-disabled"
+            ToggleResult.Failure.NO_PERMISSION -> "toggle-no-permission"
+            ToggleResult.Failure.GUARD_REACHED -> "toggle-guard-reached"
+            null -> "toggle-unknown-state"
+        }
+        player.sendMessage(plugin.lang().message(key, mapOf("state" to display)))
+    }
+
+    // ---- 管理员 ----
 
     private fun admin(sender: CommandSender, args: Array<String>) {
-        val sub = args.getOrNull(1)
-        if (sub == null) {
-            sender.sendMessage(plugin.lang().ui("usage-admin-give"))
-            sender.sendMessage(plugin.lang().ui("usage-admin-clear"))
+        if (args.size < 2) {
+            if (!hasAnyAdminPermission(sender)) {
+                requirePermission(sender, ADMIN_PERMISSION)
+                return
+            }
+            sender.sendMessage(plugin.lang().ui("usage-admin-off"))
             sender.sendMessage(plugin.lang().ui("usage-admin-reload"))
             return
         }
-        when (sub.lowercase()) {
-            "give" -> adminGive(sender, args)
-            "clear" -> adminClear(sender, args)
-            "reload" -> adminReload(sender)
+        when (args[1].lowercase()) {
+            "off", "clear" -> if (requirePermission(sender, ADMIN_OFF_PERMISSION)) adminOff(sender, args)
+            "reload" -> if (requirePermission(sender, ADMIN_RELOAD_PERMISSION)) adminReload(sender)
             else -> {
-                sender.sendMessage(plugin.lang().ui("usage-admin-give"))
-                sender.sendMessage(plugin.lang().ui("usage-admin-clear"))
+                sender.sendMessage(plugin.lang().ui("usage-admin-off"))
                 sender.sendMessage(plugin.lang().ui("usage-admin-reload"))
             }
         }
     }
 
-    private fun adminGive(sender: CommandSender, args: Array<String>) {
-        if (!requirePermission(sender, "statecharge.admin.give")) {
+    private fun adminOff(sender: CommandSender, args: Array<String>) {
+        if (args.size < 3) {
+            sender.sendMessage(plugin.lang().ui("usage-admin-off"))
             return
         }
-        val playerName = args.getOrNull(2)
-        val stateId = args.getOrNull(3)
-        val seconds = args.getOrNull(4)?.toLongOrNull()
-        if (playerName == null || stateId == null || seconds == null) {
-            sender.sendMessage(plugin.lang().ui("usage-admin-give"))
-            return
-        }
-        val target = Bukkit.getOfflinePlayerIfCached(playerName)
+        // 关闭状态要移除实体效果,只能对在线玩家做。
+        val target = Bukkit.getPlayerExact(args[2])
         if (target == null) {
-            sender.sendMessage(plugin.lang().message("admin-player-unknown", mapOf("player" to playerName)))
+            sender.sendMessage(plugin.lang().message("admin-player-offline", mapOf("player" to args[2])))
             return
         }
-        val result = plugin.states().give(target, stateId, seconds)
-        val spec = result.spec()
-        if (spec != null) {
-            sender.sendMessage(
-                plugin.lang().message(
-                    "admin-give-success",
-                    mapOf(
-                        "player" to playerName,
-                        "state" to spec.display(),
-                        "time" to plugin.durationText(seconds),
-                    ),
-                ),
-            )
+        val stateId = args.getOrNull(3)?.lowercase()
+        val count = plugin.states().clear(target, stateId)
+        if (count == 0) {
+            sender.sendMessage(plugin.lang().message("admin-clear-none", mapOf("player" to target.name)))
             return
         }
-        when (result.failure()) {
-            GiveResult.Failure.UNKNOWN_STATE ->
-                sender.sendMessage(plugin.lang().message("admin-give-unknown-state", mapOf("state" to stateId)))
-            GiveResult.Failure.INVALID_SECONDS ->
-                sender.sendMessage(plugin.lang().message("admin-give-invalid-seconds"))
-            null -> Unit
-        }
-    }
-
-    private fun adminClear(sender: CommandSender, args: Array<String>) {
-        if (!requirePermission(sender, "statecharge.admin.clear")) {
-            return
-        }
-        val playerName = args.getOrNull(2)
-        if (playerName == null) {
-            sender.sendMessage(plugin.lang().ui("usage-admin-clear"))
-            return
-        }
-        val target = Bukkit.getOfflinePlayerIfCached(playerName)
-        if (target == null) {
-            sender.sendMessage(plugin.lang().message("admin-player-unknown", mapOf("player" to playerName)))
-            return
-        }
-        val stateId = args.getOrNull(3)?.takeUnless { it.equals("all", ignoreCase = true) }
-        val cleared = plugin.states().clear(target, stateId)
-        if (cleared > 0) {
-            sender.sendMessage(
-                plugin.lang().message("admin-clear-success", mapOf("player" to playerName, "count" to cleared.toString())),
-            )
-        } else {
-            sender.sendMessage(plugin.lang().message("admin-clear-none", mapOf("player" to playerName)))
-        }
+        sender.sendMessage(
+            plugin.lang().message(
+                "admin-clear-success",
+                mapOf("player" to target.name, "count" to count.toString()),
+            ),
+        )
     }
 
     private fun adminReload(sender: CommandSender) {
-        if (!requirePermission(sender, "statecharge.admin.reload")) {
-            return
-        }
         val report = plugin.reloadStates()
         if (report.ok()) {
             sender.sendMessage(plugin.lang().message("admin-reload-success"))
-        } else {
-            val stage = report.failureSummaries().firstOrNull() ?: "?"
-            sender.sendMessage(plugin.lang().message("admin-reload-failed", mapOf("stage" to stage)))
+            return
         }
+        sender.sendMessage(
+            plugin.lang().message(
+                "admin-reload-failed",
+                mapOf("stage" to (report.failureSummaries().firstOrNull() ?: "?")),
+            ),
+        )
     }
 
-    // ---- Tab 补全 ----
+    // ---- 补全 ----
 
     override fun onTabComplete(
         sender: CommandSender,
         command: Command,
         alias: String,
         args: Array<String>,
-    ): List<String> {
-        val rootCommands = listOf("list", "status", "buy", "help", "admin")
-            .filter { sender.hasPermission(permissionFor(it)) }
-        CubexCommandSuggestions.root(args, rootCommands)?.let { return it }
-        if (args.size == 2 && args[0].equals("buy", ignoreCase = true)) {
-            return plugin.definitions().purchasable().map { it.id() }.filter { it.startsWith(args[1].lowercase()) }
+    ): List<String>? {
+        if (args.size <= 1) {
+            val subs = SUBCOMMANDS.filter {
+                if (it == "admin") hasAnyAdminPermission(sender) else sender.hasPermission(permissionFor(it))
+            }
+            return CubexCommandSuggestions.root(args, subs)
         }
-        if (args[0].equals("admin", ignoreCase = true)) {
-            return when {
-                args.size == 2 -> listOf("give", "clear", "reload").filter { it.startsWith(args[1].lowercase()) }
-                args.size == 3 && (args[1].equals("give", ignoreCase = true) || args[1].equals("clear", ignoreCase = true)) ->
-                    Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2]) }
-                args.size == 4 && args[1].equals("give", ignoreCase = true) ->
-                    plugin.definitions().all().map { it.id() }.filter { it.startsWith(args[3].lowercase()) }
-                args.size == 4 && args[1].equals("clear", ignoreCase = true) ->
-                    (plugin.definitions().all().map { it.id() } + "all").filter { it.startsWith(args[3].lowercase()) }
-                else -> emptyList()
+        val sub = args[0].lowercase()
+        if (args.size == 2 && sub in STATE_SUBCOMMANDS) {
+            return CubexCommandSuggestions.matching(plugin.definitions().purchasable().map { it.id() }, args[1])
+        }
+        if (args.size == 2 && sub == "guard") {
+            return CubexCommandSuggestions.matching(listOf("off"), args[1])
+        }
+        if (sub == "admin") {
+            if (args.size == 2) {
+                val options = buildList {
+                    if (sender.hasPermission(ADMIN_OFF_PERMISSION)) add("off")
+                    if (sender.hasPermission(ADMIN_RELOAD_PERMISSION)) add("reload")
+                }
+                return CubexCommandSuggestions.matching(options, args[1])
+            }
+            if (args.size == 3 && sender.hasPermission(ADMIN_OFF_PERMISSION) && args[1].lowercase() in setOf("off", "clear")) {
+                return CubexCommandSuggestions.matching(Bukkit.getOnlinePlayers().map { it.name }, args[2])
+            }
+            if (args.size == 4 && args[1].lowercase() in setOf("off", "clear")) {
+                return CubexCommandSuggestions.matching(plugin.definitions().all().map { it.id() }, args[3])
             }
         }
         return emptyList()
     }
 
-    // ---- 辅助 ----
+    // ---- 内部 ----
 
     private fun requirePermission(sender: CommandSender, permission: String): Boolean {
         if (sender.hasPermission(permission)) {
@@ -284,14 +325,35 @@ class StateChargeCommand(private val plugin: StateChargePlugin) : CommandExecuto
     }
 
     private fun requirePlayer(sender: CommandSender): Player? {
-        val player = sender as? Player
-        if (player == null) {
-            sender.sendMessage(plugin.lang().message("player-only"))
+        if (sender is Player) {
+            return sender
         }
-        return player
+        sender.sendMessage(plugin.lang().message("player-only"))
+        return null
     }
 
     private fun displayOf(spec: StateSpec?, fallback: String): String = spec?.display() ?: fallback
 
-    private fun permissionFor(sub: String): String = if (sub == "admin") "statecharge.admin" else "statecharge.use"
+    private fun permissionFor(sub: String): String = if (sub == "admin") ADMIN_PERMISSION else USE_PERMISSION
+
+    private fun hasAnyAdminPermission(sender: CommandSender): Boolean =
+        sender.hasPermission(ADMIN_PERMISSION) || sender.hasPermission(ADMIN_OFF_PERMISSION) ||
+            sender.hasPermission(ADMIN_RELOAD_PERMISSION)
+
+    private fun String.toBigDecimalOrNull(): BigDecimal? =
+        try {
+            BigDecimal(this)
+        } catch (ex: NumberFormatException) {
+            null
+        }
+
+    private companion object {
+        const val USE_PERMISSION = "statecharge.use"
+        const val ADMIN_PERMISSION = "statecharge.admin"
+        const val ADMIN_OFF_PERMISSION = "statecharge.admin.off"
+        const val ADMIN_RELOAD_PERMISSION = "statecharge.admin.reload"
+
+        val SUBCOMMANDS = listOf("help", "gui", "list", "status", "toggle", "on", "off", "guard", "admin")
+        val STATE_SUBCOMMANDS = setOf("toggle", "on", "off")
+    }
 }

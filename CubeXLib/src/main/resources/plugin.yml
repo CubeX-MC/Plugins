@@ -1,0 +1,8 @@
+name: CubeXLib
+version: '${version}'
+main: org.cubexmc.cubexlib.CubeXLibPlugin
+api-version: '1.18'
+author: CubeX
+description: Runtime provider of the shared cubex-* modules for external-mode CubeX plugins.
+# 库插件：必须先于依赖它的插件加载。
+load: STARTUP

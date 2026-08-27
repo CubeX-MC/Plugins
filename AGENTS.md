@@ -14,6 +14,7 @@ Minecraft 插件 monorepo（Gradle + `buildSrc` 约定插件）。产物是 **N 
 | 共享模块使用指南 / API 示例 / 接入矩阵 | [`MODULES.md`](MODULES.md) |
 | 计划 / 待办 / 跨插件演进方向 | [`PLAN.md`](PLAN.md)（**全仓唯一计划文件**） |
 | Kotlin 编码规范与 Java 互操作避坑 | [`KOTLIN_STYLE_GUIDE.md`](KOTLIN_STYLE_GUIDE.md) |
+| 新增 / 修改命令、权限、help 与提示颜色 | [`COMMAND_PERMISSION_GUIDE.md`](COMMAND_PERMISSION_GUIDE.md) |
 | 写 / 改某个插件的 README | [`README_TEMPLATE.md`](README_TEMPLATE.md)（章节顺序固定；README 只写已实现的行为） |
 
 ## 常用命令
@@ -24,6 +25,8 @@ Minecraft 插件 monorepo（Gradle + `buildSrc` 约定插件）。产物是 **N 
 .\gradlew.bat :<Plugin>:jarGate            # 部署 jar 门禁
 .\gradlew.bat jarGateAll                   # 全部插件的门禁
 .\gradlew.bat kotlinMigrationStatus        # 各插件 Java/Kotlin 文件数与 opt-in 状态
+.\gradlew.bat createPlugin -PpluginName=X  # 新插件脚手架(可加 -Pmode=external -Pmodules=core,i18n)
+.\gradlew.bat -p buildSrc test             # 构建逻辑自身的单测(根构建的 build 不含它)
 .\gradlew.bat build                        # 全仓构建 + 测试
 ```
 
@@ -32,9 +35,11 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 
 ## 硬约束
 
-- **两种打包模式，由插件自己声明**（`CubeXLib` 尚未实现，见 [`PLAN.md`](PLAN.md) §7；**在它落地前全部插件都是内嵌模式**）：
+- **两种打包模式，由插件自己声明**（`CubeXLib` 已落地；**当前 12 个插件仍全部是内嵌模式**，
+  外置模式的打包与门禁已验证、实服跨插件类可见性待验，见 [`PLAN.md`](PLAN.md) §7.1）：
   - **内嵌（默认）**——无状态 `modules/cubex-*` shade + relocate 进自己的 jar，jar 可单独安装。**所有对外发布的插件必须用这个模式**。
-  - **外置（opt-in）**——`depend: [CubeXLib]`，不 shade 任何 `cubex-*`，直接类型调用。只给自服 / 团队内部插件用。
+  - **外置（opt-in）**——在自己的 build 脚本里写 `cubex { packaging.set(CubexPackagingMode.EXTERNAL) }`，
+    不 shade 任何 `cubex-*`，直接类型调用。`depend: [CubeXLib]` **由构建注入，不要手写**。只给自服 / 团队内部插件用。
   - 判断规则一句话：**这插件会不会发给我们服务器以外的人？会 → 内嵌；不会 → 外置。**
 - **内嵌模式的插件必须能单独安装**：不引入插件间的编译期依赖；CubeXLib 对它们是**可选**服务，缺席时降级并完整运行。
 - **有状态的共享能力只放 CubeXLib**（单实例持数据）；无状态共享代码才走 `modules/cubex-*` shade。把有状态服务做成 shade 模块会让各插件各持一份、互不共享。
@@ -42,12 +47,18 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 - **跨插件 API 面不得出现任何 Kotlin 类型**：jarGate 强制每个插件把 `kotlin/**` relocate 进自己的命名空间，
   因此 `kotlin.Unit`、Kotlin 函数类型（**所有 lambda / 回调**）、`Result` 在两侧是**不同的类**，连接必然失败。
   只能用 `String`/`double`/`UUID`/`java.util.*`/Bukkit 类型/provider 自己包里的接口与 data class——
-  这就是 `org.cubexmc.reputations.api` 那 3 个文件是 Java 的原因。
+  这就是 `org.cubexmc.reputations.api` 这些文件是 Java 的原因。
   **回调式 API 跨不过这条边界**；需要通知就用 Bukkit 事件或轮询。
 - **可选连接不是依赖**：通过 `cubex-integrations` 使用提供方插件 ClassLoader 解析 Bukkit service；消费方不 `implementation`/`compileOnly` 另一个插件，也不 shade 对方 API。`softdepend` 只用于可选加载顺序。
 - **新插件要加进 `buildSrc/src/main/kotlin/CubexRelocations.kt` 的 pluginIds**，否则 shadowJar 报 `Key X missing`。
-- **新增 `modules/cubex-*` 要同时改两处**：`settings.gradle.kts` 与 `cubex-plugin.gradle.kts` 的 `sharedModulePrefixes`。
-  漏了后者，该模块的类会被拿插件自己的 java release 去校验字节码（Clarity 是 release 21，一接入就误判失败）。
+- **新增 `modules/cubex-*` 要改四处**：`settings.gradle.kts`、`buildSrc/.../CubexPackaging.kt` 的
+  `CubexModules` 名单、`buildSrc/.../CubexScaffold.kt` 的 `KNOWN_MODULES`（与前者同源），
+  以及 `CubeXLib/build.gradle.kts` 的依赖列表。
+  漏第二处，该模块的类会被拿插件自己的 java release 去校验字节码（Clarity 是 release 21，一接入就误判失败）；
+  漏第三处，`createPlugin -Pmodules=<新模块>` 会报"未知模块"；
+  漏第四处，外置模式插件在运行时找不到这个模块，且 `CubeXLib:jarGate` 会报缺模块。
+  模块的**包名由名字机械推导**为 `org/cubexmc/<name>/`，所以起名前先 grep 一遍全仓有没有同名包
+  （`cubex-economy` 就和 RuleGems 自带的 `org.cubexmc.economy` 撞了，见 `PLAN.md`）。
 - **提交严格按插件 scope**（`git add -A -- <Plugin>`）：工作区经常有别的项目的并行 WIP，别卷进来。
 - **不要把重构和玩法/配置/文案改动混在一个提交里**。
 - 推 `main` 会触发 CI 与 **10** 个公开镜像仓同步（[`.github/workflows/mirror.yml`](.github/workflows/mirror.yml) 的 `repos` 数组；Reputations、StateCharge 尚无镜像 repo）—— **推送前先跟用户确认**。
@@ -72,17 +83,21 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 ## 已定决策（别"顺手修"）
 
 - **Railway 的源码包就是 `org.cubexmc.metro`，主类 `org.cubexmc.metro.Metro`，与 Metro 完全同名——这是有意保留的**（2026-08-02 用户确认）。理由：Metro 的线路控制等功能更新可以直接搬到 Railway；Metro 与 Railway **本就不支持同时安装**。同理 Railway 的 `build.gradle.kts` 把 cloud / scoreboardlibrary / geantyref relocate 到 `org.cubexmc.metro.lib.*` 也**不要改**。
-- **Reputations 的 3 个 `.java` 是故意的 Java API 面**（`org.cubexmc.reputations.api`），不要迁 Kotlin。
+- **Reputations 的 4 个 `.java` 是故意的 Java API 面**（`org.cubexmc.reputations.api`），不要迁 Kotlin。
 - **Contract 的 Regions escrow API 是 provider-owned Kotlin API 面**：Regions 只能经 `cubex-integrations` 反射连接，不能增加 Contract 项目依赖；资金 operation id 和两边 lease/metadata 不得绕过。
 - **Clarity 编译到 Java 21**（用 1.21 属性 API），全仓其余插件是 17；`jarGate` 已按各插件的 java release 分别校验。
 
 ## 当前迁移基线
 
-- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；**9 个** `cubex-*` 模块均使用 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
+- **Kotlin 迁移与 `cubex-core` 接入已于 2026-08-16 收口**：全部插件 opt-in Kotlin 并继承 `CubexPlugin`；**10 个** `cubex-*` 模块均使用 Kotlin。剩余 `.java` 仅为 vendored `Metrics.java`、Reputations 的公开 Java API，以及 Metro/Railway 的必要互操作 shim；不要为了文件计数迁掉它们。
 - Railway 的迁移批次、共享能力审计和“能不能复用 Metro `.kt`”的两步判据原在 `KOTLIN_MIGRATION_RUNBOOK.md`，该文件已于 `484c1f6` 随 13 份计划文件一并删除；**需要时从 git 历史取**（`git show 2783844:KOTLIN_MIGRATION_RUNBOOK.md`）。它们不是待办清单。
 
 ## 已知脆弱点
 
 - `Metro:TrainTravelDisplayControllerTest.shouldThrottleUpdatesToConfiguredInterval` 偶发 `World unloaded`（Bukkit `Location` 对 mock World 持弱引用，被 GC 即抛），重跑即过。
 - `Railway/.claude/worktrees/` 有历史 agent worktree 副本（已 gitignore、未跟踪），会污染全目录 grep 与文件计数；统计以 `kotlinMigrationStatus` 或 `<Plugin>/src` 为准。
+- **Kotlin 的块注释可以嵌套**：KDoc 里写 glob（例如把 `org/cubexmc/core/` 和两个星号连写）会因为
+  `/` 后面紧跟 `*` 而**打开一个嵌套注释**，之后的 `*/` 只关掉内层，外层注释把文件剩下的部分全吃掉。
+  症状是编译器在**完全不相关的行**报 `Missing '}'` / `Identifier expected` / `Unclosed comment`
+  （2026-08-19 在 `buildSrc/CubexPackaging.kt` 实际踩到）。注释里要写 glob 就用 `//` 行注释。
 - PowerShell 5.1 的 `Set-Content -Encoding utf8` 会写 BOM，javac 直接报 `illegal character: '﻿'`；脚本改源码文件请用 `[System.IO.File]::WriteAllText($p, $t, (New-Object System.Text.UTF8Encoding($false)))`。

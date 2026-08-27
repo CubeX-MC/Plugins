@@ -35,13 +35,21 @@ Contract 同样只是可选连接。`dual_pvp` 和 `union_war` 可在 Mode 中�
 ./gradlew :Regions:test
 ./gradlew :Regions:build
 ./gradlew :Regions:shadowJar
+./gradlew :Regions:runServer
 ```
 
 可部署产物是 `Regions/build/libs/regions-<version>.jar`；不要部署 `*-plain.jar`。根仓库 CI 会单独构建、测试并上传 Regions，同时支持 `regions-v<version>` 标签发布。
 
+`runServer` 是 R1 托管连接的本地联合服：它会装入 Contract 的部署 jar、Vault 与 EssentialsX，
+但不会给 Regions 增加任何编译期插件依赖。用
+`./gradlew :Regions:runServer -PregionsRunWithContract=false` 可在独立的
+`Regions/run-no-contract` 目录验证 Contract 缺席时的降级与 lease 保全。
+
 ## 管理流程
 
 日常场地变更遵循：创建草稿 → GUI/命令编辑 → `validate`/`preview` → 隔离 `trial` → `publish`。运行时只读取已发布 revision；回滚会生成新 revision，不覆盖历史。
+
+已有场地也可以在详情页点击“应用模板”重新选择预设。确认后，模板会整体替换草稿中的 Mode、Flags、Effects 与 Triggers，不会把上一个模板的提醒或效果带过去；Region ID、名称、来源、所有权、优先级和版本历史保持不变。重新预览并发布前，运行态不会变化。
 
 常用入口：
 
@@ -67,7 +75,7 @@ Contract 奖励操作另存于 `reward-funding.yml`。一局比赛的 lock、自
 
 ## 已知边界
 
-- 尚未公开发布；当前数据格式将作为首个公开版本基线，内部开发期的旧格式不在兼容范围内。
+- 尚未发布首个正式版本；当前数据格式将作为首个 release 基线，内部开发期的旧格式不在兼容范围内。
 - 未知或未实现的 Capability / Condition 一律**校验失败**而不是默认放行——这是有意的安全默认。
 - 校验器与第三方依赖的错误正文目前仍是英文常量，尚未全部拆成翻译键。
 - race / hide-and-seek / 赞助 / 多人分成的**真实资金结算**尚未实现（见 `PLAN.md` §5.2 阶段 D）。

@@ -38,85 +38,104 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
      * Bumped whenever the published region set changes. [RegionDetectionService] uses it to know when
      * a cached lookup is still valid; drafts and history are excluded because detection ignores them.
      */
+    @Synchronized
     fun publishedRevision(): Long = publishedRevision
 
+    @Synchronized
     fun load() {
-        publishedRevision++
-        regions.clear()
-        drafts.clear()
-        history.clear()
         if (!file.exists()) {
+            regions.clear()
+            drafts.clear()
+            history.clear()
+            publishedRevision++
             dirty = false
             return
         }
-        val yaml = YamlConfiguration.loadConfiguration(file)
+        val loadedRegions = LinkedHashMap<String, RegionDefinition>()
+        val loadedDrafts = LinkedHashMap<String, RegionDefinition>()
+        val loadedHistory = LinkedHashMap<String, java.util.SortedMap<Long, RegionDefinition>>()
+        val yaml = YamlConfiguration().apply { load(file) }
         val root = yaml.getConfigurationSection("regions")
         if (root != null) {
             for (id in root.getKeys(false)) {
-                val section = root.getConfigurationSection(id) ?: continue
-                try {
-                    val region = parseRegion(id, section)
-                    regions[region.id] = region
-                } catch (ex: RuntimeException) {
-                    plugin.log().warn("Failed to load region $id: ${ex.message}")
-                }
+                val section = requireNotNull(root.getConfigurationSection(id)) { "Region $id is not a section." }
+                val region = parseRegion(id, section)
+                loadedRegions[region.id] = region
             }
         }
         val draftRoot = yaml.getConfigurationSection("drafts")
         if (draftRoot != null) {
             for (id in draftRoot.getKeys(false)) {
-                val section = draftRoot.getConfigurationSection(id) ?: continue
-                runCatching { parseRegion(id, section) }
-                    .onSuccess { drafts[id] = it.copy(lifecycle = RegionLifecycle.DRAFT) }
-                    .onFailure { plugin.log().warn("Failed to load draft $id: ${it.message}") }
+                val section = requireNotNull(draftRoot.getConfigurationSection(id)) { "Draft $id is not a section." }
+                loadedDrafts[id] = parseRegion(id, section).copy(lifecycle = RegionLifecycle.DRAFT)
             }
         }
         val historyRoot = yaml.getConfigurationSection("history")
         if (historyRoot != null) {
             for (id in historyRoot.getKeys(false)) {
-                val regionHistory = historyRoot.getConfigurationSection(id) ?: continue
+                val regionHistory = requireNotNull(historyRoot.getConfigurationSection(id)) {
+                    "History for region $id is not a section."
+                }
                 val revisions = java.util.TreeMap<Long, RegionDefinition>()
                 for (revisionKey in regionHistory.getKeys(false)) {
-                    val revision = revisionKey.toLongOrNull() ?: continue
-                    val section = regionHistory.getConfigurationSection(revisionKey) ?: continue
-                    runCatching { parseRegion(id, section) }
-                        .onSuccess { revisions[revision] = it.copy(revision = revision) }
-                        .onFailure { plugin.log().warn("Failed to load region $id revision $revision: ${it.message}") }
+                    val revision = requireNotNull(revisionKey.toLongOrNull()) {
+                        "History revision '$revisionKey' for region $id is invalid."
+                    }
+                    val section = requireNotNull(regionHistory.getConfigurationSection(revisionKey)) {
+                        "History revision $revision for region $id is not a section."
+                    }
+                    revisions[revision] = parseRegion(id, section).copy(revision = revision)
                 }
-                if (revisions.isNotEmpty()) history[id] = revisions
+                if (revisions.isNotEmpty()) loadedHistory[id] = revisions
             }
         }
+        regions.clear()
+        regions.putAll(loadedRegions)
+        drafts.clear()
+        drafts.putAll(loadedDrafts)
+        history.clear()
+        history.putAll(loadedHistory)
+        publishedRevision++
         dirty = false
     }
 
+    @Synchronized
     fun all(): List<RegionDefinition> = regions.values.toList()
 
+    @Synchronized
     fun find(id: String): RegionDefinition? = regions[id]
 
+    @Synchronized
     fun findDraft(id: String): RegionDefinition? = drafts[id]
 
+    @Synchronized
     fun revisionHistory(id: String): List<RegionDefinition> =
         history[id]?.values?.toList() ?: emptyList()
 
+    @Synchronized
     fun findRevision(id: String, revision: Long): RegionDefinition? = history[id]?.get(revision)
 
+    @Synchronized
     fun put(region: RegionDefinition) {
         regions[region.id] = region
         publishedRevision++
         dirty = true
     }
 
+    @Synchronized
     fun putDraft(region: RegionDefinition) {
         drafts[region.id] = region.copy(lifecycle = RegionLifecycle.DRAFT)
         dirty = true
     }
 
+    @Synchronized
     fun removeDraft(id: String): Boolean {
         val removed = drafts.remove(id) != null
         if (removed) dirty = true
         return removed
     }
 
+    @Synchronized
     fun recordRevision(region: RegionDefinition, maxRevisions: Int = 20) {
         val revisions = history.getOrPut(region.id) { java.util.TreeMap() }
         revisions[region.revision] = region
@@ -126,6 +145,7 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
         dirty = true
     }
 
+    @Synchronized
     fun remove(id: String): Boolean {
         val removed = regions.remove(id) != null
         if (removed) {
@@ -137,21 +157,26 @@ class RegionStorage(private val plugin: RegionsPlugin) : Reloadable, Terminable 
         return removed
     }
 
+    @Synchronized
     fun markDirty() {
         dirty = true
     }
 
+    @Synchronized
     fun flushIfDirty(): Boolean = if (dirty) save() else true
 
+    @Synchronized
     override fun reload() {
         load()
     }
 
     /** Terminable: flush pending writes when the plugin shuts down. */
+    @Synchronized
     override fun close() {
         flushIfDirty()
     }
 
+    @Synchronized
     fun save(): Boolean {
         val yaml = YamlConfiguration()
         yaml.set("regions-version", 4)

@@ -3,6 +3,7 @@ package org.cubexmc.regions
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.cubexmc.config.ConfigReload
 import org.cubexmc.config.MigrationException
+import org.cubexmc.config.MigrationRunner
 import org.cubexmc.config.ReloadChain
 import org.cubexmc.config.ReloadFailurePolicy
 import org.cubexmc.config.ReloadReport
@@ -51,6 +52,7 @@ import org.cubexmc.regions.storage.RewardFundingStore
 import org.cubexmc.regions.reward.RewardFundingService
 import org.cubexmc.regions.reward.RewardFundingRuntime
 import org.cubexmc.scheduler.CubexScheduler
+import org.cubexmc.scheduler.CubexTask
 import java.io.File
 import kotlin.math.max
 
@@ -86,6 +88,9 @@ class RegionsPlugin : CubexPlugin() {
     private var cubexScheduler: CubexScheduler? = null
     private var rewardFundingStore: RewardFundingStore? = null
     private var rewardFundingService: RewardFundingRuntime? = null
+    private var watchdogTask: CubexTask? = null
+    private var effectRefreshTask: CubexTask? = null
+    private var timerTriggerTask: CubexTask? = null
 
     override fun enablePlugin() {
         cubexScheduler = CubexScheduler.bindTo(this)
@@ -218,31 +223,37 @@ class RegionsPlugin : CubexPlugin() {
      * Returns the report so the command layer can tell the operator which stage failed.
      */
     fun reloadRegions(): ReloadReport {
-        var flushed = true
-
         val report = ReloadChain.create()
             .failurePolicy(ReloadFailurePolicy.ABORT)
-            .add("mode-cleanup", Reloadable { cleanupModesForReload() })
             .add("flush-stores", Reloadable {
                 if (!storage().flushIfDirty()) {
-                    flushed = false
-                    log().warn("Reload: could not flush regions.yml; keeping in-memory state and skipping the data stages.")
+                    throw IllegalStateException("Could not flush regions.yml; live state was kept and reload was aborted.")
                 }
             })
+            .add("mode-cleanup", Reloadable { cleanupModesForReload() })
             .add("default-files", Reloadable { saveDefaultFiles() })
             .add("baseline", Reloadable { verifyBaselineFiles() })
             .add("config", ConfigReload.bukkitConfig(this))
             .add("authority", Reloadable { configureAuthority() })
+            .add("union-provider", Reloadable {
+                unions().setPreferred(config.getString("integrations.union-provider", "lands") ?: "lands")
+            })
             .add("language", lang())
-            .addIf("templates", { flushed }, templates())
-            .addIf("regions", { flushed }, storage())
-            .addIf("lifecycle", { flushed }, Reloadable { lifecycle().reconcile() })
-            .addIf("reward-funding", { flushed }, Reloadable {
+            .add("templates", templates())
+            .add("regions", storage())
+            .add("funding-store", fundingStore())
+            .add("lifecycle", Reloadable { lifecycle().reconcile() })
+            .add("reward-funding", Reloadable {
                 rewards().reconcile().filterNot { it.successful }.forEach {
                     log().warn("Reward funding recovery remains pending (${it.code}): ${it.detail}")
                 }
             })
-            .addIf("validate", { flushed }, Reloadable { warnOnValidationIssues() })
+            .add("timers", Reloadable {
+                scheduleWatchdog()
+                scheduleEffectRefresh()
+                scheduleTimerTriggers()
+            })
+            .add("validate", Reloadable { warnOnValidationIssues() })
             .run()
 
         for (summary in report.failureSummaries()) {
@@ -387,21 +398,26 @@ class RegionsPlugin : CubexPlugin() {
         )
     }
 
+    /**
+     * 把数据基线文件跑一遍 `cubex-config` 的迁移框架。
+     *
+     * 以前这里只是"版本对不上就抛异常",没有迁移能力。现在版本表仍在 [RegionBaseline]，
+     * 但备份、原子写、保存失败回滚与失败报告都由 `MigrationRunner` 负责——
+     * 首个公开版本之后要改格式，只需在那边 `addStep(...)`，不用再动这里。
+     */
     @Throws(MigrationException::class)
     private fun verifyBaselineFiles() {
-        val errors = RegionBaseline.validate(dataFolder)
-        if (errors.isNotEmpty()) {
-            throw MigrationException(
-                errors.joinToString("; ") +
-                    ". Pre-release development files are intentionally not migrated; regenerate or update them.",
-            )
+        val migrations = MigrationRunner(this)
+        for (plan in RegionBaseline.plans()) {
+            migrations.run(plan)
         }
     }
 
     private fun scheduleWatchdog() {
+        watchdogTask?.cancel()
         val intervalSeconds = max(1, config.getLong("safety.watchdog-interval-seconds", 3))
         val periodTicks = intervalSeconds * 20L
-        regionScheduler().runGlobalTimer(
+        watchdogTask = regionScheduler().runGlobalTimer(
             Runnable {
                 lifecycle().reconcile()
                 detection().updateAllOnline()
@@ -413,8 +429,9 @@ class RegionsPlugin : CubexPlugin() {
     }
 
     private fun scheduleEffectRefresh() {
+        effectRefreshTask?.cancel()
         val periodTicks = max(1L, config.getLong("effects.refresh-interval-ticks", 60L))
-        regionScheduler().runGlobalTimer(
+        effectRefreshTask = regionScheduler().runGlobalTimer(
             Runnable { effects().refreshAll() },
             periodTicks,
             periodTicks,
@@ -422,12 +439,13 @@ class RegionsPlugin : CubexPlugin() {
     }
 
     private fun scheduleTimerTriggers() {
+        timerTriggerTask?.cancel()
         val intervalSeconds = max(
             MIN_TIMER_TRIGGER_SECONDS,
             config.getLong("safety.timer-trigger-interval-seconds", MIN_TIMER_TRIGGER_SECONDS),
         )
         val periodTicks = intervalSeconds * 20L
-        regionScheduler().runGlobalTimer(
+        timerTriggerTask = regionScheduler().runGlobalTimer(
             Runnable { triggers().fireTimers() },
             periodTicks,
             periodTicks,

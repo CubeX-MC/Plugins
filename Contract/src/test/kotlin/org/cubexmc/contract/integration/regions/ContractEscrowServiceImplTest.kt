@@ -69,11 +69,45 @@ class ContractEscrowServiceImplTest {
         fixture.service.lock("match-1", fixture.contract.id(), "arena")
 
         val failed = fixture.service.settle("match-1", fixture.contract.id(), "arena", fixture.partyB)
-        val replay = fixture.service.settle("match-1", fixture.contract.id(), "arena", fixture.partyB)
+        val reloadedStorage = ContractStorage(
+            tempDir.resolve("contract.yml").toFile(),
+            CubexLogger(Logger.getLogger("ContractEscrowServiceImplTest.reload")),
+        ).apply { load() }
+        val executorAfterRestart = FakeExecutor(failWithDispute = false)
+        val replay = ContractEscrowServiceImpl(
+            reloadedStorage,
+            executorAfterRestart,
+            CubexLogger(Logger.getLogger("ContractEscrowServiceImplTest.reload")),
+        ).settle("match-1", fixture.contract.id(), "arena", fixture.partyB)
 
         assertEquals(ContractEscrowCode.REVIEW_REQUIRED, failed.code())
         assertEquals(ContractEscrowCode.REVIEW_REQUIRED, replay.code())
         assertEquals(1, fixture.executor.settlements)
+        assertEquals(0, executorAfterRestart.settlements)
+    }
+
+    @Test
+    fun `completed settlement replays from disk without executing payout again`() {
+        val fixture = fixture()
+        fixture.service.lock("match-1", fixture.contract.id(), "arena")
+        val settled = fixture.service.settle("match-1", fixture.contract.id(), "arena", fixture.partyA)
+
+        val reloadedStorage = ContractStorage(
+            tempDir.resolve("contract.yml").toFile(),
+            CubexLogger(Logger.getLogger("ContractEscrowServiceImplTest.completed-reload")),
+        ).apply { load() }
+        val executorAfterRestart = FakeExecutor(failWithDispute = false)
+        val replay = ContractEscrowServiceImpl(
+            reloadedStorage,
+            executorAfterRestart,
+            CubexLogger(Logger.getLogger("ContractEscrowServiceImplTest.completed-reload")),
+        ).settle("match-1", fixture.contract.id(), "arena", fixture.partyA)
+
+        assertTrue(settled.successful())
+        assertEquals(ContractEscrowCode.REPLAYED, replay.code())
+        assertEquals(BigDecimal("19.00"), replay.amount())
+        assertEquals(1, fixture.executor.settlements)
+        assertEquals(0, executorAfterRestart.settlements)
     }
 
     private fun fixture(failWithDispute: Boolean = false): Fixture {

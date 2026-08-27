@@ -2,7 +2,7 @@
 
 ![](https://bstats.org/signatures/bukkit/Contract.svg)
 
-玩家对玩家合同平台。当前版本提供 SERVICE 委托、WAGER 对赌和 PARTNERSHIP 合作三类合同，重点先保证 Vault 托管资金、接单/接受邀请、提交、确认、裁决、取消退款和管理员仲裁流程正确。
+玩家对玩家合同平台。当前版本提供 SERVICE 委托、WAGER 对赌、PARTNERSHIP 合作和 SALE 交易四类合同，重点保证 Vault/物品托管、接受邀请、确认、裁决、取消退款和管理员仲裁流程正确。
 
 ## 定位
 
@@ -10,7 +10,7 @@ Contract 把玩家之间的口头约定变成**有托管、可审计、可裁决
 钱在合同成立时进入托管，不到结算不落任何一方口袋；每一笔资金流动都先写审计日志再改状态，
 宕机与 reload 之后 `余额 + 托管` 仍然守恒。
 
-面向的是需要玩家间可信交易的服务器：接单做工、双方对赌、合作分成。
+面向的是需要玩家间可信交易的服务器：接单做工、双方对赌、合作分成、具名玩家物品买卖。
 玩家不需要记命令——`/ct` 直达合同大厅，创建与签署在高版本走 Paper 原生 Dialog，
 低版本回退到库存 GUI 与聊天输入。
 
@@ -27,8 +27,9 @@ Contract 把玩家之间的口头约定变成**有托管、可审计、可裁决
 | **SERVICE 服务** | 发布方单边押注，任意承接方接单 | 发布方确认；配置目标后可由系统自动结算 |
 | **WAGER 对赌** | 双方各自押注，对手具名 | 由仲裁者裁决 |
 | **PARTNERSHIP 合作** | 双方各自押注 | 双方都确认才成功 |
+| **SALE 交易** | 卖家托管完整主手物品组，买家接受时托管价款 | 双方确认后卖家收款，买家领取物品 |
 
-其余类型（联盟 / 买卖 / 借贷）**尚未实现**，在 GUI 中显示为不可点击，
+其余类型（联盟 / 借贷）**尚未提供完整可用的玩家流程**，不作为可用功能承诺，
 且不作为可用功能承诺。进度见仓库根 [`PLAN.md`](../PLAN.md) §5.1。
 
 ## 依赖
@@ -61,12 +62,14 @@ Contract/build/libs/contract-0.1.0.jar
 /contract help
 /contract
 /contract gui
-/contract service <奖金|item> <小时> <标题>|<描述>
-/contract service <奖金|item> <小时> --mediator <中间人> <标题>|<描述>
-/contract service <奖金|item> <小时> --objective <类型> <目标> <数量> <标题>|<描述>
-/contract wager <对方> <押注> <小时> <仲裁者> <标题>|<描述>
-/contract partner <对方> <我押注> <对方押注> <小时> <标题>|<描述>
-/contract partner <对方> <我押注> <对方押注> <小时> --mediator <中间人> <标题>|<描述>
+/contract service <奖金|item> <天> <标题>|<描述>
+/contract service <奖金|item> <天> --mediator <中间人> <标题>|<描述>
+/contract service <奖金|item> <天> --objective <类型> <目标> <数量> <标题>|<描述>
+/contract wager <对方> <押注> <天> <仲裁者> <标题>|<描述>
+/contract partner <对方> <我押注> <对方押注> <天> <标题>|<描述>
+/contract partner <对方> <我押注> <对方押注> <天> --mediator <中间人> <标题>|<描述>
+/contract sale <买家> <价格> <天> <标题>|<描述>
+/contract sale <买家> <价格> <天> --mediator <中间人> <标题>|<描述>
 /contract list [页码]
 /contract my
 /contract info <id>
@@ -91,9 +94,9 @@ Contract/build/libs/contract-0.1.0.jar
 `/contract`（或 `/contract gui`）打开合同工作台，全程图形界面，普通玩家无需记命令：
 
 - **合同工作台**：首页显示行动收件箱待办数量，入口包含创建合同、行动收件箱、合同大厅、我的合同、帮助和管理员工作台。
-- **行动收件箱**：集中显示需要你接受邀请、提交完成、确认付款、确认合作、接受中间人职责或裁决争议的合同。
-- **创建合同向导**：先选类型（委托/对赌/合作），标题、玩家名、金额、押注、中间人/仲裁者和期限使用铁砧输入；描述使用聊天文本输入，支持 `cancel` 取消和 `clear` 清空。界面会实时显示描述预览与扣款明细。
-- **铁砧签署确认**：创建、接受邀请、接单、确认付款、中间人/仲裁裁决、取消合同、管理员强制付款/退款/关闭等资金动作，都会先进入确认页展示资金后果，再打开铁砧要求输入玩家名或“同意”完成签署。关闭铁砧或签名不符即视为取消，不会产生任何资金动作。
+- **行动收件箱**：集中显示需要你接受邀请、提交完成、确认付款/交易、领取结算物品、接受中间人职责或裁决争议的合同。
+- **创建合同向导**：先选类型（委托/对赌/合作/交易），再填写标题、玩家名、金额、中间人/仲裁者和期限。SALE 会实时显示卖家当前主手整组物品；预览后若主手变化，签署会被拒绝。
+- **签署确认**：创建、接受邀请、接单、双方确认、中间人/仲裁裁决、取消合同、管理员强制付款/退款/关闭等资金或物品动作，都会先展示明确后果。Paper 1.21.6+ 使用原生 Dialog，较旧版本使用库存确认页；取消不会移动资金或物品。
 - **管理员工作台**：`contract.admin.view` 可见，按争议/中断结算、进行中、全部分栏检索合同，强制付款/退款/关闭同样需要签署确认。
 
 ### 批量任务、模板池与定时发布
@@ -112,12 +115,12 @@ Contract/build/libs/contract-0.1.0.jar
 | 权限 | 作用 |
 | :-- | :-- |
 | `contract.use` | 打开并浏览合同大厅 |
-| `contract.create` | 创建委托/对赌/合作合同 |
+| `contract.create` | 创建委托/对赌/合作/交易合同 |
 | `contract.template.use` | 保存、载入、删除自己的私有模板 |
 | `contract.accept` | 接单或接受邀请 |
 | `contract.submit` | 提交完成、交付系统目标物品或货币 |
-| `contract.claim` | 领取合同暂存的交付物品或奖励物品 |
-| `contract.approve` | 确认自己发布的合同并付款 |
+| `contract.claim` | 领取合同暂存的交付物品、奖励或交易结算物品 |
+| `contract.approve` | 确认委托付款、合作完成或交易交换 |
 | `contract.cancel` | 取消可取消的合同 |
 | `contract.dispute` | 发起或撤销争议 |
 | `contract.mediate` | 接受中间人职责并裁决自己负责的合同 |
@@ -169,14 +172,15 @@ Contract/build/libs/contract-0.1.0.jar
 - `SERVICE`：传统委托。创建者托管奖金，其他玩家接单，接单者提交完成，创建者 approve 后付款。
 - `WAGER`：对赌。甲方创建时托管押注，乙方 accept 时托管同额押注，指定仲裁者用 `/contract resolve <id> <a|b>` 裁决胜方。
 - `PARTNERSHIP`：合作。甲方创建时托管自己的押注，乙方 accept 时托管自己的押注，双方都 `/contract approve <id>` 后按规则结算。
+- `SALE`：交易。卖家签署时托管确认页显示的完整主手物品组；指定买家 accept 时托管价款，双方都 `/contract approve <id>` 后卖家收款，买家用 `/contract claim <id>` 领取物品。
 
-SERVICE 和 PARTNERSHIP 可选 `--mediator <中间人>`。中间人不是收款方，也不会经手资金；他必须先 `/contract mediate <id> accept` 接受职责，之后可在合同已生效且未结束时裁决：
+SERVICE、PARTNERSHIP 和 SALE 可选 `--mediator <中间人>`。中间人不是收款方，也不会经手资金或物品；他必须先 `/contract mediate <id> accept` 接受职责，之后可在合同已生效且未结束时裁决：
 
 SERVICE 支持两种奖励托管：数字金额表示托管 Vault 货币，`item` 表示托管创建者主手整组物品。系统验收目标除事件进度和 `deliver_item` 外，也支持 `deliver_money`，接单者 `/contract submit <id>` 后会提交对应货币并按成功规则结算给雇主。完成后的奖励物品、交付物品，或取消/过期后需要领回的奖励物品，都通过 `/contract claim <id>` 领取。
 
 - `pay` / `contractor`：认定完成或接单方胜，按成功规则付款。
 - `refund` / `owner`：认定失效或创建方胜，按失败/退款规则处理。
-- PARTNERSHIP 还可用 `a` / `b` 裁定甲方或乙方胜。
+- PARTNERSHIP 与 SALE 还可用 `a` / `b` 裁定甲方或乙方胜。
 
 WAGER 使用创建时必填的仲裁者和 `/contract resolve <id> <a|b>`，保持原流程。
 
@@ -184,12 +188,12 @@ WAGER 使用创建时必填的仲裁者和 `/contract resolve <id> <a|b>`，保�
 
 - `SCHEDULED`：奖励已托管，等待一次性定时公开；不会出现在公开可接取列表。
 - `OPEN`：公开 SERVICE，等待接单。
-- `PENDING_ACCEPT`：WAGER/PARTNERSHIP 邀请已发出，等待指定对方接受。
+- `PENDING_ACCEPT`：WAGER/PARTNERSHIP/SALE 邀请已发出，等待指定对方接受。
 - `IN_PROGRESS`：已接单或邀请已接受。
 - `SUBMITTED`：SERVICE 已提交完成，等待创建者确认。
 - `COMPLETED`、`CANCELLED`、`EXPIRED`、`DISPUTED`：终态或管理员待处理状态。
 
-GUI 合同大厅支持按全部/SERVICE/WAGER/PARTNERSHIP 筛选；“我的合同”会显示与玩家相关的待接受邀请、进行中、争议和历史合同；行动收件箱会进一步筛出需要当前玩家处理的合同。所有资金动作都需要经过一次确认（Paper 1.21.6+ 为原生 Dialog 确认，更旧版本为确认页）。`/contract admin reload` 会补齐缺失的默认配置和内置语言文件，并关闭旧 GUI 会话、清理创建草稿，避免玩家在重载后继续操作旧数据。
+GUI 合同大厅和“我的合同”会显示 SALE 的待接受邀请、进行中、争议、结算与待领取状态；行动收件箱会进一步筛出需要当前玩家处理的合同。所有资金与物品动作都需要经过一次确认（Paper 1.21.6+ 为原生 Dialog，更旧版本为确认页）。`/contract admin reload` 会补齐缺失的默认配置和内置语言文件，并关闭旧 GUI 会话、清理创建草稿，避免玩家在重载后继续操作旧数据。
 
 ## 资金规则
 
@@ -205,6 +209,8 @@ WAGER 创建时扣除甲方押注；乙方接受时扣除乙方押注。裁决�
 WAGER 被 Regions 资金 lease 锁定后，普通仲裁、自动结算和无资金 `admin close` 会被阻止，避免与比赛结果竞争。Regions 正常提交胜者时按甲/乙方胜规则结算；强制结束、reload 或重启恢复走双方退款。`admin refund` 是紧急完整退款通道，但会让 Regions 的残留 lease 进入人工复核。
 
 PARTNERSHIP 创建时扣除甲方押注；乙方接受时扣除乙方押注。双方确认成功时各自取回自己的押注扣除完成佣金后的金额；取消、超时或管理员退款按当前状态退回已托管押注。
+
+SALE 创建时移除卖家确认页显示的完整主手物品组；买家接受时扣除并托管价款。双方确认后价款全额给卖家，物品成为买家的待领取结算物品；取消、超时或失败裁决把已托管资产退回来源方，胜方裁决则按合同规则分配物品与价款。
 
 雇主确认后：
 
@@ -296,9 +302,10 @@ display:
 | `terms` | 结算预览里的短语 |
 | `messages` | 命令与聊天消息（走 MiniMessage，支持 `<prefix>`） |
 
-`lang-version: 3` 起，`/contract admin reload` 与启动迁移会做两件事：把旧的 `&#RRGGBB`
-转成 MiniMessage（包括管理员自己改过的条目，措辞不动），并把 jar 内新增的键补进服务器
-已有的语言文件（已存在的条目不覆盖）。
+`lang-version: 3` 会把旧的 `&#RRGGBB` 转成 MiniMessage；v5 补齐多方待签署状态显示，
+当前 v6 补齐注资与故障核对提示。此前 `lang-version: 4` 增加 SALE
+命令、向导、确认与领取文案。`/contract admin reload` 与启动迁移会把 jar 内新增的键补进服务器
+已有语言文件，管理员自己改过的措辞与已存在条目都不会被覆盖。
 
 `LanguageParityTest` 在构建时校验三件事：两个语言文件的键集合完全一致、
 同一个键在各语言里的占位符集合一致、代码里引用的每个 `ui.*` 键都真实存在。
@@ -321,9 +328,16 @@ plugins/Contract/events.log
 
 当前版本使用 Bukkit YAML 存储，避免引入 SQLite/MySQL 驱动。后续如果合同数量明显变多，再考虑数据库层。
 
+若开发/测试存档中已有 ALLIANCE 记录，不要降级到不识别多方签署数据的版本。签署数据损坏时，
+加载会报错并保留当前内存数据，不会静默丢掉该合同或选用可能漏掉已签署成员的旧备份；请先保留原文件再核对恢复。
+
+资金日志采用原子替换写入；日志损坏时不会把它当作空文件覆盖。若开发测试的联盟注资记录中出现
+`funding-phase: PREPARED` 或 `REFUNDING`，代表外部扣款/退款结果尚不确定，自动恢复不会猜测或重复支付。
+请保留原日志、合同文件和经济插件交易记录，按操作 ID 核对；不要直接清空日志解锁，也不要带着未决记录降级。
+
 ## 已知边界
 
-- 尚未公开发布。
+- 尚未发布首个正式版本；源码镜像状态不等于 release 状态。
 - **不再支持纯 Spigot 服**：为使用 Paper 原生 Dialog 与服务端提供的 Adventure，
   编译目标改为 paper-api（仍输出 Java 17 字节码，可在 Paper 1.18+ 加载）。
 - Dialog 界面仅在 Paper 1.21.6+ 启用；更旧的 Paper 自动回退到库存 GUI + 聊天输入。
@@ -334,4 +348,5 @@ plugins/Contract/events.log
 - 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
 - 设计依据：[`DESIGN.md`](DESIGN.md)
 - 版本记录：[`CHANGELOG.md`](CHANGELOG.md)
+- 发布检查：[`docs/release-checklist.md`](docs/release-checklist.md)
 - 可选连接契约：仓库根 [`CUBEX_INTEGRATIONS_DESIGN.md`](../CUBEX_INTEGRATIONS_DESIGN.md)

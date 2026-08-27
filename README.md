@@ -74,10 +74,13 @@ plugins/
 │     ├─ cubex-kotlin-plugin.gradle.kts   # Kotlin 插件 opt-in(额外 kotlin("jvm") + stdlib relocate)
 │     ├─ cubex-kotlin-library.gradle.kts  # Kotlin 共享模块约定(Java 17/JUnit/互操作参数)
 │     ├─ CubexVersions.kt / CubexDependencies.kt / CubexRelocations.kt
-├─ modules/                 # 9 个共享模块(无 shadowJar,被各插件依赖后 shade 进去)
+│     └─ CubexPackaging.kt                # 打包模式(内嵌/外置/LIB)与共享模块名单
+├─ modules/                 # 10 个共享模块(无 shadowJar,内嵌模式下被各插件 shade 进去)
 │  ├─ cubex-core/        cubex-config/      cubex-i18n/
 │  ├─ cubex-scheduler/   cubex-integrations/ cubex-database/
-│  └─ cubex-command/     cubex-gui/         cubex-spatial/
+│  ├─ cubex-command/     cubex-gui/         cubex-spatial/
+│  └─ cubex-economy/
+├─ CubeXLib/                # 运行时 lib 插件:为外置模式插件以原包名提供 modules/ 与 Kotlin stdlib
 └─ <各插件>/                # BookLite FAWEReplacer MountLicense Contract
                             # EcoBalancer RuleGems Metro Railway Clarity Reputations
                             # Regions StateCharge
@@ -89,6 +92,7 @@ plugins/
 - 共享模块 API 与使用方法：详见 [`MODULES.md`](MODULES.md)。
 - 演进规划与全仓待办：详见 [`PLAN.md`](PLAN.md)。
 - Kotlin 编码规范与门禁说明：详见 [`KOTLIN_STYLE_GUIDE.md`](KOTLIN_STYLE_GUIDE.md)。
+- 命令、权限、help 与消息颜色：详见 [`COMMAND_PERMISSION_GUIDE.md`](COMMAND_PERMISSION_GUIDE.md)。
 
 ---
 

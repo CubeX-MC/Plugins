@@ -1,0 +1,2 @@
+# {name} 会被替换成玩家名。支持 & 颜色码与 &#RRGGBB。
+greeting: "&a你好, &f{name}&a!"

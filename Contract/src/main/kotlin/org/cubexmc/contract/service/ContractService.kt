@@ -16,6 +16,7 @@ import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.ContractObjective
 import org.cubexmc.contract.model.ContractStatus
 import org.cubexmc.contract.model.ContractType
+import org.cubexmc.contract.model.ItemClaimPlan
 import org.cubexmc.contract.model.ObjectiveType
 import org.cubexmc.contract.model.Participant
 import org.cubexmc.contract.model.ParticipantRole
@@ -43,6 +44,14 @@ class ContractService(
     private val eventLog: EventLog,
     private val batchAcceptances: BatchAcceptanceStore,
 ) : RegionFundingExecutor {
+    private val allianceFunding = AllianceFundingService(plugin, storage, economy, pending, eventLog)
+
+    /** Service-only entry until the full alliance lifecycle and player confirmation flow are wired. */
+    @Synchronized
+    fun createAlliance(creator: Player, creatorStake: BigDecimal, allyStakes: Map<String, BigDecimal>,
+                       days: Int, title: String, description: String): ServiceResult =
+        allianceFunding.create(creator, creatorStake, allyStakes, days, title, description)
+
     /**
      * Resolves a `ui.*` language key for a player-facing failure reason. Resolved per call rather
      * than cached, so `/contract admin reload` picks up a language change immediately.
@@ -471,6 +480,10 @@ class ContractService(
     @Synchronized
     fun recoverPendingTransactions() {
         for (entry in pending.loadAll()) {
+            if (PendingTransactionStore.isAllianceFunding(entry.purpose()) || entry.fundingPhase() != null) {
+                allianceFunding.recover(entry)
+                continue
+            }
             when (entry.type()) {
                 PendingTransactionStore.PendingType.WITHDRAW -> recoverWithdraw(entry)
                 PendingTransactionStore.PendingType.DEPOSIT,
@@ -576,6 +589,8 @@ class ContractService(
         when (contract.type()) {
             ContractType.WAGER -> acceptWager(contractor, contract)
             ContractType.PARTNERSHIP -> acceptPartnership(contractor, contract)
+            ContractType.SALE -> acceptSale(contractor, contract)
+            ContractType.ALLIANCE -> allianceFunding.accept(contractor, contract)
             else -> acceptService(contractor, contract)
         }
 
@@ -708,7 +723,19 @@ class ContractService(
         return result
     }
 
-    private fun acceptPartnership(player: Player, contract: Contract): ServiceResult {
+    private fun acceptPartnership(player: Player, contract: Contract): ServiceResult =
+        acceptInvitedMoneyStake(player, contract, "partnership-accept", "PARTNERSHIP_ACCEPTED", "joined partnership with stake")
+
+    private fun acceptSale(player: Player, contract: Contract): ServiceResult =
+        acceptInvitedMoneyStake(player, contract, "sale-accept", "SALE_ACCEPTED", "accepted sale for")
+
+    private fun acceptInvitedMoneyStake(
+        player: Player,
+        contract: Contract,
+        pendingPurpose: String,
+        eventType: String,
+        eventDetail: String,
+    ): ServiceResult {
         if (contract.status() != ContractStatus.PENDING_ACCEPT) {
             return ServiceResult.fail(ui("err-partner-not-acceptable"))
         }
@@ -724,7 +751,7 @@ class ContractService(
             return ServiceResult.fail(ui("err-insufficient-funds", mapOf("value" to economy.format(stake))))
         }
         val pendingId = try {
-            pending.beginWithdraw(player.uniqueId, stake, "partnership-accept", contract.id())
+            pending.beginWithdraw(player.uniqueId, stake, pendingPurpose, contract.id())
         } catch (ex: IOException) {
             return ServiceResult.fail(ui("err-pending-log", mapOf("error" to (ex.message ?: ""))))
         }
@@ -737,7 +764,7 @@ class ContractService(
         val now = System.currentTimeMillis()
         contract.acceptedAt(now)
         contract.status(ContractStatus.IN_PROGRESS)
-        logEvent(contract, now, "PARTNERSHIP_ACCEPTED", "${player.name} joined partnership with stake ${stake.toPlainString()}")
+        logEvent(contract, now, eventType, "${player.name} $eventDetail ${stake.toPlainString()}")
 
         val result = saveSync(contract, stake)
         if (!result.success()) {
@@ -748,6 +775,134 @@ class ContractService(
         }
         tryClearPending(pendingId)
         return result
+    }
+
+    /**
+     * Creates the first service-level SALE shape: the creator escrows the complete main-hand stack
+     * and the invited counterparty promises the configured money price. Command and GUI discovery
+     * are deliberately separate; this method owns validation, item removal, persistence, and
+     * rollback so future entry points cannot bypass escrow safety.
+     */
+    @Synchronized
+    fun createSale(
+        creator: Player,
+        partnerName: String,
+        price: BigDecimal,
+        days: Int,
+        title: String,
+        description: String,
+    ): ServiceResult = createSale(creator, partnerName, price, days, title, description, null, null)
+
+    @Synchronized
+    fun createSale(
+        creator: Player,
+        partnerName: String,
+        price: BigDecimal,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+    ): ServiceResult = createSale(creator, partnerName, price, days, title, description, mediatorName, null)
+
+    @Synchronized
+    fun createSale(
+        creator: Player,
+        partnerName: String,
+        price: BigDecimal,
+        days: Int,
+        title: String,
+        description: String,
+        mediatorName: String?,
+        expectedOffer: ItemStack?,
+    ): ServiceResult {
+        val hand = creator.inventory.itemInMainHand
+        if (hand.type == Material.AIR || hand.amount <= 0) {
+            return ServiceResult.fail(ui("err-item-reward-in-hand"))
+        }
+        if (isRuleGemItem(hand)) {
+            return ServiceResult.fail(ui("err-rulegems-reward"))
+        }
+        if (expectedOffer != null && (hand.amount != expectedOffer.amount || !hand.isSimilar(expectedOffer))) {
+            return ServiceResult.fail(ui("err-sale-hand-changed"))
+        }
+        val cleanTitle = plugin.text().stripControl(title)
+        if (cleanTitle.isBlank()) {
+            return ServiceResult.fail(ui("err-title-empty"))
+        }
+        val maxTitleLength = plugin.config.getInt("limits.max-title-length", 80)
+        if (cleanTitle.length > maxTitleLength) {
+            return ServiceResult.fail(ui("err-title-too-long", mapOf("max" to maxTitleLength.toString())))
+        }
+        var cleanDescription = plugin.text().stripControl(description)
+        if (cleanDescription.isBlank()) cleanDescription = cleanTitle
+        val maxDescriptionLength = plugin.config.getInt("limits.max-description-length", 500)
+        if (cleanDescription.length > maxDescriptionLength) {
+            return ServiceResult.fail(ui("err-description-too-long", mapOf("max" to maxDescriptionLength.toString())))
+        }
+        val minPrice = BigDecimal.valueOf(plugin.config.getDouble("economy.min-reward", 100.0))
+        val maxPrice = BigDecimal.valueOf(plugin.config.getDouble("economy.max-reward", 100000.0))
+        val normalizedPrice = price.setScale(2, RoundingMode.HALF_UP)
+        if (normalizedPrice < minPrice || normalizedPrice > maxPrice) {
+            return ServiceResult.fail(ui("err-stakes-range", mapOf("min" to economy.format(minPrice), "max" to economy.format(maxPrice))))
+        }
+        val minDays = plugin.config.getInt("limits.min-deadline-days", 1)
+        val maxDays = plugin.config.getInt("limits.max-deadline-days", 7)
+        if (days < minDays || days > maxDays) {
+            return ServiceResult.fail(ui("err-days-range", mapOf("min" to minDays.toString(), "max" to maxDays.toString())))
+        }
+        val openLimit = plugin.config.getInt("limits.max-open-contracts", 3)
+        val active = storage.all().count { it.ownerUuid() == creator.uniqueId && it.status().countsAsOwnerActive() }
+        if (exceedsOpenLimit(active.toLong(), 1, openLimit) && !creator.hasPermission("contract.bypass.limit")) {
+            return ServiceResult.fail(ui("err-open-limit", mapOf("limit" to openLimit.toString())))
+        }
+
+        val partner = Bukkit.getOfflinePlayer(partnerName)
+        if (partner.uniqueId == creator.uniqueId) {
+            return ServiceResult.fail(ui("err-partner-self"))
+        }
+        if (!partner.isOnline && !partner.hasPlayedBefore()) {
+            return ServiceResult.fail(ui("err-player-not-found", mapOf("name" to partnerName)))
+        }
+        val mediator = resolveOptionalMediator(mediatorName, creator.uniqueId, partner.uniqueId)
+        if (!mediator.success()) return ServiceResult.fail(mediator.error())
+
+        val offeredItem = hand.clone()
+        val now = System.currentTimeMillis()
+        val expiresAt = now + days * 24L * 60L * 60L * 1000L
+        val contract = Contract.createSale(
+            creator.uniqueId,
+            creator.name,
+            partner.uniqueId,
+            partner.name ?: partnerName,
+            listOf(Asset.item(offeredItem)),
+            listOf(Asset.money(normalizedPrice)),
+            cleanTitle,
+            cleanDescription,
+            now,
+            expiresAt,
+        )
+        applyOptionalMediator(contract, mediator)
+
+        creator.inventory.setItemInMainHand(ItemStack(Material.AIR))
+        creator.updateInventory()
+        try {
+            storage.put(contract)
+            storage.save()
+        } catch (ex: IOException) {
+            storage.remove(contract.id())
+            creator.inventory.setItemInMainHand(offeredItem)
+            creator.updateInventory()
+            return ServiceResult.fail(ui("err-save-refunded", mapOf("error" to (ex.message ?: ""))))
+        }
+        eventLog.append(
+            contract.id(),
+            "CREATED",
+            "${creator.name} proposed sale to $partnerName: ${Asset.describe(offeredItem)} for ${normalizedPrice.toPlainString()}",
+        )
+        if (mediator.present()) {
+            eventLog.append(contract.id(), "MEDIATOR_ASSIGNED", "${mediator.name()} assigned as optional mediator")
+        }
+        return ServiceResult.ok(contract)
     }
 
     @Synchronized
@@ -864,7 +1019,7 @@ class ContractService(
         return ServiceResult.ok(contract, normA)
     }
 
-    private fun approvePartnership(player: Player, contract: Contract): ServiceResult {
+    private fun approveMutualContract(player: Player, contract: Contract): ServiceResult {
         if (contract.status() != ContractStatus.IN_PROGRESS) {
             return ServiceResult.fail(ui("err-partner-not-in-progress"))
         }
@@ -884,15 +1039,16 @@ class ContractService(
         }
         contract.metadata["approved-roles"] = set.joinToString(",")
         val now = System.currentTimeMillis()
-        logEvent(contract, now, "PARTNERSHIP_APPROVED", "${player.name} (${me.role()}) approved partnership")
+        val label = if (contract.type() == ContractType.SALE) "sale" else "partnership"
+        logEvent(contract, now, "${contract.type().name}_APPROVED", "${player.name} (${me.role()}) approved $label")
 
         if (set.size >= 2) {
             return settle(
                 contract,
                 PayoutCondition.SUCCESS,
                 ContractStatus.COMPLETED,
-                "PARTNERSHIP_COMPLETED",
-                "both partners approved",
+                "${contract.type().name}_COMPLETED",
+                "both parties approved $label",
             )
         }
         return dirty(contract)
@@ -1202,16 +1358,51 @@ class ContractService(
 
     @Synchronized
     fun claimDeliveryItems(player: Player, contract: Contract): ServiceResult {
+        val recipientRole = contract.participantByUuid(player.uniqueId).map { it.role() }.orElse(null)
+        if (recipientRole != null && contract.hasItemClaims(recipientRole)) {
+            if (!contract.status().isFinal()) {
+                return ServiceResult.fail(ui("err-claim-after-completion"))
+            }
+            val items = contract.itemClaims(recipientRole)
+            val sources = contract.itemClaimSources(recipientRole)
+            val claimsBefore = contract.itemClaims()
+            val deliveryBefore = contract.deliveryItems()
+            val rewardBefore = contract.rewardItems()
+            return claimStoredItems(
+                player,
+                contract,
+                items,
+                StoredItemKind.ENTITLEMENT,
+                clear = {
+                    contract.clearItemClaims(recipientRole)
+                    if (contract.type() == ContractType.SERVICE) {
+                        if (ParticipantRole.OWNER in sources) contract.clearRewardItems()
+                        if (ParticipantRole.CONTRACTOR in sources) contract.clearDeliveryItems()
+                    }
+                },
+                restore = {
+                    contract.itemClaims(claimsBefore)
+                    contract.deliveryItems(deliveryBefore)
+                    contract.rewardItems(rewardBefore)
+                },
+            )
+        }
         if (contract.type() != ContractType.SERVICE) {
-            return ServiceResult.fail(ui("err-claim-unsupported"))
+            return ServiceResult.fail(ui("err-claim-nothing"))
         }
         if (contract.hasDeliveryItems() && player.uniqueId == contract.ownerUuid()) {
             if (contract.status() != ContractStatus.COMPLETED) {
                 return ServiceResult.fail(ui("err-claim-after-completion"))
             }
-            return claimStoredItems(player, contract, contract.deliveryItems(), StoredItemKind.DELIVERY) {
-                contract.clearDeliveryItems()
-            }
+            val items = contract.deliveryItems()
+            return claimStoredItems(
+                player,
+                contract,
+                items,
+                StoredItemKind.DELIVERY,
+                clear = { contract.clearDeliveryItems() },
+                restore = { contract.deliveryItems(items) },
+            )
         }
         if (contract.hasRewardItems()) {
             val canClaimCompletedReward = contract.status() == ContractStatus.COMPLETED && player.uniqueId == contract.contractorUuid()
@@ -1219,9 +1410,15 @@ class ContractService(
                 (contract.status() == ContractStatus.CANCELLED || contract.status() == ContractStatus.EXPIRED) &&
                     player.uniqueId == contract.ownerUuid()
             if (canClaimCompletedReward || canReclaimClosedReward) {
-                return claimStoredItems(player, contract, contract.rewardItems(), StoredItemKind.REWARD) {
-                    contract.clearRewardItems()
-                }
+                val items = contract.rewardItems()
+                return claimStoredItems(
+                    player,
+                    contract,
+                    items,
+                    StoredItemKind.REWARD,
+                    clear = { contract.clearRewardItems() },
+                    restore = { contract.rewardItems(items) },
+                )
             }
         }
         return ServiceResult.fail(ui("err-claim-nothing"))
@@ -1231,9 +1428,17 @@ class ContractService(
     private enum class StoredItemKind(val labelKey: String) {
         DELIVERY("stored-delivery-items"),
         REWARD("stored-reward-items"),
+        ENTITLEMENT("stored-reward-items"),
     }
 
-    private fun claimStoredItems(player: Player, contract: Contract, items: List<ItemStack>, kind: StoredItemKind, clear: () -> Unit): ServiceResult {
+    private fun claimStoredItems(
+        player: Player,
+        contract: Contract,
+        items: List<ItemStack>,
+        kind: StoredItemKind,
+        clear: () -> Unit,
+        restore: () -> Unit = {},
+    ): ServiceResult {
         val label = ui(kind.labelKey)
         if (items.isEmpty()) {
             return ServiceResult.fail(ui("claim-none-of-kind", mapOf("kind" to label)))
@@ -1254,10 +1459,7 @@ class ContractService(
         } catch (ex: IOException) {
             player.inventory.storageContents = inventoryBefore
             player.updateInventory()
-            when (kind) {
-                StoredItemKind.DELIVERY -> contract.deliveryItems(items)
-                StoredItemKind.REWARD -> contract.rewardItems(items)
-            }
+            restore()
             ServiceResult.fail(ui("claim-save-failed", mapOf("error" to (ex.message ?: ""))))
         }
     }
@@ -1316,8 +1518,8 @@ class ContractService(
 
     @Synchronized
     fun approve(player: Player, contract: Contract): ServiceResult {
-        if (contract.type() == ContractType.PARTNERSHIP) {
-            return approvePartnership(player, contract)
+        if (contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) {
+            return approveMutualContract(player, contract)
         }
         if (contract.type() != ContractType.SERVICE) {
             return ServiceResult.fail(ui("err-approve-unsupported"))
@@ -1718,6 +1920,11 @@ class ContractService(
         if (rules.isEmpty()) {
             return ServiceResult.fail(ui("err-no-settlement-rule", mapOf("purpose" to purpose)))
         }
+        val itemClaimPlan = try {
+            ItemClaimPlan.route(contract, rules)
+        } catch (ex: IllegalArgumentException) {
+            return ServiceResult.fail(ui("err-no-settlement-rule", mapOf("purpose" to "$purpose items: ${ex.message}")))
+        }
         val settlementId = try {
             pending.beginSettlement(contract.id(), "$purpose:$eventType")
         } catch (ex: IOException) {
@@ -1732,6 +1939,8 @@ class ContractService(
             tryClearPending(settlementId)
             return ServiceResult.fail(outcome.error)
         }
+        contract.itemClaims(itemClaimPlan.claims())
+        contract.metadata["terminal-payout-condition"] = purpose
         val now = System.currentTimeMillis()
         contract.status(newStatus)
         contract.completedAt(now)

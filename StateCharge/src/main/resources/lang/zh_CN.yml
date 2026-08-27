@@ -1,6 +1,6 @@
-# StateCharge 语言文件(zh_CN)。所有值使用 MiniMessage;占位符为 <name> 形式。
-# 新增/修改 key 后请同步 en_US.yml,并 bump lang-version(见 DESIGND.md §7)。
-lang-version: 1
+# StateCharge 简体中文语言文件
+# 值使用 MiniMessage;<prefix> 会展开为下面的 prefix。
+lang-version: 2
 
 prefix: "<gradient:#FFC24B:#FF8A00>StateCharge</gradient> <dark_gray>»</dark_gray> "
 
@@ -8,46 +8,66 @@ messages:
   no-permission: "<prefix><red>你没有权限使用这个命令。</red>"
   player-only: "<prefix><red>该命令只能由玩家执行。</red>"
   help: |-
-    <prefix><gold>==== StateCharge 帮助 ====</gold>
-    <prefix><dark_gray>/statecharge list</dark_gray> <gray>查看可购买的状态</gray>
-    <prefix><dark_gray>/statecharge status</dark_gray> <gray>查看我的生效状态与剩余时间</gray>
-    <prefix><dark_gray>/statecharge buy <状态> [份数]</dark_gray> <gray>购买限时状态(在线计时,可叠加)</gray>
-  buy-success: "<prefix><green>购买成功!</green> 你获得了 <gold><time></gold> 的 <yellow><state></yellow> 状态,花费 <white><price></white>。总剩余: <green><total></green>。"
-  buy-unknown-state: "<prefix><red>未知状态: <state>。用 /statecharge list 查看可购买的状态。</red>"
-  buy-disabled: "<prefix><red>状态 <state> 当前不可购买。</red>"
-  buy-no-permission: "<prefix><red>你没有权限购买该状态。</red>"
-  buy-conflict: "<prefix><red>你正在使用同组的 <yellow><other></yellow> 状态,先等它结束吧。</red>"
-  buy-max-stack: "<prefix><red>超出该状态的累计上限(<white><max></white>)。</red>"
-  buy-insufficient: "<prefix><red>余额不足,需要 <white><price></white>。</red>"
-  buy-economy-failed: "<prefix><red>扣款失败: <reason>。</red>"
-  buy-invalid-count: "<prefix><red>份数无效,请输入 1 到 1000 之间的整数。</red>"
-  expiry-warning: "<prefix><yellow>你的 <white><state></white> 状态将在 <red><time></red> 后到期!</yellow>"
-  expired: "<prefix><yellow>你的 <white><state></white> 状态已到期。</yellow>"
-  actionbar-countdown: "<yellow><state> 剩余 <time></yellow>"
-  admin-give-success: "<prefix><green>已给 <player> 发放 <time> 的 <state> 状态。</green>"
-  admin-give-unknown-state: "<prefix><red>未知状态: <state>。</red>"
-  admin-give-invalid-seconds: "<prefix><red>秒数无效,请输入正整数。</red>"
-  admin-player-unknown: "<prefix><red>找不到玩家: <player>。</red>"
-  admin-clear-success: "<prefix><green>已清除 <player> 的 <count> 个状态。</green>"
-  admin-clear-none: "<prefix><yellow><player> 没有任何生效中的状态。</yellow>"
+    <prefix><gold>StateCharge</gold> <gray>— 按开启时长计费的玩家状态</gray>
+    <gray>/sc</gray> <dark_gray>打开交易页(开关状态)</dark_gray>
+    <gray>/sc list</gray> <dark_gray>查看全部状态与费率</dark_gray>
+    <gray>/sc status</gray> <dark_gray>查看自己开着的状态与余额保险</dark_gray>
+    <gray>/sc toggle <状态></gray> <dark_gray>开/关一个状态</dark_gray>
+    <gray>/sc guard <金额|off></gray> <dark_gray>设置余额保险</dark_gray>
+
+  toggle-on: "<prefix><green>已开启 <white><state></white>。</green><gray>关闭前会持续计费。</gray>"
+  toggle-off: "<prefix><yellow>已关闭 <white><state></white>。</yellow><gray>本次开启共扣 <white><price></white>。</gray>"
+  toggle-already-on: "<prefix><gray><state> 已经开着了。</gray>"
+  toggle-already-off: "<prefix><gray><state> 本来就没开。</gray>"
+  toggle-unknown-state: "<prefix><red>未知状态: <state>。用 /sc list 看看有哪些。</red>"
+  toggle-disabled: "<prefix><red>状态 <state> 当前不可用。</red>"
+  toggle-no-permission: "<prefix><red>你没有权限使用 <state>。</red>"
+  toggle-guard-reached: "<prefix><red>余额已低于你设置的保险线,无法开启 <state>。</red>"
+
+  charged: "<prefix><gray>[<state>] 已开启 <white><time></white>,扣费 <gold><price></gold>。</gray>"
+  charge-failed: "<prefix><red>扣费失败,<white><state></white> 已自动关闭。</red>"
+  guard-triggered: "<prefix><red>余额已低于保险线 <white><threshold></white>,已自动关闭: <yellow><states></yellow></red>"
+
+  guard-prompt: "<prefix><yellow>请在聊天栏输入余额保险金额</yellow><gray>(输入 <white>clear</white> 恢复默认,<white>cancel</white> 取消)</gray>"
+  guard-set: "<prefix><green>余额保险已设为 <white><amount></white>。</green><gray>余额低于它时会自动关闭全部收费状态。</gray>"
+  guard-reset: "<prefix><green>余额保险已恢复默认 <white><amount></white>。</green>"
+  guard-invalid: "<prefix><red>金额无效,请输入一个不小于 0 的数字。</red>"
+  guard-cancelled: "<prefix><gray>已取消设置。</gray>"
+
+  admin-player-offline: "<prefix><red>玩家 <player> 不在线;关闭状态需要移除实体效果,只能对在线玩家操作。</red>"
+  admin-clear-success: "<prefix><green>已关闭 <player> 的 <count> 个状态。</green>"
+  admin-clear-none: "<prefix><yellow><player> 没有开着的状态。</yellow>"
   admin-reload-success: "<prefix><green>重载完成。</green>"
   admin-reload-failed: "<prefix><red>重载失败,出错的阶段: <stage>。详见控制台日志。</red>"
 
 ui:
-  list-header: "<prefix><gold>可购买的状态:</gold>"
+  list-header: "<prefix><gold>可用的状态:</gold>"
   list-line: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray>"
-  list-line-limited: "<prefix><dark_gray> - </dark_gray><yellow><id></yellow> <white><state></white><dark_gray>: </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray><dark_gray> · 上限 </dark_gray><gray><max></gray>"
-  list-empty: "<prefix><gray>当前没有可购买的状态。</gray>"
-  status-header: "<prefix><gold>你正在生效的状态:</gold>"
-  status-line: "<prefix><dark_gray> - </dark_gray><white><state></white><dark_gray> · 剩余 </dark_gray><green><time></green>"
-  status-empty: "<prefix><gray>你没有生效中的状态。用 /statecharge list 看看有什么可以买。</gray>"
-  usage-buy: "<gray>用法: /statecharge buy <状态> [份数]</gray>"
-  usage-list: "<gray>用法: /statecharge list</gray>"
-  usage-status: "<gray>用法: /statecharge status</gray>"
-  usage-admin-give: "<gray>用法: /statecharge admin give <玩家> <状态> <秒数></gray>"
-  usage-admin-clear: "<gray>用法: /statecharge admin clear <玩家> [状态]</gray>"
-  usage-admin-reload: "<gray>用法: /statecharge admin reload</gray>"
+  list-empty: "<prefix><gray>当前没有可用的状态。</gray>"
+
+  status-header: "<prefix><gold>你正在开启的状态:</gold>"
+  status-line: "<prefix><dark_gray> - </dark_gray><white><state></white><dark_gray> · </dark_gray><gold><price></gold><dark_gray> / </dark_gray><gray><duration></gray>"
+  status-empty: "<prefix><gray>你没有开启任何状态。用 /sc 打开交易页。</gray>"
+  status-guard: "<prefix><gray>余额保险: <white><amount></white></gray>"
+
+  usage-toggle: "<gray>用法: /sc toggle <状态></gray>"
+  usage-on: "<gray>用法: /sc on <状态></gray>"
+  usage-off: "<gray>用法: /sc off <状态></gray>"
+  usage-guard: "<gray>用法: /sc guard <金额|off></gray>"
+  usage-admin-off: "<gray>用法: /sc admin off <玩家> [状态]</gray>"
+  usage-admin-reload: "<gray>用法: /sc admin reload</gray>"
+
+  # 时长单位标签,供 durationText 拼装(例如 "1小时30分")。
   time-day: "天"
   time-hour: "小时"
   time-minute: "分"
   time-second: "秒"
+
+  gui-title: "<dark_gray>状态交易</dark_gray>"
+  gui-state-on: "<green>● <state></green>"
+  gui-state-off: "<gray>○ <state></gray>"
+  gui-state-rate: "<gray>费率: <gold><price></gold> / <white><duration></white></gray>"
+  gui-state-hint: "<dark_gray>点击开启或关闭</dark_gray>"
+  gui-guard-name: "<aqua>余额保险</aqua>"
+  gui-guard-current: "<gray>当前: <white><amount></white></gray>"
+  gui-guard-hint: "<dark_gray>点击后在聊天栏输入金额</dark_gray>"

@@ -19,6 +19,8 @@ dependencies {
     implementation(project(":modules:cubex-scheduler"))
     implementation(project(":modules:cubex-database"))
     implementation(project(":modules:cubex-command"))
+    implementation(project(":modules:cubex-economy"))
+    implementation(project(":modules:cubex-gui"))
     implementation(platform("net.kyori:adventure-bom:4.25.0"))
     implementation("org.incendo:cloud-paper:2.0.0-beta.17")
     implementation("org.incendo:cloud-minecraft-extras:2.0.0-beta.17")
@@ -50,6 +52,11 @@ tasks.shadowJar {
     relocate("org.incendo", "org.cubexmc.shaded.incendo")
     relocate("io.leangen.geantyref", "org.cubexmc.shaded.geantyref")
 }
+
+// 钉住 JaCoCo 工具版本:Gradle 8.14.3 的默认值是 0.8.13,而 gradle.lockfile 把它锁在
+// {strictly 0.8.11},升 Gradle 时会直接解析失败。锁文件是本插件安全流程的一部分
+// (见 .github/workflows/rulegems-security.yml),不该为了跟随 Gradle 默认值就动它。
+jacoco { toolVersion = "0.8.11" }
 
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)

@@ -9,11 +9,17 @@ import org.bukkit.event.Listener
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.player.AsyncPlayerChatEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.cubexmc.ecobalancer.EcoBalancer
 import org.cubexmc.ecobalancer.policies.TaxPolicy
 import org.cubexmc.ecobalancer.utils.EconomicMetrics
+import org.cubexmc.gui.chat.AcceptResult
+import org.cubexmc.gui.chat.ChatInputState
+import org.cubexmc.gui.chat.ChatOutcome
+import org.cubexmc.gui.chat.ModernChatBridge
+import org.cubexmc.gui.fillEmpty
 import java.util.Locale
 import java.util.UUID
 import java.util.function.Consumer
@@ -23,7 +29,18 @@ import kotlin.math.max
 class GuiManager(private val plugin: EcoBalancer) : Listener {
     private val viewingPolicyDetails: MutableMap<UUID, String> = HashMap()
     private val viewingPolicyPage: MutableMap<UUID, Int> = HashMap()
-    private val pendingChatInputs: MutableMap<UUID, Consumer<String>> = HashMap()
+    /**
+     * 聊天提问状态机（`cubex-gui`）。取消关键字每次现读语言文件，reload 之后立刻生效。
+     *
+     * 下沉顺带修掉一个并发问题：原来这里是普通 `HashMap`，却被**异步**聊天事件线程读写。
+     *
+     * 本插件编译到 spigot-api 且把 `net.kyori` relocate 进了自己的命名空间，
+     * 所以现代聊天事件走 [ModernChatBridge] 的反射注册 —— Paper 上两条链路都接住，
+     * Spigot 上自动跳过。
+     */
+    private val chatInputs = ChatInputState<Consumer<String>>(
+        cancelKeywords = { listOf(tr("messages.gui.chat_cancel_keyword", "cancel")) },
+    )
 
     init {
         Bukkit.getPluginManager().registerEvents(this, plugin)
@@ -262,7 +279,13 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
             val name = policyNames[i]
             val isActive = name == activeName
             val mat = if (isActive) Material.ENCHANTED_BOOK else Material.BOOK
-            val displayName = (if (isActive) tr("messages.gui.tp_item_active_prefix", "&a✓ ") else "&e") + name
+            // 非激活分支原本是裸的 "&e" 字面量,没过 tr(),颜色码会原样显示在物品名上。
+            val prefix = if (isActive) {
+                tr("messages.gui.tp_item_active_prefix", "&a✓ ")
+            } else {
+                tr("messages.gui.tp_item_inactive_prefix", "&e")
+            }
+            val displayName = prefix + name
 
             val policy = plugin.policyManager.getPolicy(name)
             val desc = policy?.description ?: ""
@@ -432,35 +455,75 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
     private fun createItem(mat: Material, name: String, vararg lore: String): ItemStack = createItem(mat, 0, name, *lore)
 
     private fun fillBackground(inv: Inventory) {
-        val pane = createItem(Material.BLACK_STAINED_GLASS_PANE, 0, " ")
-        for (i in 0 until inv.size) {
-            if (inv.getItem(i) == null) {
-                inv.setItem(i, pane)
-            }
+        inv.fillEmpty(createItem(Material.BLACK_STAINED_GLASS_PANE, 0, " "))
+    }
+
+    /**
+     * 在 Paper 上补一条现代聊天事件监听;Spigot 上是空操作。
+     * 由插件在注册本 Listener 之后调用一次,注销绑进插件资源栈。
+     */
+    fun registerModernChat() {
+        val listener = ModernChatBridge.register(plugin) { player, message -> captureChat(player, message) }
+        if (listener != null) {
+            plugin.bind(Runnable { ModernChatBridge.unregister(listener) })
         }
     }
 
     @EventHandler
     fun onPlayerChat(event: AsyncPlayerChatEvent) {
-        val player = event.player
-        val callback = pendingChatInputs.remove(player.uniqueId) ?: return
-        event.isCancelled = true
-        val message = event.message
-
-        if (message.trim().equals(tr("messages.gui.chat_cancel_keyword", "cancel"), ignoreCase = true)) {
-            player.sendMessage(tr("messages.gui.chat_cancelled", "&e[EcoBalancer] &cInput cancelled."))
-            Bukkit.getScheduler().runTask(plugin, Runnable {
-                val policyName = viewingPolicyDetails[player.uniqueId]
-                if (policyName != null) {
-                    openPolicyDetails(player, policyName)
-                } else {
-                    openMainMenu(player)
-                }
-            })
-            return
+        if (captureChat(event.player, event.message)) {
+            event.isCancelled = true
         }
+    }
 
-        Bukkit.getScheduler().runTask(plugin, Runnable { callback.accept(message.trim()) })
+    /** 返回这行是否归本插件、必须挡在公屏之外。两条聊天链路共用。 */
+    private fun captureChat(player: Player, message: String): Boolean {
+        val playerId = player.uniqueId
+        return when (val result = chatInputs.accept(playerId, message)) {
+            AcceptResult.NotOurs -> false
+            // 同一行从另一条链路又来了一遍:吞掉但不重复回调。
+            AcceptResult.AlreadyTaken -> true
+            is AcceptResult.Accepted -> {
+                deliverChatInput(player, playerId, result.outcome, result.payload)
+                true
+            }
+        }
+    }
+
+    @EventHandler
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        chatInputs.forget(event.player.uniqueId)
+    }
+
+    private fun deliverChatInput(
+        player: Player,
+        playerId: UUID,
+        outcome: ChatOutcome,
+        callback: Consumer<String>,
+    ) {
+        when (outcome) {
+            ChatOutcome.Cancelled -> {
+                player.sendMessage(tr("messages.gui.chat_cancelled", "&e[EcoBalancer] &cInput cancelled."))
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    chatInputs.settle(playerId)
+                    val policyName = viewingPolicyDetails[playerId]
+                    if (policyName != null) {
+                        openPolicyDetails(player, policyName)
+                    } else {
+                        openMainMenu(player)
+                    }
+                })
+            }
+
+            // 交给回调的仍是 trim 过的文本(与下沉前一致)。
+            is ChatOutcome.Submitted -> Bukkit.getScheduler().runTask(plugin, Runnable {
+                chatInputs.settle(playerId)
+                callback.accept(outcome.text.trim())
+            })
+
+            // 本插件不开放 clear、也没有超时,这两种结果到不了这里;仍然清理去重记录。
+            else -> Bukkit.getScheduler().runTask(plugin, Runnable { chatInputs.settle(playerId) })
+        }
     }
 
     @EventHandler
@@ -616,7 +679,8 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
         player.closeInventory()
         player.sendMessage(tr("messages.gui.chat_prefix", "&e[EcoBalancer] &f") + prompt)
         player.sendMessage(tr("messages.gui.chat_cancel_hint", "&7Type 'cancel' to abort."))
-        pendingChatInputs[player.uniqueId] = callback
+        // 与下沉前一致:本插件的提问没有超时(0 表示永不过期)。
+        chatInputs.open(player.uniqueId, allowClear = false, timeoutMillis = 0L, payload = callback)
     }
 
     private fun handlePolicyDetailsClick(player: Player, current: ItemStack, title: String, click: ClickType) {

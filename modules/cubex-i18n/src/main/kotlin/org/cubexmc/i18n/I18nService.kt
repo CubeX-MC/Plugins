@@ -19,6 +19,8 @@ interface I18nService : Reloadable {
     fun message(key: String?, locale: String?, placeholders: Map<String, *>?): String
     fun message(key: String?, vararg positionalArgs: Any?): String
     fun messageList(key: String?, placeholders: Map<String, *>?): List<String>
+    /** Renders a caller-owned template through the same prefix/placeholder/color pipeline. */
+    fun render(template: String?, placeholders: Map<String, *>?): String
     fun component(key: String?): Component
     fun component(key: String?, placeholders: Map<String, *>?): Component
     fun componentList(key: String?, placeholders: Map<String, *>?): List<Component>

@@ -1,115 +1,111 @@
 # StateCharge
 
-付费限时状态插件：玩家用 Vault 货币购买限时的变小 / 变大 / 飞行等状态。
+按**实际开启时长**计费的玩家状态插件：变小、变大、飞行等状态由玩家自己开关，开着才扣钱。
 
-## 定位
+## 它怎么工作
 
-服务器想卖"临时特权"时，通常要么硬编码几个固定商品，要么把整套 RPG 系统搬进来。
-StateCharge 只做中间那一层：**一个配置驱动的限时状态框架**。
-服主在 `config.yml` 里增删状态、改价格与时长，只有新增**效果类型**时才需要改代码。
+- 玩家在交易页里点一下就**开启**某个状态，再点一下**关闭**。
+- 开启期间按费率从 Vault 扣钱；**关闭即停止计费**，并立刻结算不足一个周期的零头。
+- 关闭提示报的是**本次开启到关闭累计扣掉的总额**，不是刚结算的那点零头 ——
+  开了一小时的状态中间已经按周期扣过很多次，只报最后一次会让玩家以为整段就这么便宜。
+  玩家只为真正开着的时间付钱。
+- **离线不计费**。开关状态保留，重新上线接着算。
+- 收上来的钱**转进 `economy.account` 配置的账户**，不是凭空销毁 —— 服务器经济可以做内循环。
+- **余额保险**：余额跌破玩家自设的阈值时，自动关掉他全部收费状态，防止忘关被扣干。
+- `scale` 与 `allowFlight` 使用玩家 PDC 中的 CubeX lease 栈；和 Regions 重叠、以任意顺序退出时，
+  只移除自己的层，不会把另一插件仍持有的体型或飞行权限重置掉。
 
-计时按**在线时长**：离线暂停、不扣时也不生效，避免玩家买完下线白白烧掉时长。
-
-**不做什么**（避免误装）：
-
-- 不是 RPG / 技能 / 称号系统，只管"付费换一段时间内的状态"。
-- 不做现实时间倒计时（买了就开始烧，无论在不在线）——那是另一种语义，v1 不做。
-- 不自带商店 GUI，交互走命令。
-
-## 功能特性
-
-- 内置 `scale`（变小/变大）与 `fly`（飞行）两种效果类型，内置 small / giant / fly 三个状态。
-- 状态完全由配置定义：id、展示名、价格、每份时长、累计上限、购买权限、互斥组。
-- 互斥组：同组状态不能同时生效（例如变小与变大）。
-- 重复购买**累加**剩余时长，受 `max-stack-seconds` 限制。
-- 到期提醒：阈值聊天提示 + 最后 N 秒 actionbar 倒计时。
-- 管理员可免费发放或清除状态。
-- 数据落盘带脏标记刷新，文件损坏时回退 `.bak`。
-
-## 运行要求
-
-| 项 | 要求 |
-|---|---|
-| 服务端 | Paper 1.21.x（体型走 1.20.5+ 属性 API `Attribute.SCALE`，**不需要 ProtocolLib**） |
-| Java | 17 |
-| 必需依赖 | **Vault** + 一个 Vault 经济 provider（缺失时插件自动禁用） |
-| 可选依赖 | Essentials / CMI / EssentialsX（仅用于保证加载顺序） |
-| Folia | 支持 |
-
-## 安装
-
-1. 装好 Vault 与一个经济 provider。
-2. 把 `statecharge-<version>.jar` 放进服务器 `plugins/`。
-3. 启动服务器生成默认配置，按需增删状态后 `/sc admin reload`。
-
-> 部署用的是 `build/libs/statecharge-<version>.jar`；同目录的 `*-plain.jar` **不要**部署。
+> 玩家**不预购时长**。没有"买 3 小时"这种概念，也就没有囤时长、没有到期提醒。
 
 ## 命令
 
-别名：`/sc`
+| 命令 | 说明 |
+|---|---|
+| `/sc` | 打开交易页（最常用） |
+| `/sc list` | 列出全部状态与费率 |
+| `/sc status` | 自己开着的状态 + 当前余额保险 |
+| `/sc toggle <状态>` | 开/关一个状态 |
+| `/sc on <状态>` / `/sc off <状态>` | 明确地开/关（已经是目标状态时不动） |
+| `/sc guard <金额\|off>` | 设置余额保险；`off` 恢复配置默认值 |
+| `/sc admin off <玩家> [状态]` | 关掉某在线玩家的状态 |
+| `/sc admin reload` | 重载配置、语言与存档 |
 
-| 命令 | 权限 | 说明 |
-|---|---|---|
-| `/statecharge list` | `statecharge.use` | 查看可购买的状态 |
-| `/statecharge status` | `statecharge.use` | 查看生效中的状态与剩余时间 |
-| `/statecharge buy <状态> [份数]` | `statecharge.use` + 该状态配置的 permission（若有） | 购买，默认 1 份 |
-| `/statecharge admin give <玩家> <状态> <秒数>` | `statecharge.admin.give` | 免费发放（叠加） |
-| `/statecharge admin clear <玩家> [状态]` | `statecharge.admin.clear` | 清除状态，缺省清全部 |
-| `/statecharge admin reload` | `statecharge.admin.reload` | 重载配置 / 语言 / 数据 |
+`/sc` 与 `/statecharge` 等价。
 
-## 权限
+## 交易页
 
-| 权限 | 默认 | 说明 |
-|---|---|---|
-| `statecharge.use` | true | 玩家命令（list / status / buy / help） |
-| `statecharge.buy.<id>` | true | **仅当**某状态在配置里把 `permission` 指向该节点时才检查 |
-| `statecharge.fly.keep` | false | fly 状态到期后保留飞行能力 |
-| `statecharge.admin` | op | 全部管理命令（give / clear / reload） |
+一状态一按钮，**只显示玩家有权限的状态**（状态的 `permission` 为空则所有人可见）。
+开着的状态会发光，lore 显示费率。右下角的盾牌是**余额保险**：点击后在聊天栏输入金额，
+输入 `clear` 恢复默认、`cancel` 取消。
 
-## 配置
+## 配置要点
+
+费率由两个字段合成：`price` / `unit-seconds`，读作"每 `unit-seconds` 秒收 `price`"。
+例如 `price: 100, unit-seconds: 1800` 就是每 30 分钟 100 块，开 10 分钟收 33.3 块。
 
 ```yaml
+billing:
+  # 多久结算一次。调小扣费更细,但每周期每个开着状态的在线玩家都要走 Vault(扣款 + 入账)。
+  interval-seconds: 60
+  # 余额保险默认阈值,0 = 不设。玩家可自行覆盖。
+  default-guard: 0.0
+
+economy:
+  # 玩家付的钱转到哪个账户。留空 = 直接销毁。
+  #   uuid:<uuid>     按 UUID 精确指定玩家账户(最稳)
+  #   name:<名字>      名字原样交给 Vault,由经济插件认账户
+  #   <玩家名>         先把名字解析成 UUID 再入账
+  #   bank:<名字>      Vault 的 bank 账户(需要经济插件支持 bank)
+  account: ""
+
 states:
-  small:                          # 状态 id，用于命令与权限
-    enabled: true                 # false = 不可购买（admin give 仍可用）
-    display: "变小"               # 展示名，纯文本
-    price: 100.0                  # 每份价格
-    unit-seconds: 1800            # 每份时长（秒）
-    max-stack-seconds: 21600      # 累计上限，0 = 不限
-    permission: ""                # 空 = 不检查购买权限
-    conflict-group: scale         # 同组互斥；显式 "" 关闭
+  small:
+    price: 100.0        # 每 unit-seconds 的价格,0 = 免费
+    unit-seconds: 1800
+    permission: ""      # 非空时,交易页只对有该权限的玩家显示这个状态
+    conflict-group: scale   # 同组同时只能开一个
+    icon: RABBIT_FOOT       # 交易页图标
     effect:
-      type: scale                 # scale（参数 scale: 0.1..16.0）/ fly（参数 auto-start）
+      type: scale
       scale: 0.5
 ```
 
-`notifications.expiry-warning-seconds` 控制到期提醒阈值。
-语言文件 `lang/zh_CN.yml` / `lang/en_US.yml`，值用 MiniMessage。
+只想开"随地大小变"就把 `states.fly.enabled` 设成 `false`。
+`small` 与 `giant` 同属 `scale` 互斥组，不会叠加成怪尺寸。
 
-## 数据与安全
+### `economy.account` 的三种玩家账户写法怎么选
 
-生效中的状态保存在 `plugins/StateCharge/states.yml`，按脏标记异步刷盘，并自动维护
-`states.yml.bak`。文件损坏时回退到 `.bak`，避免玩家已购时长凭空消失。
-**不要把 `states.yml` 当作清理手段删除**——那会丢掉所有玩家未用完的时长。
+| 写法 | 适用 | 代价 |
+|---|---|---|
+| `uuid:<uuid>` | **拿得到 UUID 就用它** | 无。不解析、不依赖 profile 缓存、不受改名影响 |
+| `name:<名字>` | **从不登录的虚拟银行账户** | 插件无从核对钱进了哪个账户，以经济插件的判断为准 |
+| `<玩家名>` | 想让启动日志核对具体账户 | 依赖服务器的 profile 缓存 / profile 查询 |
 
-## 构建
+`name:` 是把名字**原样交给 Vault 的 name 重载**，由经济插件用它自己的 name↔账户映射去认
+（EssentialsX、CMI 都维护这样一张表）。账户从不登录也没关系 —— 这条路径根本不需要 UUID。
 
-```powershell
-.\gradlew.bat :StateCharge:build      # 编译 + 测试 + 部署 jar
-.\gradlew.bat :StateCharge:test       # 只跑测试
-.\gradlew.bat :StateCharge:jarGate    # 部署 jar 门禁
-```
+裸名字写法会在启动时解析：在线玩家 → 服务器 profile 缓存 → profile 查询（在线模式下会去
+LittleSkin / Mojang 查一次，查到后服务器自己会记进 `usercache.json`）。查不到时 Bukkit 不会失败，
+而是**凭名字编造**一个离线 UUID —— 那是另一个账户。插件把这个编造算法复刻了一份做比对，
+识别出来就拒绝入账并报错，**不会**把钱转进幽灵账户。解析成功时启动日志会打出 UUID 并提示你抄回配置。
 
-Windows 必须用 PowerShell 跑 `.\gradlew.bat`（仓库路径含空格）。
+账户不可用时插件照常启动、照常扣钱，但每笔扣款都会记一条 WARNING —— 那些钱确实丢了。
+修好配置后 `/statecharge admin reload` 会重新解析，不必重启服务器。
+
+## 前置
+
+- **Vault** + 任一经济提供方。**缺少会直接自禁用**（记 WARNING，不是报错）。
+- Paper 1.20.5+（体型走现代 `Attribute.SCALE` API），Java 21 运行。
 
 ## 已知边界
 
-- 尚未公开发布。
-- v1 **不含**：GUI 商店、BossBar 倒计时、PlaceholderAPI、MySQL、现实时间倒计时模式、
-  bStats（需先注册服务 ID）、跨服（BungeeCord）同步。
-- 新增**效果类型**（`scale`/`fly` 之外）需要改代码；新增**状态**只改配置。
+- 扣款失败时该状态会被**强制关闭**，已经用掉的那段时间收不回来，控制台记 WARNING。
+- 扣款成功但入账 `economy.account` 失败时**不退款**：玩家已经用掉了服务，退款等于白送。
+  这笔钱确实消失了，控制台按笔记 WARNING 供对账。
+- 免费状态（`price: 0`）不参与结算，也不受余额保险影响。
+- 管理员关闭状态需要玩家**在线**——移除体型/飞行效果要作用在实体上。
 
-## 相关文档
+## 发布验证
 
-- 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
-- 设计依据：[`DESIGN.md`](DESIGN.md)
+自动门禁与部署检查见 [`docs/release-checklist.md`](docs/release-checklist.md)，真人测试步骤见
+[`REAL_SERVER_TEST.md`](REAL_SERVER_TEST.md)。Paper 与 Folia 都必须完成对应流程后再部署生产服。

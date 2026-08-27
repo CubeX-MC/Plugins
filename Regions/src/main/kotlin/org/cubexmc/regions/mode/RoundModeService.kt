@@ -35,29 +35,32 @@ class RoundModeService(private val plugin: RegionsPlugin) {
     fun isRoundMode(type: String?): Boolean =
         type.equals("hide_and_seek", ignoreCase = true)
 
-    fun onEnter(player: Player, region: RegionDefinition) {
+    @Synchronized
+    fun onEnter(player: Player, region: RegionDefinition): Boolean {
         if (!isRoundMode(region)) {
-            return
+            return false
         }
         if (endingRegions.contains(region.id)) {
             plugin.sendGame(player, plugin.gameText("game.round.restoring", mapOf("name" to region.name)))
-            return
+            return false
         }
         val state = state(region)
         if (state.active) {
             plugin.sendGame(player, plugin.gameText("game.round.in-progress", mapOf("name" to region.name)))
-            return
+            return false
         }
         val maxPlayers = region.mode?.values?.get("max-players")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         if (maxPlayers > 0 && !state.players.contains(player.uniqueId) && state.players.size >= maxPlayers) {
             plugin.sendGame(player, plugin.gameText("game.round.full", mapOf("name" to region.name)))
-            return
+            return false
         }
         state.players.add(player.uniqueId)
         state.ready.remove(player.uniqueId)
         plugin.sendGame(player, plugin.gameText("game.round.joined", mapOf("name" to region.name, "id" to region.id)))
+        return true
     }
 
+    @Synchronized
     fun onLeave(player: Player, regionId: String, reason: String) {
         val state = states[regionId] ?: return
         state.players.remove(player.uniqueId)
@@ -72,6 +75,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     fun onMove(event: PlayerMoveEvent): Boolean {
         val player = event.player
         val state = states.values.firstOrNull {
@@ -90,6 +94,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun onDamage(event: EntityDamageByEntityEvent): Boolean {
         val victim = event.entity as? Player ?: return false
         val attacker = attackingPlayer(event) ?: return false
@@ -104,6 +109,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun onDeath(event: PlayerDeathEvent): Boolean {
         val player = event.entity
         val state = states.values.firstOrNull { it.active && it.players.contains(player.uniqueId) } ?: return false
@@ -122,12 +128,14 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun onRespawn(player: Player) {
         val snapshot = pendingRespawnRestores.remove(player.uniqueId) ?: return
         restoreSnapshot(player, snapshot)
         snapshot.respawn?.let { plugin.regionScheduler().teleportAsync(player, it) }
     }
 
+    @Synchronized
     fun ready(player: Player, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isRoundMode(region)) {
@@ -150,6 +158,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun startCommand(sender: CommandSender, regionId: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isRoundMode(region)) {
@@ -163,6 +172,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun forceEnd(sender: CommandSender, regionId: String, reason: String): Boolean {
         val region = plugin.regions().find(regionId) ?: return false
         if (!isRoundMode(region)) {
@@ -176,6 +186,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun forceEnd(regionId: String, reason: String): Boolean {
         if (!states.containsKey(regionId)) {
             return false
@@ -184,6 +195,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         return true
     }
 
+    @Synchronized
     fun cleanupAll(reason: String, shuttingDown: Boolean = false) {
         val immediate = !plugin.regionScheduler().isFolia
         for (regionId in states.keys.toList()) {
@@ -209,9 +221,11 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         if (shuttingDown) pendingRespawnRestores.clear()
     }
 
+    @Synchronized
     fun restoreIfPending(player: Player, reason: String): Boolean =
         restoreStored(player, reason)
 
+    @Synchronized
     fun status(regionId: String): String {
         val state = states[regionId] ?: return "round idle"
         val hiders = state.roles.values.count { it == RoundRole.HIDER }
@@ -223,6 +237,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     private fun start(region: RegionDefinition, state: RoundState, reason: String) {
         if (state.active) {
             return
@@ -311,6 +326,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     private fun releaseSeekers(regionId: String) {
         val state = states[regionId] ?: return
         if (!state.active) {
@@ -320,6 +336,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         broadcast(state, plugin.gameText("game.round.seek-start"))
     }
 
+    @Synchronized
     private fun found(hider: Player, seeker: Player, state: RoundState, reason: String) {
         if (!state.found.add(hider.uniqueId)) {
             return
@@ -358,6 +375,7 @@ class RoundModeService(private val plugin: RegionsPlugin) {
         }
     }
 
+    @Synchronized
     private fun end(
         regionId: String,
         reason: String,

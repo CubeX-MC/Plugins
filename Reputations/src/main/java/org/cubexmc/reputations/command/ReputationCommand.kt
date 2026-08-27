@@ -9,6 +9,7 @@ import org.bukkit.entity.Player
 import org.cubexmc.core.CubexCommandSuggestions
 import org.cubexmc.reputations.ReputationsPlugin
 import org.cubexmc.reputations.gui.ReputationGui
+import org.cubexmc.reputations.service.ReputationLeaderboard
 import org.cubexmc.reputations.service.ReputationServiceImpl
 import org.cubexmc.reputations.storage.ReputationStore
 import org.cubexmc.reputations.util.Colors
@@ -20,6 +21,7 @@ class ReputationCommand(
     private val service: ReputationServiceImpl,
     private val store: ReputationStore,
     private val gui: ReputationGui,
+    private val leaderboard: ReputationLeaderboard,
 ) : CommandExecutor, TabCompleter {
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {
@@ -34,6 +36,7 @@ class ReputationCommand(
         }
         return when (args[0].lowercase(Locale.ROOT)) {
             "fields" -> listFields(sender)
+            "top" -> leaderboard(sender, args)
             "set" -> mutate(sender, args, set = true)
             "add" -> mutate(sender, args, set = false)
             "reset" -> resetField(sender, args)
@@ -85,6 +88,41 @@ class ReputationCommand(
         send(sender, "&#F4D03F已注册的信誉字段 (${fields.size}):")
         for (field in fields) {
             send(sender, "&#FFE066${field.key()} &#CFD8DC- &#FFFFFF${field.displayName()} &#9AA5B1(默认 ${format(field.defaultValue())})")
+        }
+        return true
+    }
+
+    private fun leaderboard(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("reputation.use")) {
+            send(sender, "&#E63946你没有权限。")
+            return true
+        }
+        if (args.size < 2) {
+            send(sender, "&#FFE066用法: /reputation top <字段key> [页码]")
+            return true
+        }
+        val field = leaderboard.resolveField(args[1])
+        if (field == null) {
+            send(sender, "&#E63946未注册的字段 ${args[1]} (用 /reputation fields 查看)。")
+            return true
+        }
+        val entries = leaderboard.entries(field.key())
+        if (entries.isEmpty()) {
+            send(sender, "&#FFE066${field.displayName()} 暂无排行榜数据。")
+            return true
+        }
+        val pageCount = (entries.size + LEADERBOARD_PAGE_SIZE - 1) / LEADERBOARD_PAGE_SIZE
+        val page = if (args.size >= 3) args[2].toIntOrNull() else 1
+        if (page == null || page !in 1..pageCount) {
+            send(sender, "&#E63946页码无效,请输入 1-$pageCount。")
+            return true
+        }
+
+        send(sender, "&#F4D03F${field.displayName()} 排行榜 &#9AA5B1($page/$pageCount):")
+        val from = (page - 1) * LEADERBOARD_PAGE_SIZE
+        val until = minOf(entries.size, from + LEADERBOARD_PAGE_SIZE)
+        for (entry in entries.subList(from, until)) {
+            send(sender, "&#FFE066#${entry.rank} &#FFFFFF${entry.playerName} &#9AA5B1- &#CFD8DC${format(entry.value)}")
         }
         return true
     }
@@ -172,10 +210,14 @@ class ReputationCommand(
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<String>): List<String> {
         val rootOptions = ArrayList<String>()
-        rootOptions.addAll(listOf("fields", "set", "add", "reset", "reload"))
+        rootOptions.addAll(listOf("fields", "top", "set", "add", "reset", "reload"))
         Bukkit.getOnlinePlayers().forEach { rootOptions.add(it.name) }
         CubexCommandSuggestions.root(args, rootOptions)?.let { return it }
         val sub = args[0].lowercase(Locale.ROOT)
+        if (args.size == 2 && sub == "top") {
+            return service.fields().map { it.key() }
+                .filter { it.lowercase(Locale.ROOT).startsWith(args[1].lowercase(Locale.ROOT)) }
+        }
         if (args.size == 2 && sub in listOf("set", "add", "reset")) {
             return Bukkit.getOnlinePlayers().map { it.name }.filter { it.lowercase(Locale.ROOT).startsWith(args[1].lowercase(Locale.ROOT)) }
         }
@@ -183,5 +225,9 @@ class ReputationCommand(
             return service.fields().map { it.key() }.filter { it.lowercase(Locale.ROOT).startsWith(args[2].lowercase(Locale.ROOT)) }
         }
         return emptyList()
+    }
+
+    private companion object {
+        const val LEADERBOARD_PAGE_SIZE = 10
     }
 }

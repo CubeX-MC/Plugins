@@ -1,0 +1,6 @@
+name: CookbookDailyReward
+version: '${version}'
+main: org.cubexmc.cookbook.dailyreward.DailyRewardPlugin
+api-version: '1.18'
+author: CubeX
+description: Cookbook 02 - daily login reward.

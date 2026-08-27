@@ -48,7 +48,6 @@ class StateDefinitionsTest {
         config.set("states.small.display", "变小")
         config.set("states.small.price", 100.0)
         config.set("states.small.unit-seconds", 1800)
-        config.set("states.small.max-stack-seconds", 21600)
         config.set("states.small.effect.type", "scale")
         config.set("states.small.effect.scale", 0.5)
 
@@ -66,7 +65,6 @@ class StateDefinitionsTest {
         assertEquals("变小", small!!.display())
         assertEquals(BigDecimal.valueOf(100.0), small.price())
         assertEquals(1800L, small.unitSeconds())
-        assertEquals(21600L, small.maxStackSeconds())
         assertEquals("scale", small.conflictGroup())
         assertNull(small.permission())
         assertTrue(small.effect() is ScaleEffect)
@@ -87,7 +85,6 @@ class StateDefinitionsTest {
         val plain = definitions.byId("plain")
         assertNotNull(plain)
         assertEquals(1800L, plain!!.unitSeconds())
-        assertEquals(0L, plain.maxStackSeconds())
         assertEquals(BigDecimal.valueOf(0.0), plain.price())
         assertTrue(plain.enabled())
         assertEquals("plain", plain.display())
@@ -146,11 +143,22 @@ class StateDefinitionsTest {
     }
 
     @Test
-    fun maxStackBelowUnitIsClampedToUnit() {
-        config.set("states.clamped.effect.type", "fly")
-        config.set("states.clamped.unit-seconds", 600)
-        config.set("states.clamped.max-stack-seconds", 60)
+    fun `icon falls back to the default when the material is unknown`() {
+        config.set("states.bogus.effect.type", "fly")
+        config.set("states.bogus.icon", "NOT_A_MATERIAL")
+
         val definitions = parse()
-        assertEquals(600L, definitions.byId("clamped")!!.maxStackSeconds())
+
+        // 图标只影响交易页展示,写错不该让整个状态加载失败
+        assertEquals(org.bukkit.Material.NAME_TAG, definitions.byId("bogus")!!.icon())
+        assertTrue(definitions.problems().any { it.contains("icon") })
+    }
+
+    @Test
+    fun `a configured icon is used as-is`() {
+        config.set("states.shiny.effect.type", "fly")
+        config.set("states.shiny.icon", "DIAMOND")
+
+        assertEquals(org.bukkit.Material.DIAMOND, parse().byId("shiny")!!.icon())
     }
 }

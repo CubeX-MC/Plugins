@@ -20,7 +20,7 @@ import org.cubexmc.model.PowerStructure
 import org.cubexmc.model.RedeemIngredient
 import org.cubexmc.model.RedeemRecipe
 import org.cubexmc.model.RedeemRequirements
-import org.cubexmc.utils.ColorUtils
+import org.cubexmc.core.CubexText
 import org.cubexmc.utils.ConfigParseUtils.isTrue
 import org.cubexmc.utils.ConfigParseUtils.stringOf
 import org.cubexmc.utils.ConfigParseUtils.toStringList
@@ -45,6 +45,15 @@ class GemDefinitionParser(
 
     var requiredCount: Int = 0
         private set
+
+    internal fun copyFrom(other: GemDefinitionParser) {
+        powerTemplates.clear()
+        powerTemplates.putAll(other.powerTemplates)
+        rawPowerTemplates.clear()
+        rawPowerTemplates.putAll(other.rawPowerTemplates)
+        gemDefinitions = ArrayList(other.gemDefinitions)
+        requiredCount = other.requiredCount
+    }
 
     fun getPowerTemplate(name: String?): PowerStructure? = powerTemplates[name]
 
@@ -371,7 +380,7 @@ class GemDefinitionParser(
         val nameStr = stringOf(map["name"])
         val fallback = languageManager?.getMessage("messages.gem.default_display_name") ?: "&cRule Gem"
         val raw = if (!nameStr.isNullOrEmpty()) nameStr else fallback
-        return ColorUtils.translateColorCodes(raw)
+        return CubexText.translateColorCodes(raw)
     }
 
     private fun parseExecuteConfig(obj: Any?): ExecuteConfig? {
@@ -628,7 +637,9 @@ class GemDefinitionParser(
                     }
                     val commandLabel = command.split("\\s+".toRegex())[0].lowercase(Locale.getDefault())
                     val executeCommands = toStringList(executeObj)
-                    allowed.add(AllowedCommand(commandLabel, useLimit, executeCommands, cooldown))
+                    val constraints = CommandArgumentParser.parse(entry, commandLabel, logger)
+                    val usage = (entry["usage"] as? String)?.takeIf { it.isNotBlank() } ?: "/$commandLabel"
+                    allowed.add(AllowedCommand(commandLabel, useLimit, executeCommands, cooldown, constraints, usage))
                 }
             }
         }
