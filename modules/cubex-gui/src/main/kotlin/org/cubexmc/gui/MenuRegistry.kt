@@ -28,7 +28,10 @@ class MenuRegistry : Listener {
 
     fun closeAll() {
         for (playerId in ArrayList(open.keys)) {
-            Bukkit.getPlayer(playerId)?.closeInventory()
+            val player = Bukkit.getPlayer(playerId) ?: continue
+            if (player.openInventory.topInventory === open[playerId]?.inventory) {
+                player.closeInventory()
+            }
         }
         open.clear()
     }

@@ -16,11 +16,14 @@
 | [`cubex-integrations`](modules/cubex-integrations) | 跨插件连接：无状态 ClassLoader 反射服务连接器 | **2/12** | Contract, Regions |
 | [`cubex-database`](modules/cubex-database) | SQLite 数据库：安全连接工厂、PRAGMA 参数配置、事务闭包 | **3/12** | BookLite, EcoBalancer, RuleGems |
 | [`cubex-command`](modules/cubex-command) | 动态指令：CommandMap 解析、动态指令注册与生命期注销 | **2/12** | FAWEReplacer, RuleGems |
-| [`cubex-gui`](modules/cubex-gui) | 界面交互：基于 Inventory 实例事件路由的 Menu 框架、ItemBuilder、Pagination、ChatInputState | **5/12** | Contract, Metro, Railway, EcoBalancer, Regions |
+| [`cubex-gui`](modules/cubex-gui) | 界面交互：基于 Inventory 实例事件路由的 Menu 框架、ItemBuilder、Pagination、ChatInputState | **6/12** | Contract, Metro, Railway, EcoBalancer, Regions, RuleGems |
 | [`cubex-spatial`](modules/cubex-spatial) | 空间索引：Point3D, Range3D (AABB), Octree 八叉树索引 | **2/12** | Metro, Railway |
-| [`cubex-economy`](modules/cubex-economy) | Vault 经济封装 + `economy.account` 入账路由（内循环经济） | **1/12** | StateCharge |
+| [`cubex-economy`](modules/cubex-economy) | Vault 经济封装 + `economy.account` 入账路由（内循环经济） | **2/12** | StateCharge, RuleGems |
 
 ---
+
+内嵌模式将共享包重定位到 `org.cubexmc.<插件>.libs.cubex.<模块>`，`jarGate` 拒绝原始共享包残留，
+并继续校验共享类 Java 17 字节码。外置模式和 CubeXLib 的原包名约定不变。
 
 ## 2. 各模块详解与 API 使用指南
 
@@ -127,40 +130,47 @@ for (slot in PlayerItems.allSlots(player)) {   // 背包 + 装备 + 末影箱
 
 ---
 
+资源组可使用公共 `TerminableRegistry`：按 LIFO 关闭每个资源，单个关闭失败仍继续清理；
+它不负责跨插件共享状态。兼容旧着色调用可用 `CubexText.translateColorCodes`。
+
 ### 2.2 `cubex-config`
 提供安全的文件 IO、YAML 默认键自动补充合并以及**基于版本号的配置安全迁移框架**。
 
+#### 严格文件读写与备份
+
+`AtomicYamlFiles.read(file)` 区分不存在与读取失败：不存在返回空 YAML，已有坏文件抛错。
+`AtomicYamlFiles.write(file, yaml)` 在同目录写临时文件、重新解析校验、flush 后替换，
+文件系统不支持原子移动时退回同目录替换；不能据此承诺跨文件事务或断电绝对安全。
+`FileBackups.copyUnique(source, directory)` 返回独立备份文件，不覆盖先前备份。
+业务 store 自行管理候选快照、schema 和发布时机；不要在失败的首次加载后保存空状态。
+
 #### 版本化配置迁移（`MigrationRunner`）
+
 ```kotlin
-val runner = MigrationRunner(
-    plugin = this,
-    plan = MigrationPlan.builder()
-        .currentVersion(3)
-        .step(1, 2) { ctx ->
-            // 从 v1 升到 v2：增加新字段并保留注释
-            ctx.yaml.set("new-feature.enabled", true)
-        }
-        .step(2, 3, LegacyTextToMiniMessageStep("messages.prefix")) // 文本转 MiniMessage
-        .build()
+val report = MigrationRunner(this).run(
+    MigrationPlan.yaml("language", "lang/zh_CN.yml")
+        .versionKey("lang-version")
+        .targetVersion(2)
+        .addStep(LegacyTextToMiniMessageStep(1, 2)),
 )
-val report = runner.run(configFile)
 ```
 
-#### 分阶段重载流（`ReloadChain`）
-让服主在执行 `/plugin reload` 时能精准定位是哪一步（配置、语言、数据库还是缓存）发生错误：
-```kotlin
-val report = ReloadChain.builder()
-    .stage("config") { reloadConfig() }
-    .stage("i18n") { i18nService.reload() }
-    .stage("database") { database.reconnect() }
-    .execute()
+#### 分阶段重载（`ReloadChain`）
 
-if (!report.isSuccess) {
-    logger.severe("Reload failed at stage: ${report.failedStage}, reason: ${report.error?.message}")
+```kotlin
+val report = ReloadChain.create()
+    .failurePolicy(ReloadFailurePolicy.ABORT)
+    .add("config") { reloadConfig() }
+    .add("language", i18nService)
+    .addIf("database", { databaseEnabled }) { database.reconnect() }
+    .run()
+for (failure in report.failures()) {
+    logger.log(Level.SEVERE, "Reload failed at ${failure.stage()}", failure.cause())
 }
 ```
 
----
+`YamlDefaults` 可通过 `DefaultMergeOptions.backupWith(...)` 复用插件既有备份目录，
+并用 `failOnError(true)` 在坏 YAML、缺少资源或备份失败时中止更新；默认合并行为仍兼容已有消费方。
 
 ### 2.3 `cubex-i18n`
 支持从 `lang/*.yml` 动态加载语言、支持 MiniMessage 与 Legacy 颜色代码混合解析、提供完善的 Fallback 降级链。
@@ -183,6 +193,9 @@ val component = i18n.component("menu.title")
 ```
 
 ---
+
+`I18nService.render(template, placeholders)` 渲染不对应固定 key 的动态模板；
+字符串、列表、标题及缺失前缀都使用同一语言回退链。旧式占位符适配保留在业务层。
 
 ### 2.4 `cubex-scheduler`
 屏蔽 Paper、Spigot 与 Folia 底层多线程调度差异，提供统一生命期绑定的任务句柄。
@@ -385,6 +398,17 @@ private fun applyEconomyAccount() {
 val result = economy().charge(player, cost)
 if (!result.success()) { /* 玩家付不起,回滚玩法侧 */ }
 ```
+
+#### 主动转账与消费扣费分开
+
+`VaultTransfers.hook(plugin)` 提供独立的 `transfer(from, to, amount)`，RuleGems 已接入。
+显式拒绝入账时尝试补偿付款方；`ROLLBACK_FAILED` / `REVIEW_REQUIRED` 必须人工核账，
+不能无条件重试。账户支持普通名字、UUID、`uuid:`、`name:` 和提供方支持的 `bank:`。
+普通名字先查在线/缓存和已有 Vault 命名账户，再尝试可信 profile，不枚举 `getOfflinePlayers()`；
+显式 `name:` 直接走 Vault 的字符串账户 API。调用方仍须在服务器线程使用。
+
+同一 Economy 实例内的转账串行化；这不约束经济插件自己的并发调用，也不提供跨账户事务或崩溃日志。
+`VaultEconomy.charge()` 的消费完成语义不变，不要拿它替代需要补偿的主动转账。
 
 #### `economy.account` 支持的写法
 

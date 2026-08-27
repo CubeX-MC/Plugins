@@ -40,7 +40,8 @@ internal class SimpleI18nService(
         languages.clear()
         if (options.hasCurrentLocaleSupplier() || locale.isNullOrBlank()) locale = options.currentLocale()
         val activeLocale = firstAvailableLocale(locale)
-        prefixTemplate = configuration(activeLocale).getString(options.prefixKey(), "").orEmpty()
+        prefixTemplate = localeChain(activeLocale)
+            .firstNotNullOfOrNull { configuration(it).getString(options.prefixKey()) }.orEmpty()
         prefix = color(prefixTemplate)
     }
 
@@ -82,6 +83,8 @@ internal class SimpleI18nService(
 
     override fun messageList(key: String?, placeholders: Map<String, *>?): List<String> =
         rawList(key).map { format(it, placeholders) }
+
+    override fun render(template: String?, placeholders: Map<String, *>?): String = format(template, placeholders)
 
     override fun component(key: String?): Component = component(key, emptyMap<String, Any?>())
 

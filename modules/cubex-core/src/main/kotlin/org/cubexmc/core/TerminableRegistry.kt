@@ -4,7 +4,8 @@ import java.util.ArrayDeque
 import java.util.Deque
 import java.util.Objects
 
-internal class TerminableRegistry {
+/** A LIFO resource group for a plugin or one of its domain managers. */
+class TerminableRegistry {
     private val terminables: Deque<AutoCloseable> = ArrayDeque()
 
     fun <T : AutoCloseable> bind(terminable: T): T {

@@ -81,6 +81,15 @@ class ItemBuilder @JvmOverloads constructor(
         currentMeta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
     }
 
+    /** Prefer a cosmetic glint override; older servers use the harmless fishing enchantment. */
+    fun cosmeticGlow(): ItemBuilder = apply { applyGlowEffect(meta) }
+
+    /** Hide decorative item details without changing [hideAttributes]'s existing contract. */
+    fun hideDetails(): ItemBuilder = apply {
+        meta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_UNBREAKABLE)
+        runCatching { ItemFlag.valueOf("HIDE_POTION_EFFECTS") }.getOrNull()?.let { meta?.addItemFlags(it) }
+    }
+
     fun flags(vararg flags: ItemFlag): ItemBuilder = apply {
         if (flags.isNotEmpty()) meta?.addItemFlags(*flags)
     }
@@ -122,6 +131,28 @@ class ItemBuilder @JvmOverloads constructor(
     }
 
     companion object {
+        @JvmStatic
+        fun applyGlowEffect(meta: ItemMeta?) {
+            if (meta == null) return
+            try {
+                val method = meta.javaClass.getMethod("setEnchantmentGlintOverride", java.lang.Boolean::class.java)
+                method.invoke(meta, true)
+                return
+            } catch (_: ReflectiveOperationException) {
+                // The override is absent on older server APIs.
+            } catch (_: LinkageError) {
+                // A server can expose metadata from an older API implementation.
+            }
+            try {
+                Enchantment.getByKey(NamespacedKey.minecraft("luck_of_the_sea"))?.let {
+                    meta.addEnchant(it, 1, true)
+                }
+            } catch (_: LinkageError) {
+                // No usable enchantment API: the item still renders without a glint.
+            }
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
+        }
+
         /**
          * Resolved reflectively because the "harmless enchantment" constant was renamed across the
          * versions this repo targets (`DURABILITY` on 1.18, `UNBREAKING` on 1.21). A null result just

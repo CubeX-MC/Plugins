@@ -36,6 +36,9 @@ interface OfflinePlayerLookup {
     fun byUuid(uuid: UUID): OfflinePlayer
 
     fun byName(name: String): NameLookup
+
+    /** Non-blocking online/profile-cache lookup; never enumerates player files. */
+    fun knownByName(name: String): NameLookup = NameLookup.Unknown
 }
 
 /**
@@ -70,8 +73,8 @@ object BukkitOfflinePlayerLookup : OfflinePlayerLookup {
     override fun byUuid(uuid: UUID): OfflinePlayer = Bukkit.getOfflinePlayer(uuid)
 
     override fun byName(name: String): NameLookup {
-        Bukkit.getPlayerExact(name)?.let { return NameLookup.Found(it, "online player") }
-        cachedByName(name)?.let { return NameLookup.Found(it, "server profile cache") }
+        val known = knownByName(name)
+        if (known is NameLookup.Found) return known
 
         @Suppress("DEPRECATION") // 在线模式下这一步就是 profile 查询;下面会分辨真假。
         val looked = Bukkit.getOfflinePlayer(name)
@@ -80,6 +83,16 @@ object BukkitOfflinePlayerLookup : OfflinePlayerLookup {
         }
         // 离线模式服务器上,按名字哈希出来的 UUID 就是这台服上正确的账户标识。
         return if (Bukkit.getServer().onlineMode) NameLookup.Fabricated else NameLookup.Found(looked, "offline-mode name hash")
+    }
+
+    override fun knownByName(name: String): NameLookup {
+        Bukkit.getPlayerExact(name)?.let { return NameLookup.Found(it, "online player") }
+        val cached = cachedByName(name) ?: return NameLookup.Unknown
+        return if (cached.uniqueId == fabricatedUuidOf(name) && Bukkit.getServer().onlineMode) {
+            NameLookup.Fabricated
+        } else {
+            NameLookup.Found(cached, "server profile cache")
+        }
     }
 
     /** Bukkit 查不到 profile 时编造 UUID 用的算法,原样复刻一份用于比对。 */

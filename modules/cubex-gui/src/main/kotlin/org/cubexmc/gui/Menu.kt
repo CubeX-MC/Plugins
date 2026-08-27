@@ -9,8 +9,11 @@ import org.bukkit.inventory.ItemStack
  * A built inventory screen: holds the [Inventory] plus the per-slot [InventoryButton]s.
  * Build a menu by placing buttons/decorations, then hand it to [MenuRegistry.open].
  */
-class Menu(val title: String, rows: Int) {
-    val inventory: Inventory = Bukkit.createInventory(null, rows * 9, title)
+class Menu private constructor(val inventory: Inventory, val title: String) {
+    constructor(title: String, rows: Int) : this(Bukkit.createInventory(null, rows * 9, title), title)
+
+    /** Adapt an existing holder-based menu without replacing its inventory identity or metadata. */
+    constructor(inventory: Inventory) : this(inventory, "")
     private val buttons: MutableMap<Int, InventoryButton> = HashMap()
 
     /** Runs when this menu's inventory is closed and not immediately replaced by another menu. */

@@ -288,6 +288,94 @@ class VaultEconomyTest {
         verify(economy).depositPlayer(bankHolder, 100.0)
     }
 
+    @Test
+    fun `legacy transfer names use a recognised virtual Vault account without fabricating a player`() {
+        val lookup = mock(OfflinePlayerLookup::class.java)
+        `when`(lookup.byUuid(payer.uniqueId)).thenReturn(payer)
+        `when`(lookup.knownByName("cubex_bank")).thenReturn(NameLookup.Unknown)
+        `when`(economy.hasAccount("cubex_bank")).thenReturn(true)
+        `when`(economy.has(payer, 100.0)).thenReturn(true)
+
+        assertEquals(VaultTransfers.Result.SUCCESS, VaultTransfers(economy, lookup)
+            .transfer("uuid:${payer.uniqueId}", "cubex_bank", 100.0))
+
+        verify(economy).depositPlayer("cubex_bank", 100.0)
+        verify(lookup, never()).byName("cubex_bank")
+        verify(economy, never()).depositPlayer(bankHolder, 100.0)
+    }
+
+    @Test
+    fun `explicit named transfers never resolve Bukkit players`() {
+        val lookup = mock(OfflinePlayerLookup::class.java)
+        `when`(economy.has("payer", 100.0)).thenReturn(true)
+        `when`(economy.withdrawPlayer("payer", 100.0)).thenReturn(success())
+
+        assertEquals(VaultTransfers.Result.SUCCESS,
+            VaultTransfers(economy, lookup).transfer("name:payer", "name:cubex_bank", 100.0))
+
+        org.mockito.Mockito.verifyNoInteractions(lookup)
+        verify(economy).depositPlayer("cubex_bank", 100.0)
+    }
+
+    @Test
+    fun `unknown fabricated transfer recipient stops before any withdrawal`() {
+        val lookup = mock(OfflinePlayerLookup::class.java)
+        `when`(lookup.knownByName("unknown")).thenReturn(NameLookup.Unknown)
+        `when`(lookup.byName("unknown")).thenReturn(NameLookup.Fabricated)
+
+        assertEquals(VaultTransfers.Result.FAILED,
+            VaultTransfers(economy, lookup).transfer("name:payer", "unknown", 100.0))
+
+        verify(economy, never()).withdrawPlayer(anyString(), anyDouble())
+    }
+
+    @Test
+    fun `a known online player keeps its UUID route ahead of a same-name account`() {
+        val lookup = mock(OfflinePlayerLookup::class.java)
+        `when`(lookup.knownByName("Steve")).thenReturn(NameLookup.Found(payer, "online player"))
+        `when`(economy.has(payer, 100.0)).thenReturn(true)
+
+        assertEquals(VaultTransfers.Result.SUCCESS,
+            VaultTransfers(economy, lookup).transfer("Steve", "name:cubex_bank", 100.0))
+
+        verify(economy).withdrawPlayer(payer, 100.0)
+        verify(lookup, never()).byName(anyString())
+    }
+
+    @Test
+    fun `ambiguous transfer deposit requires reconciliation and is not blindly refunded`() {
+        `when`(economy.has("payer", 100.0)).thenReturn(true)
+        `when`(economy.withdrawPlayer("payer", 100.0)).thenReturn(success())
+        `when`(economy.depositPlayer("cubex_bank", 100.0)).thenThrow(IllegalStateException("provider unavailable"))
+
+        assertEquals(VaultTransfers.Result.REVIEW_REQUIRED,
+            VaultTransfers(economy).transfer("name:payer", "name:cubex_bank", 100.0))
+
+        verify(economy, never()).depositPlayer("payer", 100.0)
+    }
+
+    @Test
+    fun `null transfer deposit response does not trigger a speculative refund`() {
+        `when`(economy.has("payer", 100.0)).thenReturn(true)
+        `when`(economy.withdrawPlayer("payer", 100.0)).thenReturn(success())
+        `when`(economy.depositPlayer("cubex_bank", 100.0)).thenReturn(null)
+
+        assertEquals(VaultTransfers.Result.REVIEW_REQUIRED,
+            VaultTransfers(economy).transfer("name:payer", "name:cubex_bank", 100.0))
+
+        verify(economy, never()).depositPlayer("payer", 100.0)
+    }
+
+    @Test
+    fun `invalid transfer amount is rejected before account lookup`() {
+        val lookup = mock(OfflinePlayerLookup::class.java)
+        for (invalid in listOf(0.0, -1.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertEquals(VaultTransfers.Result.INVALID_AMOUNT,
+                VaultTransfers(economy, lookup).transfer("payer", "cubex_bank", invalid))
+        }
+        org.mockito.Mockito.verifyNoInteractions(lookup)
+    }
+
     // ---- helpers ----
 
     private fun economyWith(spec: EconomyAccount): VaultEconomy =

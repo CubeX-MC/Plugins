@@ -113,7 +113,7 @@ FoliaLib 不向插件泄漏原 API。
 > 若某标签被别的插件抢先注册，卸载时会把对方的条目一起删掉。
 > `CommandMaps.unregister` 改为**按对象身份**匹配，只删真正属于自己的条目。
 
-### 2.8 `cubex-gui` — 5/12（Contract · Metro · Railway · EcoBalancer · Regions）· 2026-08-17 新建
+### 2.8 `cubex-gui` — 6/12（Contract · Metro · Railway · EcoBalancer · Regions · RuleGems）· 2026-08-17 新建
 
 | 类型 | 能力 |
 |---|---|
@@ -138,7 +138,7 @@ Metro/Railway 各自保留同名 `org.cubexmc.metro.gui.ItemBuilder` 作为**薄
 抽取前已核对 Metro 与 Railway 两侧内容**逐字节一致**（仅换行符不同）。
 按既定纪律**只下沉无状态空间索引**，`StopManager`/`Stop` 留在插件内。
 
-### 2.10 `cubex-economy` — 1/12（StateCharge）· 2026-08-21 新建
+### 2.10 `cubex-economy` — 2/12（StateCharge · RuleGems）· 2026-08-21 新建
 
 `VaultEconomy`（`has`/`balance`/`withdraw`/`deposit`/`charge`/`format` + `useAccount` 入账路由）·
 `EconomyAccount`（`economy.account` 的纯解析：空 / `uuid:<uuid>` / 裸 UUID / `<玩家名>` / `bank:<名字>`）·
@@ -155,7 +155,7 @@ Metro/Railway 各自保留同名 `org.cubexmc.metro.gui.ItemBuilder` 作为**薄
 | MountLicense | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
 | Contract | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — |
 | EcoBalancer | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | — |
-| RuleGems | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — | — |
+| RuleGems | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ |
 | Metro | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | — |
 | Railway | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | — |
 | Regions | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — |
@@ -471,6 +471,12 @@ Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证�
 
 ### 5.3 RuleGems（已公开）
 
+- [x] **CubeX 接入补齐（2026-08-27）**：早期生命周期绑定、ReloadChain 与发布前校验、
+      统一 I18nService/文本/GUI/转账；本次不改数据格式或补满次数。
+      实现与验证见 [接入验收](RuleGems/docs/cubex-integration-evidence.md)。
+- [ ] 本轮升级的实服验收：实际经济插件/银行双向小额转账、原服数据升级与权限/GUI烟测；
+      不以自动化测试代替实服证据。
+
 配置语法清理 + `redeem_requirements` 增强（同类多颗/异类多颗/混合配方/`any_of`/自引用）P1-P7 已落地。
 
 - [x] **P8 Paper/Folia 实服烟测已完成**（2026-08-17）
@@ -690,6 +696,8 @@ graph TD
       EMBEDDED（Clarity/Contract 原样通过）、LIB（`unrelocatedKotlin=1029`、9 个模块齐全）、
       EXTERNAL（由 `cookbook/hello-external` **常驻**验证：`relocatedKotlin=0 cubexModuleEntries=0`，
       jar 内 `plugin.yml` 末尾出现构建注入的 `depend: [CubeXLib]`，而源文件里没有）
+- [x] **内嵌共享包隔离补齐（2026-08-27）**：约定插件统一 relocate `cubex-*`；
+      jarGate 拒绝原始共享包、检查重定位后共享字节码和重复类；外置/LIB 规则不变。
 - [x] **CubeXLib 是全仓唯一允许携带未 relocate `kotlin/**` 的 jar**——LIB 模式还会校验
       `projectName == CubeXLib`，别的项目想用这个模式会被门禁挡下
 - [x] **实服验证跨插件类可见性已通过**（2026-08-20，**Paper 26.1.2**，
@@ -828,16 +836,13 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
 - [x] **StateCharge 已切换**：删掉本地 `economy/EconomyService.kt`，`config.yml` 升到 v2
       并带 `economy.account` 的迁移步骤；`applyEconomyAccount()` 在 enable 与 reload 各解析一次
       （名字解析要查 usercache/存档，不能落进每分钟一次的结算里）
-- ⚠️ **包名撞车（已知、暂时无害）**：模块包名由模块名机械推导为 `org/cubexmc/economy/`，
-      而 RuleGems 自带一个同包的 `org.cubexmc.economy.EconomyProvider`。今天不炸
-      （RuleGems 是 EMBEDDED、release 17，`jarGate` 已实测通过），但它会在 RuleGems 改打包模式时炸。
-      RuleGems 迁到本模块时这个类会被删掉，撞车随之消失
+- [x] **RuleGems 包名撞车已消除（2026-08-27）**：删除本地 EconomyProvider/ItemBuilder；
+      GUI 业务类移到 `org.cubexmc.rulegems.gui`。仍采用 EMBEDDED，不切外置模式。
 - [ ] **其余消费方迁移**（每个都是独立提交，不要和玩法改动混在一起）：
       - [ ] **MountLicense**：最简单，一处 `withdraw`，与 StateCharge 同形
       - [ ] **Metro / Railway**：现有"有 owner 转 owner"的行为要保留，`economy.account` 只接管 owner 缺席的分支
-      - [ ] **RuleGems**：把 `EconomyProvider.transfer` 的补偿回滚语义搬进模块（它是全仓唯一正确处理
-            "Vault 没有跨账户事务"的实现），顺带修掉 `resolveAccounts` 里的
-            `Bukkit.getOfflinePlayers()`（主线程 O(存档数)，且一次转账要扫两遍）
+      - [x] **RuleGems（2026-08-27）**：`VaultTransfers` 承接独立转账/补偿，
+            显式命名账户与可信 UUID 路由；移除全量离线枚举。异常结果要求人工核账，开关仍默认关闭。
       - [ ] **EcoBalancer**：已能工作，最后再迁，且必须保持 `tax-account` / `tax-account-name` 键兼容
       - [ ] **Contract**：`SYSTEM_SINK` 接入本模块 —— **等 §4 R1 真钱故障注入验证之后再动**
 

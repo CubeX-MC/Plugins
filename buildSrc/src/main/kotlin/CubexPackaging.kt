@@ -41,6 +41,14 @@ object CubexModules {
 
     // 形如 org/cubexmc/core/ 加两个星号,供 shadowJar 的 ant 风格 exclude 使用。
     val archivePatterns: List<String> = archivePrefixes.map { prefix -> prefix + "**" }
+
+    fun embeddedRelocations(projectName: String): Map<String, String> =
+        names.associate { name ->
+            "org.cubexmc.$name" to (CubexRelocations.libsNamespace(projectName) + ".cubex.$name")
+        }
+
+    fun relocatedArchivePrefixes(projectName: String): List<String> =
+        embeddedRelocations(projectName).values.map { it.replace('.', '/') + "/" }
 }
 
 // plugin.yml 的最小改写工具:EXTERNAL 模式下由构建注入 depend,禁止手写。

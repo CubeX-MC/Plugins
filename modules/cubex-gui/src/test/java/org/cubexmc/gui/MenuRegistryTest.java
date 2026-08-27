@@ -187,6 +187,31 @@ class MenuRegistryTest {
         assertNull(registry.openMenu(playerId));
     }
 
+    @Test
+    void closeAllOnlyClosesTheInventoryOwnedByTheRegistry() {
+        Inventory managed = mock(Inventory.class);
+        Inventory other = mock(Inventory.class);
+        Player player = mock(Player.class);
+        UUID id = UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(id);
+        InventoryView view = mock(InventoryView.class);
+        when(player.getOpenInventory()).thenReturn(view);
+        when(view.getTopInventory()).thenReturn(other);
+        MenuRegistry registry = new MenuRegistry();
+        registry.open(player, new Menu(managed));
+        try (org.mockito.MockedStatic<Bukkit> bukkit = org.mockito.Mockito.mockStatic(Bukkit.class)) {
+            bukkit.when(() -> Bukkit.getPlayer(id)).thenReturn(player);
+            registry.closeAll();
+            org.mockito.Mockito.verify(player, org.mockito.Mockito.never()).closeInventory();
+            assertNull(registry.openMenu(id));
+
+            registry.open(player, new Menu(managed));
+            when(view.getTopInventory()).thenReturn(managed);
+            registry.closeAll();
+            org.mockito.Mockito.verify(player).closeInventory();
+        }
+    }
+
     private InventoryClickEvent clickEvent(Player player, Inventory topInventory, int rawSlot) {
         InventoryView view = mock(InventoryView.class);
         when(view.getTopInventory()).thenReturn(topInventory);

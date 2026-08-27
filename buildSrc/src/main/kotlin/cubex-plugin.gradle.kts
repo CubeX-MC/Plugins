@@ -85,6 +85,13 @@ tasks.named<ShadowJar>("shadowJar") {
     ).forEach { exclude(it) }
     // 护栏#5:绝不 relocate sqlite-jdbc
 
+    if (cubex.packaging.get() == CubexPackagingMode.EMBEDDED) {
+        CubexModules.embeddedRelocations(project.name).forEach { (source, target) ->
+            // Shadow matches raw prefixes: command must not capture RuleGems' commands package.
+            relocate(source, target) { include(source.replace('.', '/') + "/**") }
+        }
+    }
+
     // EXTERNAL:cubex-*、Kotlin stdlib、FoliaLib 都由 CubeXLib 在运行时提供,不进 jar。
     // Adventure 仍是各插件自己的决定(Paper 提供 / Spigot 需自带),这里不替它们决定。
     if (cubex.packaging.get() == CubexPackagingMode.EXTERNAL) {
@@ -147,7 +154,10 @@ tasks.register("jarGate") {
 
     doLast {
         val libsPrefix = CubexRelocations.libsNamespace(projectName).replace('.', '/')
-        val pluginAllowedMajors = setOf(javaRelease.get() + 44)
+        val pluginMajor = javaRelease.get() + 44
+        val pluginAllowedMajors = setOf(pluginMajor)
+        val relocatedModulePrefixes = CubexModules.relocatedArchivePrefixes(projectName)
+        val allModulePrefixes = sharedModulePrefixes + relocatedModulePrefixes
         val failures = mutableListOf<String>()
         val report = mutableListOf<String>()
 
@@ -160,10 +170,20 @@ tasks.register("jarGate") {
             val reflectImpl = names.count { it.contains("kotlin/reflect/full/") || it.contains("kotlin/reflect/jvm/") }
 
             val cubexModuleEntries = names.count { name -> sharedModulePrefixes.any(name::startsWith) }
+            val relocatedModuleEntries = names.count { name -> relocatedModulePrefixes.any(name::startsWith) }
+            val unexpectedSharedClasses = names.filter {
+                CubexJarClasses.isUnexpectedSharedClass(it, "$libsPrefix/cubex/", relocatedModulePrefixes)
+            }
+            if (unexpectedSharedClasses.isNotEmpty()) {
+                failures += "共享包重定位误包含未登记的业务包: " + unexpectedSharedClasses.take(5).joinToString()
+            }
             val mode = packaging.get()
 
             report += "mode=$mode unrelocatedKotlin=$unrelocatedKotlin relocatedKotlin=$relocatedKotlin " +
-                "reflectImpl=$reflectImpl cubexModuleEntries=$cubexModuleEntries"
+                "reflectImpl=$reflectImpl cubexModuleEntries=$cubexModuleEntries relocatedModuleEntries=$relocatedModuleEntries"
+
+            val duplicates = names.filter { it.endsWith(".class") }.groupingBy { it }.eachCount().filterValues { it > 1 }
+            if (duplicates.isNotEmpty()) failures += "jar 内出现重复类: " + duplicates.keys.take(5).joinToString()
 
             // 三种模式共同要求
             if (reflectImpl > 0) {
@@ -176,6 +196,9 @@ tasks.register("jarGate") {
             when (mode) {
                 // 自包含:stdlib 必须 relocate,不得残留 kotlin/**
                 CubexPackagingMode.EMBEDDED -> {
+                    if (cubexModuleEntries > 0) {
+                        failures += "EMBEDDED 模式残留 $cubexModuleEntries 个未 relocate 的 cubex-* 条目"
+                    }
                     if (unrelocatedKotlin > 0) {
                         failures += "jar 内残留 $unrelocatedKotlin 个未 relocate 的 kotlin/** 条目"
                     }
@@ -193,9 +216,9 @@ tasks.register("jarGate") {
                         failures += "EXTERNAL 模式不得携带 Kotlin runtime(由 ${CubexModules.LIB_PLUGIN_NAME} 提供)," +
                             "实际 unrelocated=$unrelocatedKotlin relocated=$relocatedKotlin"
                     }
-                    if (cubexModuleEntries > 0) {
+                    if (cubexModuleEntries + relocatedModuleEntries > 0) {
                         failures += "EXTERNAL 模式不得打入 cubex-* 模块类(由 ${CubexModules.LIB_PLUGIN_NAME} 提供)," +
-                            "实际 $cubexModuleEntries 个条目"
+                            "实际 raw=$cubexModuleEntries relocated=$relocatedModuleEntries 个条目"
                     }
                     val yml = zip.getEntry("plugin.yml")
                         ?.let { entry -> zip.getInputStream(entry).use { it.readBytes().toString(Charsets.UTF_8) } }
@@ -224,9 +247,7 @@ tasks.register("jarGate") {
             // 本仓库自己的类:org/cubexmc/** 里排除所有 relocate 目标命名空间
             val shaded = shadedPaths.get()
             val ownClasses = entries.filter { entry ->
-                entry.name.startsWith("org/cubexmc/") &&
-                    entry.name.endsWith(".class") &&
-                    shaded.none { entry.name.startsWith(it) }
+                CubexJarClasses.expectedMajor(entry.name, pluginMajor, sharedModuleMajor, allModulePrefixes, shaded) != null
             }
             val wrongBytecode = ownClasses.mapNotNull { entry ->
                 val header = ByteArray(8)
@@ -235,8 +256,9 @@ tasks.register("jarGate") {
                     return@mapNotNull "${entry.name}(读不到字节码头)"
                 }
                 val major = ((header[6].toInt() and 0xFF) shl 8) or (header[7].toInt() and 0xFF)
-                val allowedMajors =
-                    if (sharedModulePrefixes.any(entry.name::startsWith)) setOf(sharedModuleMajor) else pluginAllowedMajors
+                val allowedMajors = setOf(
+                    requireNotNull(CubexJarClasses.expectedMajor(entry.name, pluginMajor, sharedModuleMajor, allModulePrefixes, shaded)),
+                )
                 if (major in allowedMajors) null else "${entry.name}(major=$major, allowed=${allowedMajors.sorted()})"
             }
             report += "ownClasses=${ownClasses.size} pluginBytecodeMajors=${pluginAllowedMajors.sorted()} sharedBytecodeMajor=$sharedModuleMajor"
