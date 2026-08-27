@@ -7,6 +7,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ContractStatusTest {
     @Test
+    void multiPartyPendingAcceptanceIsLiveAndAwaitingSignatures() {
+        assertTrue(ContractStatus.PENDING_ACCEPT_MULTI.countsAsOwnerActive());
+        assertTrue(ContractStatus.PENDING_ACCEPT_MULTI.awaitsAcceptance());
+        assertFalse(ContractStatus.PENDING_ACCEPT_MULTI.isFinal());
+        // Per-member funded limits must use the alliance signature snapshot, not this binary flag.
+        assertFalse(ContractStatus.PENDING_ACCEPT_MULTI.countsAsContractorActive());
+    }
+
+    @Test
     void isFinalCoversTerminalStates() {
         assertTrue(ContractStatus.COMPLETED.isFinal());
         assertTrue(ContractStatus.CANCELLED.isFinal());

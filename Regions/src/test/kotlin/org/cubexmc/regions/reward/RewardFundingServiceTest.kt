@@ -114,6 +114,63 @@ class RewardFundingServiceTest {
     }
 
     @Test
+    fun `settlement intent survives store reload and replays the same operation id`() {
+        val partyA = UUID.randomUUID()
+        val provider = FakeProvider(partyA, UUID.randomUUID())
+        val firstStore = store()
+        val region = region("dual_pvp")
+        val firstService = service(provider, firstStore)
+        assertTrue(firstService.reserve(region).successful)
+        val operationId = provider.operations.single()
+
+        provider.checkAvailable = false
+        val interrupted = firstService.settle(region, setOf(partyA))
+        assertFalse(interrupted.successful)
+
+        val reloadedStore = RewardFundingStore(
+            tempDir.resolve("reward-funding.yml").toFile(),
+            logger(),
+        ).apply { reload() }
+        assertEquals(LeaseState.SETTLING, reloadedStore.get("arena")?.state)
+        assertEquals(operationId, reloadedStore.get("arena")?.operationId)
+
+        provider.checkAvailable = true
+        val recovered = service(provider, reloadedStore).reconcile()
+
+        assertTrue(recovered.single().successful)
+        assertEquals(operationId, provider.operations.last())
+        assertEquals(listOf(partyA), provider.winners)
+        assertEquals(0, provider.refunds)
+        assertTrue(reloadedStore.all().isEmpty())
+    }
+
+    @Test
+    fun `review-required settlement remains durable and never falls back to refund`() {
+        val partyA = UUID.randomUUID()
+        val provider = FakeProvider(partyA, UUID.randomUUID())
+        val firstStore = store()
+        val region = region("dual_pvp")
+        val firstService = service(provider, firstStore)
+        assertTrue(firstService.reserve(region).successful)
+        val operationId = provider.operations.single()
+        provider.settlementFailure = FundingResult.fail("REVIEW_REQUIRED", "partial payout")
+
+        val failed = firstService.settle(region, setOf(partyA))
+        assertEquals("REVIEW_REQUIRED", failed.code)
+
+        val reloadedStore = RewardFundingStore(
+            tempDir.resolve("reward-funding.yml").toFile(),
+            logger(),
+        ).apply { reload() }
+        val replay = service(provider, reloadedStore).reconcile()
+
+        assertEquals("REVIEW_REQUIRED", replay.single().code)
+        assertEquals(LeaseState.SETTLING, reloadedStore.get("arena")?.state)
+        assertTrue(provider.operations.all { it == operationId })
+        assertEquals(0, provider.refunds)
+    }
+
+    @Test
     fun `union lookup outage retains raw winner candidates for later reconciliation`() {
         val partyA = UUID.randomUUID()
         val partyB = UUID.randomUUID()
@@ -174,6 +231,7 @@ class RewardFundingServiceTest {
         val winners = mutableListOf<UUID>()
         val operations = mutableListOf<String>()
         var checkAvailable = true
+        var settlementFailure: FundingResult? = null
 
         override fun check(contractId: String, regionId: String): FundingResult =
             if (checkAvailable) FundingResult.ok(contractId, partyA, partyB)
@@ -193,7 +251,7 @@ class RewardFundingServiceTest {
         ): FundingResult {
             operations += operationId
             winners += winnerId
-            return FundingResult.ok(contractId, partyA, partyB)
+            return settlementFailure ?: FundingResult.ok(contractId, partyA, partyB)
         }
 
         override fun refund(

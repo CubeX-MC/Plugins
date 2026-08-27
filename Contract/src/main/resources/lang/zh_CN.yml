@@ -1,10 +1,11 @@
-lang-version: 3
+lang-version: 6
 prefix: "<#F4D03F>[Contract]<#F1F5F9> "
 
 status:
   scheduled: "定时待发布"
   open: "公开中"
   pending_accept: "待对方接受"
+  pending_accept_multi: "待盟友签署"
   in_progress: "进行中"
   submitted: "待确认"
   completed: "已完成"
@@ -101,6 +102,22 @@ objective-prompts:
   default: "<#FFE066>请输入目标"
 
 ui:
+  err-alliance-create-permission: "你没有创建联盟合同的权限。"
+  err-alliance-accept-permission: "你没有接受联盟邀请的权限。"
+  err-alliance-funding-blocked: "你或该联盟仍有未完成的资金记录，请先联系管理员核对；本次未扣款。"
+  err-alliance-funding-review: "资金操作 <id> 需要核对，请勿重复支付；请管理员检查该操作的资金日志。"
+  err-alliance-journal: "资金日志暂时无法保存，本次未扣款；请联系管理员检查存储。"
+  err-alliance-save-refunded: "签署保存失败，刚才扣除的押金已退回；请在存储问题修复后重试。"
+  err-alliance-description-length: "联盟说明不能超过 <max> 个字符。"
+  err-alliance-roster: "联盟需要至少两名不同的受邀盟友，不能重复或包含创建者。"
+  err-alliance-stake: "每人的押金必须为正数、精确到分，并处于服务器设定的金额范围内。"
+  err-alliance-open-limit: "你已达到可同时创建的未结束合同上限。"
+  err-alliance-active-limit: "你已达到可同时接受的合同上限；尚未全员签署的已注资联盟也计入。"
+  err-alliance-stale: "合同数据已更新，请重新打开后再签署。"
+  err-alliance-not-pending: "该联盟当前不处于等待签署状态。"
+  err-alliance-invalid: "联盟条款或签署记录异常，请联系管理员核对。"
+  err-alliance-member-only: "只有本合同中受邀的盟友可以签署。"
+  err-alliance-already-signed: "你已经签署并托管过押金，不会再次扣款。"
   # ---- 通用取值 ----------------------------------------------------------------
   value-unset: "未填"
   value-none: "无"
@@ -185,6 +202,7 @@ ui:
   detail-repeat: "<#CFD8DC>重复接取: <#FFFFFF><value>"
   detail-stored-delivery: "<#CFD8DC>合同暂存: <#FFFFFF><count> 个交付物品"
   detail-stored-reward: "<#CFD8DC>奖励暂存: <#FFFFFF><count> 个物品"
+  detail-item-claims: "<#CFD8DC>待领取结算物品: <#FFFFFF><count> 个"
   detail-deadline: "<#CFD8DC>接单截止: <#FFFFFF><time>"
   detail-dispute: "<#E63946>争议: <#F1F5F9><value>"
   verify-label-system: "系统验收"
@@ -201,6 +219,7 @@ ui:
   inbox-claim-delivery: "待你领取交付物品"
   inbox-claim-reward: "待你领取奖励物品"
   inbox-reclaim-reward: "待你领回奖励物品"
+  inbox-claim-entitlement: "待你领取交易结算物品"
   inbox-submit: "待你提交完成"
   inbox-deliver-item: "待你交付物品"
   inbox-deliver-money: "待你提交货币"
@@ -212,6 +231,7 @@ ui:
   progress-mediator-accepted: "中间人已接受,等待争议或双方处理"
   progress-open: "等待玩家接单"
   progress-pending-accept: "等待指定对方接受邀请"
+  progress-pending-accept-multi: "等待所有受邀盟友签署并托管各自押金"
   progress-in-progress: "执行中,等待接单方完成"
   progress-submitted: "已提交,等待雇主确认"
   progress-disputed: "申诉中,等待管理员或中间人处理"
@@ -250,6 +270,7 @@ ui:
   action-claim-delivery: "<#69DB7C>领取交付物品"
   action-claim-reward: "<#69DB7C>领取奖励物品"
   action-reclaim-reward: "<#69DB7C>领回奖励物品"
+  action-claim-entitlement: "<#69DB7C>领取结算物品"
   action-claim-stored: "<#CFD8DC>合同暂存: <#FFFFFF><count> 个物品"
   action-claim-space: "<#CFD8DC>需要背包空间"
   action-approve: "<#69DB7C>确认付款"
@@ -258,6 +279,8 @@ ui:
   action-approve-early-warn: "<#E63946>⚠ 乙方尚未提交完成"
   action-partner-approve: "<#69DB7C>确认合作完成"
   action-partner-approve-detail: "<#CFD8DC>双方确认后按合作规则结算"
+  action-sale-approve: "<#69DB7C>确认交易"
+  action-sale-approve-detail: "<#CFD8DC>双方确认后交换价款与物品"
   action-resolve-a: "<#69DB7C>裁定 A 胜"
   action-resolve-a-detail: "<#CFD8DC>将按对赌规则付款给甲方"
   action-resolve-b: "<#E63946>裁定 B 胜"
@@ -313,6 +336,9 @@ ui:
   confirm-partner-title: "确认合作完成 #<id>"
   confirm-partner-1: "记录你的确认。"
   confirm-partner-2: "双方都确认后各自取回押注(扣除佣金)。"
+  confirm-sale-title: "确认交易交换 #<id>"
+  confirm-sale-1: "记录你对所示物品与价格的确认。"
+  confirm-sale-2: "双方确认后卖家收到价款，买家可以领取物品。"
   confirm-resolve-a-title: "裁定甲方胜 #<id>"
   confirm-resolve-a-1: "甲方获得双方押注,扣除系统佣金。"
   confirm-resolve-b-title: "裁定乙方胜 #<id>"
@@ -351,6 +377,9 @@ ui:
   wizard-type-partnership: "<#69DB7C>合作 PARTNERSHIP"
   wizard-type-partnership-1: "<#CFD8DC>双方各自押注,双方确认后结算"
   wizard-type-partnership-2: "<#CFD8DC>可选指定中间人"
+  wizard-type-sale: "<#69DB7C>交易 SALE"
+  wizard-type-sale-1: "<#CFD8DC>你的完整主手物品组托管给指定买家"
+  wizard-type-sale-2: "<#CFD8DC>买家托管价款，双方确认后交换"
   wizard-type-label: "<#FFE066>类型: <#FFFFFF><value>"
   wizard-type-label-detail: "<#CFD8DC>如需更换类型请返回上一步"
   wizard-abandon: "<#E63946>放弃创建"
@@ -376,6 +405,8 @@ ui:
   field-mediator: "中间人(可选)"
   field-mediator-short: "中间人"
   field-partner-stake: "对方押注"
+  field-sale-price: "买家价款"
+  field-sale-item: "你要出售的物品"
   field-count: "发布份数"
   field-cooldown: "重复冷却(小时)"
   field-objective-amount: "目标数量"
@@ -387,6 +418,7 @@ ui:
   prompt-arbiter: "<#FFE066>请输入仲裁者玩家名(输 cancel 取消)"
   prompt-mediator: "<#FFE066>请输入中间人玩家名(输 cancel 取消)"
   prompt-partner-stake: "<#FFE066>请输入对方押注金额(输 cancel 取消)"
+  prompt-sale-price: "<#FFE066>请输入买家价款(输 cancel 取消)"
   prompt-count: "<#FFE066>请输入发布份数(输 cancel 取消)"
   prompt-cooldown: "<#FFE066>请输入重复接取冷却小时数(输 cancel 取消)"
   prompt-objective-amount: "<#FFE066>请输入目标数量(输 cancel 取消)"
@@ -395,6 +427,8 @@ ui:
   reward-item-title: "<#69DB7C>奖励物品"
   reward-item-1: "<#CFD8DC>签署时托管主手整组物品"
   reward-item-2: "<#FFE066>请把奖励拿在主手"
+  sale-item-hold: "<#FFE066>预览前请把要出售的完整物品组拿在主手"
+  sale-item-value: "<count>x <material>"
   reward-mode-item: "<#69DB7C>奖励: <#FFFFFF>主手物品"
   reward-mode-item-1: "<#CFD8DC>签署时托管主手整组物品。"
   reward-mode-item-2: "<#FFE066>点击切换为金钱奖励"
@@ -451,6 +485,9 @@ ui:
   preview-deduct-now: "<#CFD8DC>签署后立即扣除: <#E63946><value>"
   preview-partner-stake: "<#CFD8DC>对方押注: <#69DB7C><value>"
   preview-deduct-mine: "<#CFD8DC>签署后立即扣除我的押注: <#E63946><value>"
+  preview-sale-offer: "<#CFD8DC>卖家物品: <#69DB7C><value>"
+  preview-sale-price: "<#CFD8DC>买家价款: <#69DB7C><value>"
+  preview-sale-escrow: "<#E63946>卖家签署时会扣除预览中显示的完整主手物品组。"
   preview-escrow-note: "<#CFD8DC>资金由服务器托管,不交给对方或中间人。"
 
   # ---- Paper Dialog 表单 -------------------------------------------------------
@@ -464,6 +501,7 @@ ui:
   result-ok: "<#69DB7C>操作成功。"
   result-signed: "<#69DB7C>签署成功,操作已完成。"
   result-created: "<#69DB7C>签署成功,已发布 <count> 份委托。"
+  result-sale-created: "<#69DB7C>签署成功，交易邀请已发出，所示物品已进入托管。"
   dispute-prompt: "<#FFE066>请在 60 秒内输入争议原因,或输入 <#E63946>cancel <#FFE066>取消。"
   dispute-cancelled: "<#FFE066>已取消争议输入。"
   dispute-timeout: "<#E63946>争议输入超时,已取消。"
@@ -474,6 +512,7 @@ ui:
   usage-service: "/contract service \\<奖金|item> \\<天> [--count \\<份数>] [--repeat \\<unlimited|once|cooldown>] [--cooldown \\<小时>] [--mediator \\<中间人>] [--objective \\<类型> \\<目标> \\<数量>] \\<标题>|\\<描述>"
   usage-wager: "/contract wager \\<对方> \\<押注> \\<天> \\<仲裁者> \\<标题>|\\<描述>"
   usage-partner: "/contract partner \\<对方> \\<我押注> \\<对方押注> \\<天> [--mediator \\<中间人>] \\<标题>|\\<描述>"
+  usage-sale: "/contract sale \\<买家> \\<价格> \\<天> [--mediator \\<中间人>] \\<标题>|\\<描述>"
   usage-dispute: "/contract dispute \\<id> \\<原因>"
   usage-admin: "<#FFE066>/contract admin reload|pay|refund|close \\<id>"
   rep-empty: "<#FFE066><name> 暂无合同履约记录。"
@@ -481,6 +520,7 @@ ui:
   rep-line: "<#CFD8DC>完成 <#69DB7C><completed> <#CFD8DC>· 取消 <#FFE066><cancelled> <#CFD8DC>· 逾期 <#E63946><expired> <#CFD8DC>· 争议 <#E63946><disputed>"
   info-participant: "    <#CFD8DC>- <#FFE066><role><#CFD8DC>: <#FFFFFF><name>"
   info-stake: " <#CFD8DC><label>: <#69DB7C><value>"
+  info-item-claims: "<#CFD8DC>待领取结算物品: <#FFFFFF><count> 个"
   info-arbiter: "    <#CFD8DC>- <#FFE066><role><#CFD8DC>: <#FFFFFF><name> <#CFD8DC>(<state>)"
   info-payout: "    <#CFD8DC>- <#FFE066><condition><#CFD8DC>: <value>"
   info-payout-none: "    <#CFD8DC>- <value>"
@@ -670,6 +710,8 @@ ui:
   err-claim-unsupported: "这个合同类型没有可领取的暂存物品"
   err-claim-after-completion: "交付物品需要在合同完成后领取"
   err-claim-nothing: "当前没有你可以领取的暂存物品"
+  err-sale-item-in-hand: "预览前请把要出售的完整物品组拿在主手"
+  err-sale-hand-changed: "确认预览后主手物品发生了变化，请重新预览并签署交易"
   claim-none-of-kind: "这份合同没有可领取的<kind>"
   claim-inventory-full: "背包空间不足,请清理后再领取"
   claim-save-failed: "保存领取状态失败,已回滚背包: <error>"
@@ -783,6 +825,7 @@ messages:
     <#FFE066>/contract wager \<对方> \<押注> \<天> \<仲裁> \<标题>|\<描述> <#F1F5F9>- 发起对赌
     <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<天> \<标题>|\<描述> <#F1F5F9>- 发起合作
     <#CFD8DC>可选: <#FFE066>/contract partner \<对方> \<我押注> \<对方押注> \<天> --mediator \<中间人> \<标题>|\<描述>
+    <#FFE066>/contract sale \<买家> \<价格> \<天> \<标题>|\<描述> <#F1F5F9>- 预览并签署主手物品交易
     <#FFE066>/contract resolve \<id> \<a|b> <#F1F5F9>- 仲裁者裁决对赌
     <#FFE066>/contract mediate \<id> \<accept|pay|refund|owner|contractor> <#F1F5F9>- 中间人接受职责或裁决
     <#FFE066>/contract list [页码] <#F1F5F9>- 查看公开合同

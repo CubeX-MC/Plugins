@@ -9,6 +9,8 @@ enum class ContractStatus {
 
     /** Wager/partnership waiting for a specific opponent/partner to accept. */
     PENDING_ACCEPT,
+    /** Alliance waiting for all invited members to fund and sign their own stakes. */
+    PENDING_ACCEPT_MULTI,
     IN_PROGRESS,
     SUBMITTED,
     COMPLETED,
@@ -20,10 +22,10 @@ enum class ContractStatus {
     fun isFinal(): Boolean = this == COMPLETED || this == CANCELLED || this == EXPIRED
 
     fun countsAsOwnerActive(): Boolean =
-        this == SCHEDULED || this == OPEN || this == PENDING_ACCEPT || this == IN_PROGRESS || this == SUBMITTED || this == DISPUTED
+        this == SCHEDULED || this == OPEN || this == PENDING_ACCEPT || this == PENDING_ACCEPT_MULTI || this == IN_PROGRESS || this == SUBMITTED || this == DISPUTED
 
     fun countsAsContractorActive(): Boolean = this == IN_PROGRESS || this == SUBMITTED || this == DISPUTED
 
     /** Whether the contract is waiting for a counterparty signature/acceptance. */
-    fun awaitsAcceptance(): Boolean = this == OPEN || this == PENDING_ACCEPT
+    fun awaitsAcceptance(): Boolean = this == OPEN || this == PENDING_ACCEPT || this == PENDING_ACCEPT_MULTI
 }

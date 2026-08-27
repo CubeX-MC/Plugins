@@ -22,7 +22,7 @@
 | 共享模块 | **10 个**：`cubex-core` · `cubex-config` · `cubex-i18n` · `cubex-scheduler` · `cubex-integrations` · `cubex-database` · `cubex-command` · `cubex-gui` · `cubex-spatial` · `cubex-economy`（2026-08-21 新建） |
 | Kotlin 化 | ✅ 2026-08-16 收口。全部插件与模块 opt-in Kotlin 并继承 `CubexPlugin` |
 | 字节码目标 | 全仓 Java 17；**Clarity 例外为 21**（1.21 属性 API）。`jarGate` 按各插件 release 分别校验 |
-| 已发布/待发布 | 已公开：BookLite · MountLicense · Metro · Railway · RuleGems · EcoBalancer · FAWEReplacer。未公开首发：Contract · Regions · StateCharge · Clarity · Reputations |
+| 正式 release | 已有：BookLite · MountLicense · Metro · Railway · RuleGems · EcoBalancer · FAWEReplacer。待首个 release：Contract · Regions · StateCharge · Clarity · Reputations。源码可见性另算：Contract · Regions · Clarity 已在镜像名单 |
 | 全仓验收 | `gradlew build jarGateAll` 全绿（12 插件 + CubeXLib + 9 模块，2026-08-19 复跑） |
 
 遗留 `.java` 仅：vendored bStats `Metrics.java`、Reputations 的公开 Java API
@@ -243,6 +243,15 @@ stdlib。我们的 `jarGate` 强制 `unrelocatedKotlin=0` 且测试随每次构�
       它是"真钱跨插件流动 + 重启重放"唯一还没有实服证据的环节。
       场景至少覆盖：settle 中途关服、Vault provider 中途卸载、Contract 先于 Regions 卸载、
       同一 operation id 重复提交、`REVIEW_REQUIRED` 后的人工处理路径。
+      - [x] **2026-08-24 自动化前置已补齐**：Paper 1.21.11 + Vault + EssentialsX +
+        Contract + Regions 联合 `runServer` 实测加载成功；Regions 通过提供方 ClassLoader 调到真实
+        Contract 服务，并对不存在的 WAGER 返回 `CONTRACT_NOT_FOUND`。
+      - [x] **提供方缺席保全已实服验证**：无 Contract 的独立 `runServer` 重载返回
+        `PROVIDER_UNAVAILABLE`，停服前后 `PREPARING` lease 与 operation id 原样保留。
+        双侧单测另覆盖落盘重启后的同 operation 重放、终态不重复付款、`REVIEW_REQUIRED`
+        不转退款。
+      - [ ] **仍需真人余额链路**：真实 WAGER 的 settle 中途关服、Vault provider 中途卸载、
+        Contract 先卸载、人工处理 `REVIEW_REQUIRED`，并在 Paper 与 Folia 核对余额守恒。
 - ❌ ~~race / hide-and-seek / 赞助 / 多人分成的结果语义~~ —— 不是独立条目。
       这些 Mode 在 Regions 侧本身还没做完，语义要和 §5.2 阶段 D 一起定，单列只会造成两处漂移。
 
@@ -257,7 +266,7 @@ stdlib。我们的 `jarGate` 强制 `unrelocatedKotlin=0` 且测试随每次构�
 
 ### R3 — Reputations 完善（大幅收窄）
 
-Reputations 目前**只有 Contract 一个消费方**，且尚未公开发布。在第二个字段提供方出现前，
+Reputations 目前**只有 Contract 一个消费方**，且尚未发布首个正式版本。在第二个字段提供方出现前，
 按"可扩展性"预建抽象正是各设计文档反复警告的投机性设计。
 
 保留：
@@ -290,9 +299,11 @@ Reputations 目前**只有 Contract 一个消费方**，且尚未公开发布。
 现状：根补全的形态差异已由 `CubexCommandSuggestions` 统一；动态命令注册/撤销已由
 `cubex-command` 统一。剩下的是权限命名、`help`/`usage` 渲染、提示与颜色规范。
 
-- [ ] 写一份命令/权限规范（`<plugin>.<area>.<action>`、help 渲染、错误与成功提示、颜色），
-      **新代码与未公开插件（Contract/Regions/StateCharge/Clarity/Reputations）遵守**
-- ❌ ~~回头重命名已公开插件的权限节点~~ —— 已公开的 7 个插件的权限节点是服主
+- [x] 写一份命令/权限规范（2026-08-25）：[`COMMAND_PERMISSION_GUIDE.md`](COMMAND_PERMISSION_GUIDE.md)
+      已统一 `<plugin>.<area>.<action>` 叶节点、`.use`/`.admin` 聚合节点、help/补全权限过滤、
+      usage 写法、MiniMessage 颜色及已有 release 节点的兼容纪律。**新代码与待首个 release 插件的命令面遵守**；
+      既有简写节点不作为新代码范例，也不对已有 release 插件做无兼容期改名。
+- ❌ ~~回头重命名已有 release 插件的权限节点~~ —— 这 7 个插件的权限节点是服主
       配置文件里的公共契约，批量重命名会**静默破坏线上权限组**，代价远超收益。
       要改只能随大版本 + 提供旧节点兼容期，不作为常规待办。
 
@@ -300,7 +311,7 @@ Reputations 目前**只有 Contract 一个消费方**，且尚未公开发布。
 
 ## 5. 各插件待办
 
-### 5.1 Contract（未公开首发）
+### 5.1 Contract（待首个正式 release）
 
 资金核心、WAGER、PARTNERSHIP、GUI 大厅化（铁砧已彻底移除）、Reputations 桥、
 Regions escrow API、bStats 均已完成。
@@ -313,8 +324,8 @@ Regions escrow API、bStats 均已完成。
 | 类型 | 结论 | 依据 |
 |---|---|---|
 | **BOUNTY** | **✅ 完全冗余，已删除** | `SERVICE` + `ResolutionRule.SYSTEM_OBJECTIVE` + `ContractObjective`（18 种 `ObjectiveType`，含 `KILL_PLAYER`/`KILL_ENTITY`）**已经实现**了"第一个完成 X 的人自动结算"，`ContractService` 里有 `SYSTEM_OBJECTIVE_COMPLETED` 结算路径。单独加 BOUNTY 只是把 OWNER/CONTRACTOR 改名成 POSTER/CLAIMER |
-| **SALE** | **✅ 可由 PARTNERSHIP 表达**，不需要新机制 | 形状与 PARTNERSHIP 完全一致（双方押注 + `BOTH_APPROVE`），差别只在**交换**而非各退各。`PayoutRule(SUCCESS, source=PARTY_A, recipient=participant(PARTY_B), 100%)` + 反向一条即可表达。**唯一缺口是 ITEM 资产**（见下） |
-| **ALLIANCE** | ❌ **不可归约** | 现有类型都是 1-2 方。需要 (a) 多方接受状态 `PENDING_ACCEPT_MULTI`；(b) `PayoutRule.source` 只能指一个 `ParticipantRole`，N 个 ALLY 共用一个角色时无法表达"违约者押注按 N-1 等分给其他人" |
+| **SALE** | **✅ 自动化实现完成；真人验收待做** | 卖家主手整组物品与买家 Vault 价款均有签署确认；service 处理接受/双方审批，`ItemClaimPlan` 处理成功交换、返还与裁决，GUI/命令/收件箱/详情页均可创建、处理和领取。尚未做 Paper/Folia 真人链路 |
+| **ALLIANCE** | **底层与注资 service 完成；终态结算 / 玩家入口待接** | UUID 签署快照、动态本金分配计算、逐成员 Vault 注资与分阶段故障恢复已接入；终态付款、取消/超时及裁决仍待接，尚未开放玩家创建 |
 | **LOAN** | ❌ **不可归约** | 需要 **initial-transfer**：创建时钱**直接转给** debtor 而非进托管。现有全部类型都是"押注进托管"，没有任何一条路径让资金在结算前离开托管。另需还款动作与到期自动判决 |
 
 **落地结论**
@@ -322,25 +333,62 @@ Regions escrow API、bStats 均已完成。
       及其语言键；顺手修好 `templates.yml` 的 `preset_bounty`——它本来就写着
       `objective-type: KILL_PLAYER`，却挂在没有创建路径的 `BOUNTY` 类型上（**等于一个发不出去的预设**），
       现改为 `type: SERVICE`，玩法不变
-- [ ] **SALE**：加 `Contract.createSale(...)`（PARTNERSHIP 形状 + 交换 payout 规则）。ITEM 资产已就绪，可以开工
+- [x] **SALE**（自动化范围完成；真人验收按当前要求暂缓）：
+      - [x] 底层（2026-08-25）：`Contract.createSale(...)` 建立双方交换/返还/争议裁决规则；
+        `ItemClaimPlan` 在外部付款前按 participant role 路由实物，拒绝不可唯一交付的规则；
+        `item-claims.<recipient>.<source>` 持久化终态领取权，覆盖重启恢复、旧 SERVICE 物品池回退、
+        背包满与存档失败回滚。单测覆盖成功交换、失败返还、歧义规则失败关闭和新旧存档形状。
+      - [x] Service 状态机（2026-08-25）：`createSale` 托管卖家完整主手 stack、存档失败原样归还；
+        受邀买家以独立 `sale-accept` pending operation 托管价款，双方复用互相审批状态机后执行交换。
+        自动化测试覆盖 accept dispatch、第二次审批结算、卖家收款与买家物品领取权。
+      - [x] 玩家入口（2026-08-25）：`/contract sale` 预填并打开签署确认，GUI 创建器新增 SALE；
+        确认页回显完整主手物品组、买家与价款，确认后主手变化会失败关闭。详情页与行动收件箱
+        覆盖接受、双方审批、争议裁决和结算物品领取；lang v3→v4 自动补齐双语键且保留服主改文。
+      - [ ] 按用户当前要求暂缓 Paper/Folia 真人验收；发布前仍需覆盖真实 Vault 余额、背包满、
+        确认页换手防护、重启后领取与中间人裁决
 - [ ] **ALLIANCE**：`createAlliance` + `PENDING_ACCEPT_MULTI` + **动态生成 payouts**
       （已定方案 B：违约时按当时状态构造规则；不采用方案 A 加 `SourceSelector`，避免模型膨胀）
+      - [x] 底层切片（2026-08-27）：`createAlliance` 创建 3 人以上、OWNER + 多个 ALLY 的纯金钱合同；
+        `AllianceAgreement` 是按 UUID 区分的不可变已注资签署/审批快照，全部签署后才允许审批。
+        `alliance.version: 1` 保存签署时间和审批人；异常记录拒绝加载，不静默丢弃或回退到旧签署备份。
+      - [x] 动态分配计算（2026-08-27）：`AlliancePayoutPlan` 只计算本金、不执行付款；
+        待签署退款仅覆盖已注资成员，成功要求全员签署及审批，违约按具名 UUID 分配本金。
+        守约者先收回自己的本金，违约者本金以整数分均分；尾差按 UUID 排序分配，逐来源守恒。
+        无 `SourceSelector`，无把多个 ALLY 当成首个 ALLY 的角色查找。验证记录见
+        [`Contract/docs/alliance-model-evidence.md`](Contract/docs/alliance-model-evidence.md)。
+      - [x] 注资 service（2026-08-27）：`ContractService.createAlliance` 与 ALLIANCE accept 分派
+        接入逐成员 Vault 扣款；已注资签署 + `alliance-funding-op-<uuid>` 共同落盘，最后一人签署才激活。
+        部分签署仍计入盟友接受上限；权限、重名 UUID、并发重复签署、旧对象和保存失败回滚有测试。
+      - [x] 分阶段恢复（2026-08-27）：pending 增加 `funding-phase`，先记 PREPARED 再扣款，
+        以 WITHDRAWN 确认扣款；退款先记 REFUNDING，确认成功后为 REFUNDED。明确拒绝为 REJECTED。
+        已落盘签署必须按 UUID、金额、操作 ID 匹配才清日志；PREPARED/REFUNDING 的不确定结果保留人工核对，
+        不自动重付。共享日志改为严格读取和同目录原子替换，保留旧记录格式。证据见
+        [`Contract/docs/alliance-funding-evidence.md`](Contract/docs/alliance-funding-evidence.md)。
+      - [ ] **下一可执行切片：终态结算 service**。接通全员审批、取消/超时退款和具名违约裁决；
+        在付款前持久化 UUID 分配计划与执行意图，保证中断后防双付，且任何未决注资记录都阻止结算/清理。
+        本轮只完成注资及其失败补偿，没有把纯分配计划直接循环付款。
+      - [ ] 玩家命令/GUI：完整成员与各自押金预览、一次确认、签署进度、审批、具名裁决；
+        在 service 与恢复门禁完成前保持 ALLIANCE 不可从玩家入口创建。
 - [ ] **LOAN**：initial-transfer + 可选抵押物 + 到期自动判决（还款成功退抵押物 / 失败给 creditor）
 - [ ] **RECURRING 租赁**：推到最后。已定方案——不在 Contract 内加 schedule 字段，改为"父合同生成子合同"
 - [ ] **PARTNERSHIP 共享池**（sharedPool）未实现
 
 #### ITEM 资产（2026-08-17 完成）
 
-审计发现原计划描述已过期：**真正的物品托管早就实现了**——`Contract.deliveryItems`/`rewardItems`
+审计发现原计划描述有两层：**SERVICE 的物品托管早就实现了**——`Contract.deliveryItems`/`rewardItems`
 持有真实 `ItemStack`，由 `ContractStorage` 以 `ItemStack.serialize()/deserialize()` 持久化，
-GUI 有完整领取流程。过期的是 `Asset`：`Asset.item()` 只存 `"DIAMOND x 64"` 这样的**展示字符串**，
-与真实托管**各存一份、可能对不上**。
+GUI 有完整领取流程；`Asset` 的展示串重复问题也已修好。2026-08-25 又补上按 participant role
+生成并持久化终态领取权的通用层；旧 SERVICE 池继续作为旧存档与降级兼容面。SALE 玩家入口已于
+2026-08-25 接入命令、GUI、详情页和行动收件箱，真人运行时验收仍待发布前执行。
 
 - [x] `Asset` 的 ITEM 改为携带真实 `ItemStack`（`Asset.item(stack)`、`itemStack()`、`itemCount()`），
       `toMap`/`fromMap` 走 `ItemStack.serialize()` 往返，并**同时保留** `reference` 展示串
 - [x] 旧存档兼容：只有 `reference` 没有 `item` 的记录照常加载（不臆造 stack）；
       `item` 载荷损坏时退回展示串而不是让整份合同加载失败
 - [x] `Participant.itemStake()` / `itemStakeAmount()`；`AssetTest` 覆盖新旧两种格式与损坏载荷
+- [x] 通用终态领取：`ItemClaimPlan` 依据实际 `PayoutRule` 把每个 source role 的实物路由给唯一
+      participant recipient；`ContractService` 在 Vault 付款前先验证，并把领取权按 recipient/source
+      双层角色持久化。领取存档失败恢复合同与背包；旧 SERVICE 展示型 stake 回退到 reward/delivery 池
 - [ ] 让 `deliveryItems`/`rewardItems` 与参与者 stake 共用同一份数据（现在是"同源写两处"，
       已不再会不一致，但仍是两份状态）——重构项，不阻塞玩法
 
@@ -357,7 +405,8 @@ GUI 有完整领取流程。过期的是 `Asset`：`Asset.item()` 只存 `"DIAMO
       `max-open-contracts` 上限。与 R3 一并设计，**别在 Contract 内另起一套**
 - [ ] **首发前冻结数据基线**（合同存档、`events.log`、escrow lease、`config-version`/`lang-version`）：
       与 Regions §5.2 同一条纪律——公开版本之后任何格式变化必须提供单向迁移 + 自动化测试
-- [ ] 补 `Contract/docs/release-checklist.md`（Metro/Railway/Regions 已有），内容用 §6 那四项 jarGate 不查的人工确认
+- [x] 补 `Contract/docs/release-checklist.md`（2026-08-25）：含自动门禁、最终 JAR 的
+      `plugin.yml` / bStats 31491 / 无 SQLite / Paper 提供 Adventure 四项人工确认、部署前恢复检查与真人验收
 - [ ] 首发前实服验证
 
 **跨阶段不变量（底线，每阶段都必须维持）**
@@ -376,7 +425,7 @@ GUI 有完整领取流程。过期的是 `Asset`：`Asset.item()` 只存 `"DIAMO
   **2026-08-19 订正**：这条此前只是"要求"，源码里 Contract 其实**只监听 legacy**。
   随 §7.4 的 ChatInput 下沉一并补上了现代事件监听，现在名副其实
 
-### 5.2 Regions（未公开首发）
+### 5.2 Regions（待首个正式 release）
 
 阶段 A（授权与能力真实性）、B（模板化创作与发布）、C（运行时完整度与组合规则）代码层已收口；
 Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证。
@@ -480,7 +529,7 @@ Railway 的源码包**就是** `org.cubexmc.metro`，主类 `org.cubexmc.metro.M
 "能不能直接复用 Metro 的 `.kt`"的两步判据原在 `KOTLIN_MIGRATION_RUNBOOK.md`（已删除，
 `git show 2783844:KOTLIN_MIGRATION_RUNBOOK.md` 可取回）。
 
-### 5.8 StateCharge（未公开首发）
+### 5.8 StateCharge（待首个正式 release）
 
 付费限时状态框架已实现：配置驱动（内置 `scale`/`fly` 两种 effect kind + small/giant/fly 三状态）、
 Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线暂停、重复购买累加）、互斥组、
@@ -502,20 +551,25 @@ Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线�
 - [x] 补 `StateCharge/docs/release-checklist.md` 与 `StateCharge/REAL_SERVER_TEST.md`（2026-08-21）
 - [ ] 首发前实服验证
 
-### 5.9 Clarity（未公开首发）
+### 5.9 Clarity（待首个正式 release）
 
 清理 Adapt 遗留 attribute modifier。仅接入 `cubex-core`。
 
 - [ ] 首发前实服验证；确认是否需要 i18n（目前无语言文件）
-- [ ] 补 `Clarity/docs/release-checklist.md`
-- [ ] **保持编译到 Java 21**（用 1.21 属性 API），这是全仓唯一例外，`jarGate` 已按插件分别校验
+- [x] 补 `Clarity/docs/release-checklist.md`（2026-08-25）：含 Java 21、bStats 31800、
+      无 SQLite/Adventure、dry-run 与不可逆清理的发布纪律
+- [x] **保持编译到 Java 21**：`Clarity/build.gradle.kts` 显式 `options.release=21`，
+      1.21 属性 API 与 `jarGate` major 65 检查继续锁定（2026-08-25 复核）
 
-### 5.10 Reputations（未公开首发）
+### 5.10 Reputations（待首个正式 release）
 
 Vault 模式共享信誉服务，bStats 31877。
 
 - [x] R3 收窄后的内容：排行榜 + 变动事件广播 + PAPI（2026-08-24，见 §4）
 - [x] **`org.cubexmc.reputations.api` 的 4 个 `.java` 是故意的 Java API 面，不要迁 Kotlin**
+- [x] 补 `Reputations/docs/release-checklist.md` 与 `Reputations/REAL_SERVER_TEST.md`；
+      Paper 1.20.1 / Java 21 已实测无 PAPI 独立启用、PAPI 2.11.6 expansion 注册与正常停服（2026-08-24）
+- [ ] 首发前真人验证：最低支持线 1.18.x、权限/GUI/真实字段排行榜、PAPI 返回值、异步事件与异常恢复
 
 ### 5.11 FAWEReplacer（已公开）
 
@@ -536,7 +590,8 @@ Vault 模式共享信誉服务，bStats 31877。
          而 `RuleGems/gradle.lockfile` 锁在 `{strictly 0.8.11}` → `jacocoAgent` 解析直接失败。
          锁文件是它安全流程的一部分（见 `rulegems-security.yml`），**不该为跟随 Gradle 默认值就动它**；
          已在 `RuleGems/build.gradle.kts` 显式 `jacoco { toolVersion = "0.8.11" }`，让升级只动 Gradle 本身
-- [ ] 命令/权限规范文档（R4 收窄后的内容，见 §4）
+- [x] 命令/权限规范文档（2026-08-25）：[`COMMAND_PERMISSION_GUIDE.md`](COMMAND_PERMISSION_GUIDE.md)，
+      同时已加入 `AGENTS.md`、根 README 与插件 README 模板入口
 - [x] **CI 补跑 `buildSrc` 测试**（2026-08-19）：buildSrc 是独立构建，根构建的 `build` **不会**带上它的
       测试，`plugin.yml` 的 depend 注入逻辑住在那里；`build.yml` 已加 `./gradlew -p buildSrc test`，
       并把 CubeXLib 加进按插件构建的矩阵
@@ -561,11 +616,13 @@ Vault 模式共享信誉服务，bStats 31877。
       至此 §2 阶段全部通过 —— **本轮重构零回归**，MountLicense 的损坏 UUID 也确认被安静忽略
 - [ ] EcoBalancer 的 `lang/*.yml` **完全没有 `messages.gui.*` 这组键**，
       GUI 文案全靠代码里的 fallback，服主无法翻译。属既有缺口，单独修
-- [ ] 给 Contract / StateCharge / Clarity / Reputations 补 `docs/release-checklist.md`
-      （Metro/Railway/Regions 已有），内容就是上面那四项人工确认
-- [ ] 明确“未公开”的口径：[`mirror.yml`](.github/workflows/mirror.yml) 每次推 main 都会把 Contract /
-      Regions / Clarity 一并 subtree-split 推到公开镜像仓，与 §1 “未公开首发”的措辞冲突。
-      若指的是“未发 release 而非源码未公开”，把 §1 的说法改掉
+- [x] 给 Contract / Clarity 补 `docs/release-checklist.md`（2026-08-25）；StateCharge / Reputations
+      此前已完成，Metro/Railway/Regions 已有。两份新清单均覆盖 `jarGate` 不查的
+      `plugin.yml`、bStats id、SQLite 平台内容和 Adventure 副本
+- [x] 明确发布口径（2026-08-25）：PLAN 统一使用“已有正式 release / 待首个正式 release”，
+      不再用“公开”同时表示源码可见性和版本发布。Contract / Regions / Clarity 在
+      [`mirror.yml`](.github/workflows/mirror.yml) 的镜像名单内，但仍属于待首个正式 release；
+      StateCharge / Reputations 尚无镜像 repo，同样不改变其 release 状态
 - [x] 删除历史残留目录 `Contracts/`（`Contract/` 的旧副本，含 169M 未跟踪的 build/run 产物）
 - [ ] `Railway/.claude/worktrees/` 有历史 agent worktree 副本（已 gitignore、未跟踪），
       会污染全目录 grep 与文件计数；统计以 `kotlinMigrationStatus` 或 `<Plugin>/src` 为准

@@ -10,12 +10,12 @@ enum class ContractType {
     /** Both parties stake; both must approve. */
     PARTNERSHIP,
 
-    // —— Not implemented yet; shown greyed out in the GUI. See PLAN.md §5.1. ——
+    // —— Types below are tracked individually in PLAN.md §5.1. ——
 
-    /** Needs multi-party acceptance and dynamically generated payouts. */
+    /** Model and phased funding exist; terminal settlement and player creation remain pending. */
     ALLIANCE,
 
-    /** PARTNERSHIP shape with swap payouts; blocked on ITEM assets. */
+    /** Item-for-money swap with command/GUI creation and role-owned settlement. */
     SALE,
 
     /** Needs initial-transfer (money leaves escrow at creation) and a repayment step. */

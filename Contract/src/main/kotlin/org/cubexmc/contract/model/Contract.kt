@@ -5,6 +5,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.ArrayList
 import java.util.Collections
+import java.util.EnumMap
 import java.util.LinkedHashMap
 import java.util.Optional
 import java.util.UUID
@@ -33,8 +34,11 @@ class Contract(
 ) {
     private val participants: MutableList<Participant> = ArrayList(participants)
     private val payouts: MutableList<PayoutRule> = ArrayList(payouts)
+    private var allianceAgreement: AllianceAgreement? = null
     private val deliveryItems: MutableList<ItemStack> = ArrayList(deliveryItems.map { it.clone() })
     private val rewardItems: MutableList<ItemStack> = ArrayList(rewardItems.map { it.clone() })
+    private val itemClaims: MutableMap<ParticipantRole, MutableMap<ParticipantRole, List<ItemStack>>> =
+        EnumMap(ParticipantRole::class.java)
     private val events: MutableList<ContractEvent> = ArrayList(events)
 
     // Free-form metadata bag for type-specific data (creation-fee, commission-percent, etc).
@@ -180,6 +184,29 @@ class Contract(
 
     fun payouts(): List<PayoutRule> = Collections.unmodifiableList(payouts)
 
+    fun allianceAgreement(): AllianceAgreement? = allianceAgreement
+
+    fun allianceAgreement(agreement: AllianceAgreement) {
+        validateAllianceAgreement(agreement)
+        this.allianceAgreement = agreement
+    }
+
+    internal fun checkedAllianceAgreement(): AllianceAgreement {
+        val agreement = requireNotNull(allianceAgreement) { "Alliance funded signatures are missing" }
+        validateAllianceAgreement(agreement)
+        return agreement
+    }
+
+    private fun validateAllianceAgreement(agreement: AllianceAgreement) {
+        val members = AlliancePayoutPlan.principalByUuid(this)
+        require(agreement.members().toSet() == members.keys && agreement.creatorUuid() == ownerUuid()) {
+            "Alliance signatures must match the contract's members and creator"
+        }
+        require(agreement.signatures()[agreement.creatorUuid()] == createdAt && agreement.signatures().values.all { it < expiresAt }) {
+            "Alliance signatures must match creation and precede the acceptance deadline"
+        }
+    }
+
     fun status(): ContractStatus = status
 
     fun status(status: ContractStatus) {
@@ -259,7 +286,55 @@ class Contract(
 
     fun rewardItemCount(): Int = rewardItems.sumOf { it.amount }
 
-    fun hasStoredItems(): Boolean = hasDeliveryItems() || hasRewardItems()
+    fun hasStoredItems(): Boolean = hasDeliveryItems() || hasRewardItems() || hasItemClaims()
+
+    /**
+     * Physical stacks currently held for [sourceRole]. Participant assets are authoritative for new
+     * records; the SERVICE pools remain a compatibility fallback for saves written before ITEM assets
+     * carried a real ItemStack.
+     */
+    fun escrowedItems(sourceRole: ParticipantRole): List<ItemStack> {
+        val participantItems = participant(sourceRole).map { it.itemStake() }.orElse(emptyList())
+        if (participantItems.isNotEmpty()) return participantItems.map { it.clone() }
+        if (type == ContractType.SERVICE) {
+            if (sourceRole == ParticipantRole.OWNER) return rewardItems()
+            if (sourceRole == ParticipantRole.CONTRACTOR) return deliveryItems()
+        }
+        return emptyList()
+    }
+
+    fun itemClaims(): Map<ParticipantRole, Map<ParticipantRole, List<ItemStack>>> {
+        val copy = EnumMap<ParticipantRole, Map<ParticipantRole, List<ItemStack>>>(ParticipantRole::class.java)
+        for ((recipient, bySource) in itemClaims) {
+            val sourceCopy = EnumMap<ParticipantRole, List<ItemStack>>(ParticipantRole::class.java)
+            for ((source, items) in bySource) sourceCopy[source] = items.map { it.clone() }
+            copy[recipient] = sourceCopy
+        }
+        return copy
+    }
+
+    fun itemClaims(claims: Map<ParticipantRole, Map<ParticipantRole, List<ItemStack>>>) {
+        itemClaims.clear()
+        for ((recipient, bySource) in claims) {
+            val sourceCopy = EnumMap<ParticipantRole, List<ItemStack>>(ParticipantRole::class.java)
+            for ((source, items) in bySource) sourceCopy[source] = items.map { it.clone() }
+            if (sourceCopy.isNotEmpty()) itemClaims[recipient] = sourceCopy
+        }
+    }
+
+    fun itemClaims(recipient: ParticipantRole): List<ItemStack> =
+        itemClaims[recipient]?.values?.flatten()?.map { it.clone() } ?: emptyList()
+
+    fun itemClaimSources(recipient: ParticipantRole): Set<ParticipantRole> =
+        itemClaims[recipient]?.keys?.toSet() ?: emptySet()
+
+    fun hasItemClaims(recipient: ParticipantRole): Boolean = !itemClaims[recipient].isNullOrEmpty()
+
+    fun hasItemClaims(): Boolean = itemClaims.isNotEmpty()
+
+    fun clearItemClaims(recipient: ParticipantRole) {
+        itemClaims.remove(recipient)
+    }
 
     fun events(): List<ContractEvent> = Collections.unmodifiableList(ArrayList(events))
 
@@ -671,6 +746,117 @@ class Contract(
                 "CREATED",
                 "$creatorName proposed partnership with $partnerName, stakes ${stakeA.toPlainString()} / ${stakeB.toPlainString()}",
             )
+            return contract
+        }
+
+        /** Model factory only: the service must escrow the creator stake before persisting this. */
+        @JvmStatic
+        fun createAlliance(
+            id: String,
+            creator: Participant,
+            allies: List<Participant>,
+            title: String,
+            description: String,
+            now: Long,
+            expiresAt: Long,
+        ): Contract {
+            require(creator.role() == ParticipantRole.OWNER && allies.all { it.role() == ParticipantRole.ALLY }) {
+                "Alliance requires an OWNER creator and ALLY invitees"
+            }
+            require(now >= 0 && expiresAt > now) { "Alliance deadline must follow its creation" }
+            // Participant is mutable; creation must not retain the caller's draft objects.
+            val members = (listOf(creator) + allies).map {
+                Participant(it.role(), it.uuid(), it.displayName(), it.stake())
+            }
+            val contract = Contract(
+                id, ContractType.ALLIANCE, title, description, members, null,
+                ResolutionRule.ALL_APPROVE, emptyList(), ContractStatus.PENDING_ACCEPT_MULTI,
+                now, null, null, null, null, expiresAt, null, null, emptyList(), emptyList(),
+            )
+            val roster = AlliancePayoutPlan.principalByUuid(contract).keys.toList()
+            val creatorUuid = requireNotNull(creator.uuid()) { "Alliance creator UUID is missing" }
+            contract.allianceAgreement(AllianceAgreement.create(roster, creatorUuid, now))
+            contract.addEvent(now, "CREATED", "${creator.displayName()} proposed alliance to ${allies.size} allies")
+            return contract
+        }
+
+        @JvmStatic
+        fun createSale(
+            creatorUuid: UUID,
+            creatorName: String,
+            partnerUuid: UUID,
+            partnerName: String,
+            stakeA: List<Asset>,
+            stakeB: List<Asset>,
+            title: String,
+            description: String,
+            now: Long,
+            expiresAt: Long,
+        ): Contract = createSale(
+            UUID.randomUUID().toString(),
+            creatorUuid,
+            creatorName,
+            partnerUuid,
+            partnerName,
+            stakeA,
+            stakeB,
+            title,
+            description,
+            now,
+            expiresAt,
+        )
+
+        @JvmStatic
+        fun createSale(
+            id: String,
+            creatorUuid: UUID,
+            creatorName: String,
+            partnerUuid: UUID,
+            partnerName: String,
+            stakeA: List<Asset>,
+            stakeB: List<Asset>,
+            title: String,
+            description: String,
+            now: Long,
+            expiresAt: Long,
+        ): Contract {
+            require(stakeA.isNotEmpty() && stakeB.isNotEmpty()) { "A sale requires a stake from both parties" }
+            val first = Participant(ParticipantRole.PARTY_A, creatorUuid, creatorName, stakeA)
+            val second = Participant(ParticipantRole.PARTY_B, partnerUuid, partnerName, stakeB)
+            val rules = arrayListOf(
+                PayoutRule(PayoutCondition.SUCCESS, ParticipantRole.PARTY_A, PayoutRecipient.participant(ParticipantRole.PARTY_B), BigDecimal("100")),
+                PayoutRule(PayoutCondition.SUCCESS, ParticipantRole.PARTY_B, PayoutRecipient.participant(ParticipantRole.PARTY_A), BigDecimal("100")),
+                PayoutRule(PayoutCondition.FAILURE, ParticipantRole.PARTY_A, PayoutRecipient.participant(ParticipantRole.PARTY_A), BigDecimal("100")),
+                PayoutRule(PayoutCondition.FAILURE, ParticipantRole.PARTY_B, PayoutRecipient.participant(ParticipantRole.PARTY_B), BigDecimal("100")),
+                PayoutRule(PayoutCondition.TIMEOUT, ParticipantRole.PARTY_A, PayoutRecipient.participant(ParticipantRole.PARTY_A), BigDecimal("100")),
+                PayoutRule(PayoutCondition.TIMEOUT, ParticipantRole.PARTY_B, PayoutRecipient.participant(ParticipantRole.PARTY_B), BigDecimal("100")),
+                PayoutRule(PayoutCondition.DISPUTE_RESOLVED_FOR_OWNER, ParticipantRole.PARTY_A, PayoutRecipient.participant(ParticipantRole.PARTY_A), BigDecimal("100")),
+                PayoutRule(PayoutCondition.DISPUTE_RESOLVED_FOR_OWNER, ParticipantRole.PARTY_B, PayoutRecipient.participant(ParticipantRole.PARTY_A), BigDecimal("100")),
+                PayoutRule(PayoutCondition.DISPUTE_RESOLVED_FOR_CONTRACTOR, ParticipantRole.PARTY_A, PayoutRecipient.participant(ParticipantRole.PARTY_B), BigDecimal("100")),
+                PayoutRule(PayoutCondition.DISPUTE_RESOLVED_FOR_CONTRACTOR, ParticipantRole.PARTY_B, PayoutRecipient.participant(ParticipantRole.PARTY_B), BigDecimal("100")),
+            )
+            val contract = Contract(
+                id,
+                ContractType.SALE,
+                title,
+                description,
+                listOf(first, second),
+                null,
+                ResolutionRule.BOTH_APPROVE,
+                rules,
+                ContractStatus.PENDING_ACCEPT,
+                now,
+                null,
+                null,
+                null,
+                null,
+                expiresAt,
+                null,
+                null,
+                emptyList(),
+                emptyList(),
+            )
+            contract.addEvent(now, "CREATED", "$creatorName proposed a sale with $partnerName")
             return contract
         }
     }

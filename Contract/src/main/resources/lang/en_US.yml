@@ -1,10 +1,11 @@
-lang-version: 3
+lang-version: 6
 prefix: "<#F4D03F>[Contract]<#F1F5F9> "
 
 status:
   scheduled: "Scheduled"
   open: "Open"
   pending_accept: "Pending acceptance"
+  pending_accept_multi: "Awaiting alliance signatures"
   in_progress: "In progress"
   submitted: "Submitted"
   completed: "Completed"
@@ -101,6 +102,22 @@ objective-prompts:
   default: "<#FFE066>Enter a target"
 
 ui:
+  err-alliance-create-permission: "You do not have permission to create an alliance contract."
+  err-alliance-accept-permission: "You do not have permission to accept an alliance invitation."
+  err-alliance-funding-blocked: "You or this alliance have an unresolved funding record. Ask an admin to review it; no money was withdrawn this time."
+  err-alliance-funding-review: "Funding operation <id> requires review. Do not pay again; ask an admin to check its funding journal."
+  err-alliance-journal: "The funding journal could not be saved. No money was withdrawn; ask an admin to check storage."
+  err-alliance-save-refunded: "The signature could not be saved. Your withdrawal has been refunded; retry after storage is repaired."
+  err-alliance-description-length: "Alliance descriptions cannot exceed <max> characters."
+  err-alliance-roster: "An alliance needs at least two distinct invited allies, excluding its creator."
+  err-alliance-stake: "Each stake must be positive, use whole cents, and fall within the server's amount limits."
+  err-alliance-open-limit: "You have reached the limit for unfinished contracts you can create."
+  err-alliance-active-limit: "You have reached the accepted-contract limit; funded alliances still awaiting other signatures also count."
+  err-alliance-stale: "The contract data has changed. Reopen it before signing."
+  err-alliance-not-pending: "This alliance is not currently awaiting signatures."
+  err-alliance-invalid: "The alliance terms or signatures are invalid. Ask an admin to review them."
+  err-alliance-member-only: "Only allies invited to this contract may sign."
+  err-alliance-already-signed: "You have already signed and escrowed your stake. You will not be charged again."
   # ---- Shared values -----------------------------------------------------------
   value-unset: "not set"
   value-none: "none"
@@ -185,6 +202,7 @@ ui:
   detail-repeat: "<#CFD8DC>Repeat policy: <#FFFFFF><value>"
   detail-stored-delivery: "<#CFD8DC>Held by contract: <#FFFFFF><count> delivered item(s)"
   detail-stored-reward: "<#CFD8DC>Reward held: <#FFFFFF><count> item(s)"
+  detail-item-claims: "<#CFD8DC>Unclaimed item entitlements: <#FFFFFF><count> item(s)"
   detail-deadline: "<#CFD8DC>Accept by: <#FFFFFF><time>"
   detail-dispute: "<#E63946>Dispute: <#F1F5F9><value>"
   verify-label-system: "system verified"
@@ -201,6 +219,7 @@ ui:
   inbox-claim-delivery: "Claim the delivered items"
   inbox-claim-reward: "Claim your reward items"
   inbox-reclaim-reward: "Reclaim your reward items"
+  inbox-claim-entitlement: "Claim your settled sale items"
   inbox-submit: "Submit your completion"
   inbox-deliver-item: "Deliver the items"
   inbox-deliver-money: "Deliver the money"
@@ -212,6 +231,7 @@ ui:
   progress-mediator-accepted: "Mediator accepted; waiting on a dispute or the parties"
   progress-open: "Waiting for a contractor"
   progress-pending-accept: "Waiting for the named player to accept"
+  progress-pending-accept-multi: "Waiting for every invited ally to sign and escrow their stake"
   progress-in-progress: "In progress; waiting on the contractor"
   progress-submitted: "Submitted; waiting on the owner"
   progress-disputed: "Disputed; waiting on an admin or the mediator"
@@ -250,6 +270,7 @@ ui:
   action-claim-delivery: "<#69DB7C>Claim delivered items"
   action-claim-reward: "<#69DB7C>Claim reward items"
   action-reclaim-reward: "<#69DB7C>Reclaim reward items"
+  action-claim-entitlement: "<#69DB7C>Claim settled items"
   action-claim-stored: "<#CFD8DC>Held by contract: <#FFFFFF><count> item(s)"
   action-claim-space: "<#CFD8DC>You need free inventory space"
   action-approve: "<#69DB7C>Approve payment"
@@ -258,6 +279,8 @@ ui:
   action-approve-early-warn: "<#E63946>⚠ The contractor has not submitted yet"
   action-partner-approve: "<#69DB7C>Confirm partnership completion"
   action-partner-approve-detail: "<#CFD8DC>Settles once both sides confirm"
+  action-sale-approve: "<#69DB7C>Confirm the sale"
+  action-sale-approve-detail: "<#CFD8DC>Exchanges the price and item once both sides confirm"
   action-resolve-a: "<#69DB7C>Rule: A wins"
   action-resolve-a-detail: "<#CFD8DC>Pays Party A by the wager rules"
   action-resolve-b: "<#E63946>Rule: B wins"
@@ -313,6 +336,9 @@ ui:
   confirm-partner-title: "Confirm partnership completion #<id>"
   confirm-partner-1: "Records your confirmation."
   confirm-partner-2: "Once both sides confirm, each stake returns minus commission."
+  confirm-sale-title: "Confirm sale exchange #<id>"
+  confirm-sale-1: "Records your approval of the displayed item and price."
+  confirm-sale-2: "Once both sides approve, the seller receives the price and the buyer can claim the item."
   confirm-resolve-a-title: "Rule for Party A #<id>"
   confirm-resolve-a-1: "Party A takes both stakes minus the server commission."
   confirm-resolve-b-title: "Rule for Party B #<id>"
@@ -351,6 +377,9 @@ ui:
   wizard-type-partnership: "<#69DB7C>PARTNERSHIP"
   wizard-type-partnership-1: "<#CFD8DC>Each side stakes; settles once both confirm"
   wizard-type-partnership-2: "<#CFD8DC>An optional mediator can be named"
+  wizard-type-sale: "<#69DB7C>SALE"
+  wizard-type-sale-1: "<#CFD8DC>Your full main-hand stack is held for the named buyer"
+  wizard-type-sale-2: "<#CFD8DC>The buyer escrows the price; both sides approve the exchange"
   wizard-type-label: "<#FFE066>Type: <#FFFFFF><value>"
   wizard-type-label-detail: "<#CFD8DC>Go back a step to change the type"
   wizard-abandon: "<#E63946>Discard draft"
@@ -376,6 +405,8 @@ ui:
   field-mediator: "Mediator (optional)"
   field-mediator-short: "Mediator"
   field-partner-stake: "Their stake"
+  field-sale-price: "Buyer price"
+  field-sale-item: "Item you are selling"
   field-count: "Copies to post"
   field-cooldown: "Repeat cooldown (hours)"
   field-objective-amount: "Objective amount"
@@ -387,6 +418,7 @@ ui:
   prompt-arbiter: "<#FFE066>Type the arbiter's name (or cancel)"
   prompt-mediator: "<#FFE066>Type the mediator's name (or cancel)"
   prompt-partner-stake: "<#FFE066>Type their stake (or cancel)"
+  prompt-sale-price: "<#FFE066>Type the buyer price (or cancel)"
   prompt-count: "<#FFE066>Type how many copies to post (or cancel)"
   prompt-cooldown: "<#FFE066>Type the repeat cooldown in hours (or cancel)"
   prompt-objective-amount: "<#FFE066>Type the objective amount (or cancel)"
@@ -395,6 +427,8 @@ ui:
   reward-item-title: "<#69DB7C>Item reward"
   reward-item-1: "<#CFD8DC>Escrows the whole main-hand stack when you sign"
   reward-item-2: "<#FFE066>Hold the reward in your main hand"
+  sale-item-hold: "<#FFE066>Hold the exact full stack you want to sell before previewing"
+  sale-item-value: "<count>x <material>"
   reward-mode-item: "<#69DB7C>Reward: <#FFFFFF>main-hand item"
   reward-mode-item-1: "<#CFD8DC>Escrows the whole main-hand stack when you sign."
   reward-mode-item-2: "<#FFE066>Click to switch to a money reward"
@@ -451,6 +485,9 @@ ui:
   preview-deduct-now: "<#CFD8DC>Charged immediately on signing: <#E63946><value>"
   preview-partner-stake: "<#CFD8DC>Their stake: <#69DB7C><value>"
   preview-deduct-mine: "<#CFD8DC>Your stake charged on signing: <#E63946><value>"
+  preview-sale-offer: "<#CFD8DC>Seller item: <#69DB7C><value>"
+  preview-sale-price: "<#CFD8DC>Buyer price: <#69DB7C><value>"
+  preview-sale-escrow: "<#E63946>The full displayed main-hand stack is removed when the seller signs."
   preview-escrow-note: "<#CFD8DC>The server holds the money; it never goes to the other side or the mediator."
 
   # ---- Paper Dialog form -------------------------------------------------------
@@ -464,6 +501,7 @@ ui:
   result-ok: "<#69DB7C>Done."
   result-signed: "<#69DB7C>Signed; the action completed."
   result-created: "<#69DB7C>Signed; posted <count> service contract(s)."
+  result-sale-created: "<#69DB7C>Signed; the sale invitation was sent and the displayed item is now held."
   dispute-prompt: "<#FFE066>Type the dispute reason within 60 seconds, or type <#E63946>cancel<#FFE066>."
   dispute-cancelled: "<#FFE066>Dispute input cancelled."
   dispute-timeout: "<#E63946>Dispute input timed out and was cancelled."
@@ -474,6 +512,7 @@ ui:
   usage-service: "/contract service \\<reward|item> \\<days> [--count \\<n>] [--repeat \\<unlimited|once|cooldown>] [--cooldown \\<hours>] [--mediator \\<player>] [--objective \\<type> \\<target> \\<amount>] \\<title>|\\<description>"
   usage-wager: "/contract wager \\<opponent> \\<stake> \\<days> \\<arbiter> \\<title>|\\<description>"
   usage-partner: "/contract partner \\<partner> \\<my stake> \\<their stake> \\<days> [--mediator \\<player>] \\<title>|\\<description>"
+  usage-sale: "/contract sale \\<buyer> \\<price> \\<days> [--mediator \\<player>] \\<title>|\\<description>"
   usage-dispute: "/contract dispute \\<id> \\<reason>"
   usage-admin: "<#FFE066>/contract admin reload|pay|refund|close \\<id>"
   rep-empty: "<#FFE066><name> has no contract track record yet."
@@ -481,6 +520,7 @@ ui:
   rep-line: "<#CFD8DC>Completed <#69DB7C><completed> <#CFD8DC>· cancelled <#FFE066><cancelled> <#CFD8DC>· expired <#E63946><expired> <#CFD8DC>· disputed <#E63946><disputed>"
   info-participant: "    <#CFD8DC>- <#FFE066><role><#CFD8DC>: <#FFFFFF><name>"
   info-stake: " <#CFD8DC><label>: <#69DB7C><value>"
+  info-item-claims: "<#CFD8DC>Unclaimed item entitlements: <#FFFFFF><count> item(s)"
   info-arbiter: "    <#CFD8DC>- <#FFE066><role><#CFD8DC>: <#FFFFFF><name> <#CFD8DC>(<state>)"
   info-payout: "    <#CFD8DC>- <#FFE066><condition><#CFD8DC>: <value>"
   info-payout-none: "    <#CFD8DC>- <value>"
@@ -670,6 +710,8 @@ ui:
   err-claim-unsupported: "This contract type has no stored items to claim"
   err-claim-after-completion: "Delivered items can be claimed once the contract completes"
   err-claim-nothing: "There is nothing here for you to claim"
+  err-sale-item-in-hand: "Hold the exact full stack you want to sell in your main hand before previewing"
+  err-sale-hand-changed: "Your main-hand item changed after the preview; review and sign the sale again"
   claim-none-of-kind: "This contract has no <kind> to claim"
   claim-inventory-full: "Not enough inventory space; free some slots and try again"
   claim-save-failed: "Saving the claim failed; your inventory was rolled back: <error>"
@@ -783,6 +825,7 @@ messages:
     <#FFE066>/contract wager \<opponent> \<stake> \<days> \<arbiter> \<title>|\<description> <#F1F5F9>- Open a wager
     <#FFE066>/contract partner \<partner> \<my stake> \<their stake> \<days> \<title>|\<description> <#F1F5F9>- Invite a partner
     <#CFD8DC>Optional: <#FFE066>/contract partner \<partner> \<my stake> \<their stake> \<days> --mediator \<player> \<title>|\<description>
+    <#FFE066>/contract sale \<buyer> \<price> \<days> \<title>|\<description> <#F1F5F9>- Preview and sign a main-hand item sale
     <#FFE066>/contract resolve \<id> \<a|b> <#F1F5F9>- Arbiter resolves a wager
     <#FFE066>/contract mediate \<id> \<accept|pay|refund|owner|contractor> <#F1F5F9>- Mediator accepts duties or resolves
     <#FFE066>/contract list [page] <#F1F5F9>- List open service contracts

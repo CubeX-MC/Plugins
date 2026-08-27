@@ -23,7 +23,7 @@ permissions:
     description: Open and inspect the contract board.
   contract.create:
     default: true
-    description: Create service, wager, and partnership contracts.
+    description: Create service, wager, partnership, and sale contracts.
   contract.create.batch:
     default: op
     description: Create more than one service contract in a single batch.

@@ -214,7 +214,17 @@ give @s diamond_pickaxe[minecraft:custom_data={PublicBukkitValues:{"leveltools:l
 
 ### 3.1 §4 R1 — Regions ↔ Contract 托管故障注入（**全仓价值最高的一条**）
 
-这是"真钱跨插件流动 + 重启重放"唯一还没有实服证据的环节。
+真钱余额链路仍待真人验证；以下不涉及玩家余额的连接与持久化前置已经完成：
+
+- [x] Paper 1.21.11 + Vault + EssentialsX + Contract + Regions 联合启动；Regions 经提供方
+      ClassLoader 调到真实 Contract 服务，不存在的 WAGER 正确返回 `CONTRACT_NOT_FOUND`。
+- [x] 无 Contract 启动后注入 `PREPARING` lease；reload 返回 `PROVIDER_UNAVAILABLE`，正常停服后
+      `reward-funding.yml` 仍保留相同 state 与 operation id。
+- [x] 双侧自动化测试覆盖落盘重启后的同 operation 重放、已完成终态不重复执行，以及
+      `REVIEW_REQUIRED` 保留 `SETTLING` 且不回退成 refund。
+
+本地可用 `./gradlew :Regions:runServer` 启动联合服；加
+`-PregionsRunWithContract=false` 会改用隔离的 `Regions/run-no-contract` 数据目录并省略 Contract。
 **每一条都要在结束后核对：`余额 + 托管 = 之前余额`。**
 
 - [ ] settle 执行到一半强制关服 → 重启后以**同一 operation id** 重放，不得二次付款。

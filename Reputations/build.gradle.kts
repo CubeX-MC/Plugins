@@ -23,3 +23,12 @@ tasks.processResources {
         expand("project" to mapOf("version" to project.version))
     }
 }
+
+tasks.runServer {
+    // The plugin must also work without PlaceholderAPI; that standalone path is covered before
+    // enabling this richer default dev-server setup (see REAL_SERVER_TEST.md).
+    minecraftVersion("1.20.1")
+    downloadPlugins {
+        url("https://repo.extendedclip.com/content/repositories/placeholderapi/me/clip/placeholderapi/2.11.6/placeholderapi-2.11.6.jar")
+    }
+}

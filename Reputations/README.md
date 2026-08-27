@@ -117,6 +117,7 @@ shade 事件类；应从 Reputations 的 ClassLoader 解析事件类型后，用
 .\gradlew.bat :Reputations:build      # 编译 + 测试 + 部署 jar
 .\gradlew.bat :Reputations:test       # 只跑测试
 .\gradlew.bat :Reputations:jarGate    # 部署 jar 门禁
+.\gradlew.bat :Reputations:runServer  # Paper 1.20.1 + PlaceholderAPI 2.11.6 开发服
 ```
 
 Windows 必须用 PowerShell 跑 `.\gradlew.bat`（仓库路径含空格）。
@@ -124,11 +125,13 @@ Windows 必须用 PowerShell 跑 `.\gradlew.bat`（仓库路径含空格）。
 
 ## 已知边界
 
-- 尚未公开发布。
+- 尚未发布首个正式版本；当前尚无独立镜像 repo。
 - 目前只有 Contract 一个字段提供方；排行榜不会扫描服务器的全部离线玩家，只展示该字段已有持久化值的记录。
 - 不提供跨字段的加权聚合或等级(tier)推导——权重口径属于未定的玩法决策，刻意留白。
 
 ## 相关文档
 
 - 待办与路线：仓库根 [`PLAN.md`](../PLAN.md)
-- 可选连接契约：仓库根 [`CUBEX_INTEGRATIONS_DESIGN.md`](../CUBEX_INTEGRATIONS_DESIGN.md)
+- 可选连接与共享模块：仓库根 [`MODULES.md`](../MODULES.md)
+- 实服验收：[`REAL_SERVER_TEST.md`](REAL_SERVER_TEST.md)
+- 发布检查：[`docs/release-checklist.md`](docs/release-checklist.md)

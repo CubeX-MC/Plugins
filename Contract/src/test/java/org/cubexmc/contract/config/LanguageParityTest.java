@@ -30,6 +30,17 @@ import org.junit.jupiter.api.Test;
  */
 class LanguageParityTest {
 
+    @Test
+    void everyContractStatusHasALabelInBothLocales() {
+        for (String locale : LOCALES) {
+            YamlConfiguration lang = load(locale);
+            for (org.cubexmc.contract.model.ContractStatus status : org.cubexmc.contract.model.ContractStatus.values()) {
+                assertTrue(lang.isString("status." + status.name().toLowerCase(java.util.Locale.ROOT)),
+                    locale + " is missing status " + status);
+            }
+        }
+    }
+
     private static final List<String> LOCALES = List.of("zh_CN", "en_US");
     private static final Pattern PLACEHOLDER = Pattern.compile("<([a-z][a-z0-9_-]*)>");
     /**
@@ -38,6 +49,7 @@ class LanguageParityTest {
      * key passed as a placeholder value, for example.
      */
     private static final Pattern UI_KEY = Pattern.compile("\\bui\\(\\s*\"([a-z][a-z0-9-]*)\"");
+    private static final Pattern FUNDING_FAIL_KEY = Pattern.compile("\\bfail\\(\\s*\"([a-z][a-z0-9-]*)\"");
 
     /** The conditional form: {@code ui(if (cond) "a" else "b")}. */
     private static final Pattern UI_KEY_CONDITIONAL = Pattern.compile(
@@ -101,6 +113,10 @@ class LanguageParityTest {
                     record(defined, missing, simple.group(1), file);
                 }
                 Matcher conditional = UI_KEY_CONDITIONAL.matcher(source);
+                if (file.getFileName().toString().equals("AllianceFundingService.kt")) {
+                    Matcher failures = FUNDING_FAIL_KEY.matcher(source);
+                    while (failures.find()) record(defined, missing, failures.group(1), file);
+                }
                 while (conditional.find()) {
                     record(defined, missing, conditional.group(1), file);
                     record(defined, missing, conditional.group(2), file);

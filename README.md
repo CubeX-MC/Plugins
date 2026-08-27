@@ -92,6 +92,7 @@ plugins/
 - 共享模块 API 与使用方法：详见 [`MODULES.md`](MODULES.md)。
 - 演进规划与全仓待办：详见 [`PLAN.md`](PLAN.md)。
 - Kotlin 编码规范与门禁说明：详见 [`KOTLIN_STYLE_GUIDE.md`](KOTLIN_STYLE_GUIDE.md)。
+- 命令、权限、help 与消息颜色：详见 [`COMMAND_PERMISSION_GUIDE.md`](COMMAND_PERMISSION_GUIDE.md)。
 
 ---
 

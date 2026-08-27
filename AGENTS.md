@@ -14,6 +14,7 @@ Minecraft 插件 monorepo（Gradle + `buildSrc` 约定插件）。产物是 **N 
 | 共享模块使用指南 / API 示例 / 接入矩阵 | [`MODULES.md`](MODULES.md) |
 | 计划 / 待办 / 跨插件演进方向 | [`PLAN.md`](PLAN.md)（**全仓唯一计划文件**） |
 | Kotlin 编码规范与 Java 互操作避坑 | [`KOTLIN_STYLE_GUIDE.md`](KOTLIN_STYLE_GUIDE.md) |
+| 新增 / 修改命令、权限、help 与提示颜色 | [`COMMAND_PERMISSION_GUIDE.md`](COMMAND_PERMISSION_GUIDE.md) |
 | 写 / 改某个插件的 README | [`README_TEMPLATE.md`](README_TEMPLATE.md)（章节顺序固定；README 只写已实现的行为） |
 
 ## 常用命令

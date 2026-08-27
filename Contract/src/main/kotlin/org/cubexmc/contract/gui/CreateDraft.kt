@@ -150,7 +150,8 @@ class CreateDraft(private val type: ContractType) {
 
     fun systemVerified(): Boolean = type == ContractType.SERVICE && objectiveType != null
 
-    fun needsCounterparty(): Boolean = type == ContractType.WAGER || type == ContractType.PARTNERSHIP
+    fun needsCounterparty(): Boolean =
+        type == ContractType.WAGER || type == ContractType.PARTNERSHIP || type == ContractType.SALE
 
     fun needsPartnerStake(): Boolean = type == ContractType.PARTNERSHIP
 

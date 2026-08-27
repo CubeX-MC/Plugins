@@ -9,6 +9,7 @@ import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.core.Reloadable
 import org.cubexmc.core.Terminable
 import org.cubexmc.contract.model.Asset
+import org.cubexmc.contract.model.AllianceAgreement
 import org.cubexmc.contract.model.Contract
 import org.cubexmc.contract.model.ContractEvent
 import org.cubexmc.contract.model.ContractObjective
@@ -88,6 +89,9 @@ class ContractStorage : Reloadable, Terminable {
         }
         try {
             return parseContracts(loadStrict(file))
+        } catch (invalid: InvalidAllianceDataException) {
+            // Never replace a funded-signature error with an older snapshot that may omit members.
+            throw invalid
         } catch (primary: Exception) {
             logger.severe("contract.yml is unreadable: ${primary.message}")
             if (backupFile.exists()) {
@@ -122,6 +126,9 @@ class ContractStorage : Reloadable, Terminable {
                 val contract = readContract(id, section)
                 result[contract.id()] = contract
             } catch (ex: RuntimeException) {
+                if (section.getString("type") == ContractType.ALLIANCE.name) {
+                    throw InvalidAllianceDataException("Invalid alliance $id; refusing to discard funded signatures", ex)
+                }
                 logger.warn("Skipping malformed contract $id: ${ex.message}")
             }
         }
@@ -279,6 +286,15 @@ class ContractStorage : Reloadable, Terminable {
                 contract.metadata[key] = meta.getString(key, "") ?: ""
             }
         }
+        contract.itemClaims(readItemClaims(section))
+        if (type == ContractType.ALLIANCE) {
+            val agreement = requireNotNull(section.getConfigurationSection("alliance")) {
+                "Alliance funded signatures are missing; refusing to infer escrow ownership"
+            }
+            val members = contract.participants().map { requireNotNull(it.uuid()) { "Unnamed alliance member" } }
+            val creator = requireNotNull(contract.ownerUuid()) { "Alliance creator is missing" }
+            contract.allianceAgreement(AllianceAgreement.fromMap(members, creator, agreement.getValues(false)))
+        }
         return contract
     }
 
@@ -382,6 +398,11 @@ class ContractStorage : Reloadable, Terminable {
         }
         section["participants"] = participants
 
+        if (contract.type() == ContractType.ALLIANCE) {
+            val agreement = contract.checkedAllianceAgreement()
+            section.createSection("alliance", agreement.toMap())
+        }
+
         if (contract.arbiter() != null) {
             section["arbiter"] = contract.arbiter()?.toMap()
         }
@@ -409,6 +430,13 @@ class ContractStorage : Reloadable, Terminable {
         }
         if (contract.hasRewardItems()) {
             section["reward-items"] = contract.rewardItems().map { it.serialize() }
+        }
+        if (contract.hasItemClaims()) {
+            for ((recipient, bySource) in contract.itemClaims()) {
+                for ((source, items) in bySource) {
+                    section["item-claims.${recipient.name}.${source.name}"] = items.map { it.serialize() }
+                }
+            }
         }
 
         if (contract.metadata.isNotEmpty()) {
@@ -444,6 +472,31 @@ class ContractStorage : Reloadable, Terminable {
 
     private fun readRewardItems(section: ConfigurationSection): List<ItemStack> {
         return readItems(section, "reward-items")
+    }
+
+    private fun readItemClaims(
+        section: ConfigurationSection,
+    ): Map<ParticipantRole, Map<ParticipantRole, List<ItemStack>>> {
+        val root = section.getConfigurationSection("item-claims") ?: return emptyMap()
+        val claims = java.util.EnumMap<ParticipantRole, Map<ParticipantRole, List<ItemStack>>>(ParticipantRole::class.java)
+        for (recipientKey in root.getKeys(false)) {
+            val recipient = runCatching { ParticipantRole.valueOf(recipientKey) }.getOrElse {
+                logger.warn("Skipping item claims for unknown recipient role $recipientKey")
+                continue
+            }
+            val recipientSection = root.getConfigurationSection(recipientKey) ?: continue
+            val bySource = java.util.EnumMap<ParticipantRole, List<ItemStack>>(ParticipantRole::class.java)
+            for (sourceKey in recipientSection.getKeys(false)) {
+                val source = runCatching { ParticipantRole.valueOf(sourceKey) }.getOrElse {
+                    logger.warn("Skipping item claims for unknown source role $sourceKey")
+                    continue
+                }
+                val items = readItems(recipientSection, sourceKey)
+                if (items.isNotEmpty()) bySource[source] = items
+            }
+            if (bySource.isNotEmpty()) claims[recipient] = bySource
+        }
+        return claims
     }
 
     private fun readItems(section: ConfigurationSection, path: String): List<ItemStack> {
@@ -506,6 +559,9 @@ class ContractStorage : Reloadable, Terminable {
 
     private fun nullableLong(section: ConfigurationSection, path: String): Long? =
         if (section.contains(path)) section.getLong(path) else null
+
+    private class InvalidAllianceDataException(message: String, cause: RuntimeException) :
+        IllegalStateException(message, cause)
 
     /** Reload stage: re-read the backing file. */
     override fun reload() {

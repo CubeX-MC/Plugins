@@ -148,6 +148,85 @@ class ContractsMigrationTest {
         assertNotNull(lang.getString("objectives.kill_entity"));
     }
 
+    @Test
+    void langVersionThreeAddsSaleKeysWithoutOverwritingOperators() throws Exception {
+        Path langFile = tempDir.resolve("lang").resolve("zh_CN.yml");
+        Files.createDirectories(langFile.getParent());
+        Files.writeString(langFile, """
+                lang-version: 3
+                ui:
+                  wizard-type-title: "我自定义的类型标题"
+                """);
+        ContractPlugin plugin = mockPlugin();
+        when(plugin.getResource("lang/zh_CN.yml"))
+                .thenAnswer(invocation -> Files.newInputStream(bundledLang()));
+        MigrationRunner runner = new MigrationRunner(plugin);
+
+        MigrationReport report = runner.run(MigrationPlan.yaml("Contracts lang zh_CN", "lang/zh_CN.yml")
+                .versionKey("lang-version")
+                .targetVersion(4)
+                .addStep(new LangV3ToV4Step(plugin)));
+
+        YamlConfiguration lang = YamlConfiguration.loadConfiguration(langFile.toFile());
+        assertTrue(report.migrated());
+        assertEquals(4, lang.getInt("lang-version"));
+        assertEquals("我自定义的类型标题", lang.getString("ui.wizard-type-title"));
+        assertNotNull(lang.getString("ui.wizard-type-sale"));
+        assertNotNull(lang.getString("ui.err-sale-hand-changed"));
+        assertNotNull(lang.getString("messages.help"));
+    }
+
+    @Test
+    void langVersionFourAddsAllianceLabelsInBothLocalesAndIsIdempotent() throws Exception {
+        for (String locale : java.util.List.of("zh_CN", "en_US")) {
+            Path langFile = tempDir.resolve("lang").resolve(locale + ".yml");
+            Files.createDirectories(langFile.getParent());
+            Files.writeString(langFile, """
+                    lang-version: 4
+                    status:
+                      pending_accept: "custom pending label"
+                    ui:
+                      progress-pending-accept: "custom progress"
+                    """);
+            ContractPlugin plugin = mockPlugin();
+            when(plugin.getResource("lang/" + locale + ".yml")).thenAnswer(invocation ->
+                Files.newInputStream(Path.of("src/main/resources/lang/" + locale + ".yml")));
+            MigrationRunner runner = new MigrationRunner(plugin);
+            MigrationPlan plan = MigrationPlan.yaml("Contract lang " + locale, "lang/" + locale + ".yml")
+                .versionKey("lang-version").targetVersion(5).addStep(new LangV4ToV5Step(plugin));
+            assertTrue(runner.run(plan).migrated());
+            assertTrue(runner.run(plan).skipped());
+            YamlConfiguration lang = YamlConfiguration.loadConfiguration(langFile.toFile());
+            assertEquals(5, lang.getInt("lang-version"));
+            assertEquals("custom pending label", lang.getString("status.pending_accept"));
+            assertEquals("custom progress", lang.getString("ui.progress-pending-accept"));
+            assertNotNull(lang.getString("status.pending_accept_multi"));
+            assertNotNull(lang.getString("ui.progress-pending-accept-multi"));
+        }
+    }
+
+    @Test
+    void langVersionFiveAddsFundingKeysWithoutReplacingOperatorWording() throws Exception {
+        for (String locale : java.util.List.of("zh_CN", "en_US")) {
+            Path langFile = tempDir.resolve("lang").resolve(locale + ".yml");
+            Files.createDirectories(langFile.getParent());
+            Files.writeString(langFile, "lang-version: 5\nui:\n  err-alliance-invalid: Custom text\n");
+            ContractPlugin plugin = mockPlugin();
+            when(plugin.getResource("lang/" + locale + ".yml")).thenAnswer(i ->
+                Files.newInputStream(Path.of("src/main/resources/lang/" + locale + ".yml")));
+            MigrationRunner runner = new MigrationRunner(plugin);
+            MigrationPlan plan = MigrationPlan.yaml("Funding lang", "lang/" + locale + ".yml")
+                .versionKey("lang-version").targetVersion(6).addStep(new LangV5ToV6Step(plugin));
+            assertTrue(runner.run(plan).migrated());
+            assertTrue(runner.run(plan).skipped());
+            YamlConfiguration lang = YamlConfiguration.loadConfiguration(langFile.toFile());
+            assertEquals(6, lang.getInt("lang-version"));
+            assertEquals("Custom text", lang.getString("ui.err-alliance-invalid"));
+            assertNotNull(lang.getString("ui.err-alliance-funding-review"));
+            assertNotNull(lang.getString("ui.err-alliance-already-signed"));
+        }
+    }
+
     private Path bundledLang() {
         return Path.of("src", "main", "resources", "lang", "zh_CN.yml");
     }

@@ -61,7 +61,12 @@ class DialogInputService(private val plugin: ContractPlugin) {
         if (draft.needsCounterparty()) {
             inputs.add(textInput("counterparty", ui("field-counterparty"), draft.counterparty(), 32))
         }
-        inputs.add(textInput("amount", ui(if (draft.type() == ContractType.SERVICE) "field-reward" else "field-my-stake"), numberText(draft.amount()), 16))
+        val amountKey = when (draft.type()) {
+            ContractType.SERVICE -> "field-reward"
+            ContractType.SALE -> "field-sale-price"
+            else -> "field-my-stake"
+        }
+        inputs.add(textInput("amount", ui(amountKey), numberText(draft.amount()), 16))
         inputs.add(textInput("mediator", ui(if (draft.mediatorRequired()) "field-arbiter" else "dialog-mediator"), draft.mediator(), 32))
         if (draft.needsPartnerStake()) {
             inputs.add(textInput("stake", ui("field-partner-stake"), numberText(draft.partnerStake()), 16))
