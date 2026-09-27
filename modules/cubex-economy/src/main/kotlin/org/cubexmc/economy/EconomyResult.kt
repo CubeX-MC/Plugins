@@ -8,17 +8,17 @@ package org.cubexmc.economy
  * `economy.account`。这种情况**不回滚**(理由见 [VaultEconomy.charge]),
  * 调用方通常不需要处理它,但服主要能从日志里对上账。
  */
-class EconomyResult private constructor(
+public class EconomyResult private constructor(
     private val success: Boolean,
     private val reason: String,
     private val depositFailed: Boolean,
 ) {
-    fun success(): Boolean = success
+    public fun success(): Boolean = success
 
-    fun reason(): String = reason
+    public fun reason(): String = reason
 
     /** 扣款成功但没能入账到 `economy.account`:这笔钱被销毁了,需要服主对账。 */
-    fun depositFailed(): Boolean = depositFailed
+    public fun depositFailed(): Boolean = depositFailed
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -31,19 +31,19 @@ class EconomyResult private constructor(
     override fun toString(): String =
         "EconomyResult[success=$success, reason=$reason, depositFailed=$depositFailed]"
 
-    companion object {
+    public companion object {
         private val OK = EconomyResult(true, "", false)
 
         @JvmStatic
-        fun ok(): EconomyResult = OK
+        public fun ok(): EconomyResult = OK
 
         /** 扣款成功,入账失败。 */
         @JvmStatic
-        fun okButNotBanked(reason: String?): EconomyResult =
+        public fun okButNotBanked(reason: String?): EconomyResult =
             EconomyResult(true, reason.orEmpty().ifBlank { "deposit to economy.account failed" }, true)
 
         @JvmStatic
-        fun fail(reason: String?): EconomyResult =
+        public fun fail(reason: String?): EconomyResult =
             EconomyResult(false, reason.orEmpty().ifBlank { "economy transaction failed" }, false)
     }
 }

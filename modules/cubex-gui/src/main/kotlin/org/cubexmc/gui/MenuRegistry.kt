@@ -15,18 +15,18 @@ import java.util.UUID
  * Tracks the open [Menu] per player and routes inventory events to it (AuctionHouse `GUIManager`
  * style). Replaces title-string matching plus central slot dispatch.
  */
-class MenuRegistry : Listener {
+public class MenuRegistry : Listener {
     private val open: MutableMap<UUID, Menu> = HashMap()
 
-    fun open(player: Player, menu: Menu) {
+    public fun open(player: Player, menu: Menu) {
         open[player.uniqueId] = menu
         player.openInventory(menu.inventory)
     }
 
     /** The menu this player currently has open, or null. Exposed for reload/shutdown handling. */
-    fun openMenu(playerId: UUID): Menu? = open[playerId]
+    public fun openMenu(playerId: UUID): Menu? = open[playerId]
 
-    fun closeAll() {
+    public fun closeAll() {
         for (playerId in ArrayList(open.keys)) {
             val player = Bukkit.getPlayer(playerId) ?: continue
             if (player.openInventory.topInventory === open[playerId]?.inventory) {
@@ -37,7 +37,7 @@ class MenuRegistry : Listener {
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
-    fun onClick(event: InventoryClickEvent) {
+    public fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val menu = open[player.uniqueId] ?: return
         if (event.view.topInventory !== menu.inventory) {
@@ -53,7 +53,7 @@ class MenuRegistry : Listener {
 
     /** Nothing in a menu is ever meant to move, so a drag over its slots is refused outright. */
     @EventHandler
-    fun onDrag(event: InventoryDragEvent) {
+    public fun onDrag(event: InventoryDragEvent) {
         val player = event.whoClicked as? Player ?: return
         val menu = open[player.uniqueId] ?: return
         if (event.view.topInventory === menu.inventory) {
@@ -62,7 +62,7 @@ class MenuRegistry : Listener {
     }
 
     @EventHandler
-    fun onClose(event: InventoryCloseEvent) {
+    public fun onClose(event: InventoryCloseEvent) {
         val playerId = event.player.uniqueId
         val menu = open[playerId] ?: return
         // Only drop tracking on a genuine close; a synchronous reopen has already swapped in a new menu.
@@ -73,7 +73,7 @@ class MenuRegistry : Listener {
     }
 
     @EventHandler
-    fun onQuit(event: PlayerQuitEvent) {
+    public fun onQuit(event: PlayerQuitEvent) {
         open.remove(event.player.uniqueId)
     }
 }

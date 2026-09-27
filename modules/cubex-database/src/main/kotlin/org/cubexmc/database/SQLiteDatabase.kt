@@ -13,7 +13,7 @@ import org.bukkit.plugin.Plugin
  * Those differ per plugin and stay in the plugin. This type only removes the duplicated
  * "resolve path, load driver, open connection, apply PRAGMAs" preamble.
  */
-class SQLiteDatabase @JvmOverloads constructor(
+public class SQLiteDatabase @JvmOverloads constructor(
     private val file: File,
     private val pragmas: SQLitePragmas = SQLitePragmas.none(),
     /**
@@ -32,7 +32,7 @@ class SQLiteDatabase @JvmOverloads constructor(
      * @param relativeOrAbsolutePath an absolute path, or a path relative to the plugin data folder.
      */
     @JvmOverloads
-    constructor(
+    public constructor(
         plugin: Plugin,
         relativeOrAbsolutePath: String,
         pragmas: SQLitePragmas = SQLitePragmas.none(),
@@ -45,16 +45,16 @@ class SQLiteDatabase @JvmOverloads constructor(
         ignorePragmaFailures,
     )
 
-    fun file(): File = file
+    public fun file(): File = file
 
     /** Creates the parent directory if missing. Returns false when it could not be created. */
-    fun ensureParentDirectory(): Boolean {
+    public fun ensureParentDirectory(): Boolean {
         val parent = file.parentFile ?: return true
         return parent.exists() || parent.mkdirs()
     }
 
     @Throws(SQLException::class)
-    fun openConnection(): Connection {
+    public fun openConnection(): Connection {
         loadDriver()
         val connection = DriverManager.getConnection(jdbcUrl())
         try {
@@ -69,7 +69,7 @@ class SQLiteDatabase @JvmOverloads constructor(
         return connection
     }
 
-    fun jdbcUrl(): String {
+    public fun jdbcUrl(): String {
         val base = "jdbc:sqlite:${file.absolutePath}"
         if (!mirrorBusyTimeoutInUrl) return base
         // As a URL parameter busy_timeout also covers the window before the PRAGMA statement itself

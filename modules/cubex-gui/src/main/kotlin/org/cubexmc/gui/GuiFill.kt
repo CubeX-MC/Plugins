@@ -11,7 +11,7 @@ import org.bukkit.inventory.ItemStack
  *
  * 摆完全部按钮**之后**再调用，否则会把还没放的位置提前占掉。
  */
-fun Inventory.fillEmpty(filler: ItemStack) {
+public fun Inventory.fillEmpty(filler: ItemStack) {
     for (slot in 0 until size) {
         if (getItem(slot) == null) {
             setItem(slot, filler)
@@ -20,6 +20,6 @@ fun Inventory.fillEmpty(filler: ItemStack) {
 }
 
 /** 同 [Inventory.fillEmpty]，作用于本菜单的界面。 */
-fun Menu.fillEmpty(filler: ItemStack) {
+public fun Menu.fillEmpty(filler: ItemStack) {
     inventory.fillEmpty(filler)
 }

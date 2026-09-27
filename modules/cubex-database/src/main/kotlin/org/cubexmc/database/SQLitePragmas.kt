@@ -7,7 +7,7 @@ package org.cubexmc.database
  * busy timeouts and journal settings — so nothing here has a "one true" default beyond SQLite's own.
  * A pragma left unset is not emitted at all, which keeps SQLite's default rather than guessing one.
  */
-class SQLitePragmas private constructor(
+public class SQLitePragmas private constructor(
     private val busyTimeoutMillis: Int?,
     private val wal: Boolean?,
     private val synchronous: String?,
@@ -16,7 +16,7 @@ class SQLitePragmas private constructor(
     private val cacheSizeKb: Int?,
 ) {
     /** The PRAGMA statements to run, in a stable order, for a freshly opened connection. */
-    fun statements(): List<String> {
+    public fun statements(): List<String> {
         val statements = ArrayList<String>(6)
         busyTimeoutMillis?.let { statements.add("PRAGMA busy_timeout = $it") }
         wal?.let { statements.add("PRAGMA journal_mode = ${if (it) "WAL" else "DELETE"}") }
@@ -29,9 +29,9 @@ class SQLitePragmas private constructor(
     }
 
     /** The busy timeout, if set, so a caller can mirror it into the JDBC URL as EcoBalancer does. */
-    fun busyTimeoutMillis(): Int? = busyTimeoutMillis
+    public fun busyTimeoutMillis(): Int? = busyTimeoutMillis
 
-    class Builder internal constructor() {
+    public class Builder internal constructor() {
         private var busyTimeoutMillis: Int? = null
         private var wal: Boolean? = null
         private var synchronous: String? = null
@@ -39,36 +39,36 @@ class SQLitePragmas private constructor(
         private var tempStoreMemory: Boolean? = null
         private var cacheSizeKb: Int? = null
 
-        fun busyTimeoutMillis(millis: Int): Builder = apply {
+        public fun busyTimeoutMillis(millis: Int): Builder = apply {
             require(millis >= 0) { "busy_timeout must not be negative: $millis" }
             busyTimeoutMillis = millis
         }
 
-        fun wal(enabled: Boolean): Builder = apply { wal = enabled }
+        public fun wal(enabled: Boolean): Builder = apply { wal = enabled }
 
-        fun synchronous(value: String?): Builder = apply {
+        public fun synchronous(value: String?): Builder = apply {
             synchronous = value?.takeUnless(String::isBlank)?.uppercase()
         }
 
-        fun foreignKeys(enabled: Boolean): Builder = apply { foreignKeys = enabled }
+        public fun foreignKeys(enabled: Boolean): Builder = apply { foreignKeys = enabled }
 
-        fun tempStoreMemory(enabled: Boolean): Builder = apply { tempStoreMemory = enabled }
+        public fun tempStoreMemory(enabled: Boolean): Builder = apply { tempStoreMemory = enabled }
 
-        fun cacheSizeKb(kilobytes: Int): Builder = apply {
+        public fun cacheSizeKb(kilobytes: Int): Builder = apply {
             require(kilobytes > 0) { "cache_size must be positive: $kilobytes" }
             cacheSizeKb = kilobytes
         }
 
-        fun build(): SQLitePragmas =
+        public fun build(): SQLitePragmas =
             SQLitePragmas(busyTimeoutMillis, wal, synchronous, foreignKeys, tempStoreMemory, cacheSizeKb)
     }
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun builder(): Builder = Builder()
+        public fun builder(): Builder = Builder()
 
         /** No PRAGMA statements at all; SQLite defaults apply. */
         @JvmStatic
-        fun none(): SQLitePragmas = builder().build()
+        public fun none(): SQLitePragmas = builder().build()
     }
 }

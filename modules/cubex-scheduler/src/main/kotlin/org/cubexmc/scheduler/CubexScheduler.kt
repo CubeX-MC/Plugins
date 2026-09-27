@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
 import kotlin.math.max
 
-class CubexScheduler private constructor(private val plugin: Plugin) {
+public class CubexScheduler private constructor(private val plugin: Plugin) {
     private val tasks: MutableSet<ManagedCubexTask> = ConcurrentHashMap.newKeySet()
 
     @Volatile
@@ -20,25 +20,25 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
     @Volatile
     private var foliaInitFailed = false
 
-    fun plugin(): Plugin = plugin
+    public fun plugin(): Plugin = plugin
 
-    val isFolia: Boolean
+    public val isFolia: Boolean
         get() = foliaLib()?.isFolia == true
 
-    val isPaper: Boolean
+    public val isPaper: Boolean
         get() = foliaLib()?.isPaper == true
 
-    val isSpigot: Boolean
+    public val isSpigot: Boolean
         get() = foliaLib()?.isSpigot == true
 
-    fun runGlobal(task: Runnable): CubexTask = runGlobalLater(task, 0L)
+    public fun runGlobal(task: Runnable): CubexTask = runGlobalLater(task, 0L)
 
-    fun runGlobal(task: Consumer<CubexTask>): CubexTask = runGlobalLater(task, 0L)
+    public fun runGlobal(task: Consumer<CubexTask>): CubexTask = runGlobalLater(task, 0L)
 
-    fun runGlobalLater(task: Runnable, delayTicks: Long): CubexTask =
+    public fun runGlobalLater(task: Runnable, delayTicks: Long): CubexTask =
         runGlobalLater(Consumer { task.run() }, delayTicks)
 
-    fun runGlobalLater(task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
+    public fun runGlobalLater(task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
         val delay = max(0L, delayTicks)
         val managed = newTask()
         val wrapped = oneShot(managed, task)
@@ -62,10 +62,10 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun runGlobalTimer(task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
+    public fun runGlobalTimer(task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
         runGlobalTimer(Consumer { task.run() }, delayTicks, periodTicks)
 
-    fun runGlobalTimer(task: Consumer<CubexTask>, delayTicks: Long, periodTicks: Long): CubexTask {
+    public fun runGlobalTimer(task: Consumer<CubexTask>, delayTicks: Long, periodTicks: Long): CubexTask {
         val delay = max(1L, delayTicks)
         val period = max(1L, periodTicks)
         val managed = newTask()
@@ -77,14 +77,14 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun runAsync(task: Runnable): CubexTask = runAsyncLater(task, 0L)
+    public fun runAsync(task: Runnable): CubexTask = runAsyncLater(task, 0L)
 
-    fun runAsync(task: Consumer<CubexTask>): CubexTask = runAsyncLater(task, 0L)
+    public fun runAsync(task: Consumer<CubexTask>): CubexTask = runAsyncLater(task, 0L)
 
-    fun runAsyncLater(task: Runnable, delayTicks: Long): CubexTask =
+    public fun runAsyncLater(task: Runnable, delayTicks: Long): CubexTask =
         runAsyncLater(Consumer { task.run() }, delayTicks)
 
-    fun runAsyncLater(task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
+    public fun runAsyncLater(task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
         val delay = max(0L, delayTicks)
         val managed = newTask()
         val wrapped = oneShot(managed, task)
@@ -104,10 +104,10 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun runAsyncTimer(task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
+    public fun runAsyncTimer(task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
         runAsyncTimer(Consumer { task.run() }, delayTicks, periodTicks)
 
-    fun runAsyncTimer(task: Consumer<CubexTask>, delayTicks: Long, periodTicks: Long): CubexTask {
+    public fun runAsyncTimer(task: Consumer<CubexTask>, delayTicks: Long, periodTicks: Long): CubexTask {
         val delay = max(1L, delayTicks)
         val period = max(1L, periodTicks)
         val managed = newTask()
@@ -119,14 +119,14 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun runAtEntity(entity: Entity, task: Runnable): CubexTask = runAtEntityLater(entity, task, 0L)
+    public fun runAtEntity(entity: Entity, task: Runnable): CubexTask = runAtEntityLater(entity, task, 0L)
 
-    fun runAtEntity(entity: Entity, task: Consumer<CubexTask>): CubexTask = runAtEntityLater(entity, task, 0L)
+    public fun runAtEntity(entity: Entity, task: Consumer<CubexTask>): CubexTask = runAtEntityLater(entity, task, 0L)
 
-    fun runAtEntityLater(entity: Entity, task: Runnable, delayTicks: Long): CubexTask =
+    public fun runAtEntityLater(entity: Entity, task: Runnable, delayTicks: Long): CubexTask =
         runAtEntityLater(entity, Consumer { task.run() }, delayTicks)
 
-    fun runAtEntityLater(entity: Entity, task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
+    public fun runAtEntityLater(entity: Entity, task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
         val delay = max(0L, delayTicks)
         val managed = newTask()
         val wrapped = oneShot(managed, task)
@@ -151,10 +151,10 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun runAtEntityTimer(entity: Entity, task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
+    public fun runAtEntityTimer(entity: Entity, task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
         runAtEntityTimer(entity, Consumer { task.run() }, delayTicks, periodTicks)
 
-    fun runAtEntityTimer(
+    public fun runAtEntityTimer(
         entity: Entity,
         task: Consumer<CubexTask>,
         delayTicks: Long,
@@ -171,14 +171,14 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun runAtLocation(location: Location, task: Runnable): CubexTask = runAtLocationLater(location, task, 0L)
+    public fun runAtLocation(location: Location, task: Runnable): CubexTask = runAtLocationLater(location, task, 0L)
 
-    fun runAtLocation(location: Location, task: Consumer<CubexTask>): CubexTask = runAtLocationLater(location, task, 0L)
+    public fun runAtLocation(location: Location, task: Consumer<CubexTask>): CubexTask = runAtLocationLater(location, task, 0L)
 
-    fun runAtLocationLater(location: Location, task: Runnable, delayTicks: Long): CubexTask =
+    public fun runAtLocationLater(location: Location, task: Runnable, delayTicks: Long): CubexTask =
         runAtLocationLater(location, Consumer { task.run() }, delayTicks)
 
-    fun runAtLocationLater(location: Location, task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
+    public fun runAtLocationLater(location: Location, task: Consumer<CubexTask>, delayTicks: Long): CubexTask {
         val delay = max(0L, delayTicks)
         val managed = newTask()
         val wrapped = oneShot(managed, task)
@@ -203,10 +203,10 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun runAtLocationTimer(location: Location, task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
+    public fun runAtLocationTimer(location: Location, task: Runnable, delayTicks: Long, periodTicks: Long): CubexTask =
         runAtLocationTimer(location, Consumer { task.run() }, delayTicks, periodTicks)
 
-    fun runAtLocationTimer(
+    public fun runAtLocationTimer(
         location: Location,
         task: Consumer<CubexTask>,
         delayTicks: Long,
@@ -223,7 +223,7 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         return managed
     }
 
-    fun teleportAsync(entity: Entity, location: Location): CompletableFuture<Boolean> {
+    public fun teleportAsync(entity: Entity, location: Location): CompletableFuture<Boolean> {
         val lib = foliaLib()
         if (lib != null) return lib.scheduler.teleportAsync(entity, location)
         return try {
@@ -233,7 +233,7 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         }
     }
 
-    fun cancelAll() {
+    public fun cancelAll() {
         tasks.toTypedArray().forEach { it.cancel() }
         foliaLib?.let { lib ->
             try {
@@ -275,19 +275,19 @@ class CubexScheduler private constructor(private val plugin: Plugin) {
         }
     }
 
-    companion object {
+    public companion object {
         private val FOLIA: Boolean = probeFolia()
 
         @JvmStatic
-        fun bindTo(plugin: CubexPlugin): CubexScheduler =
+        public fun bindTo(plugin: CubexPlugin): CubexScheduler =
             CubexScheduler(plugin).also { scheduler -> plugin.bind(Runnable { scheduler.cancelAll() }) }
 
         @JvmStatic
-        fun create(plugin: Plugin): CubexScheduler =
+        public fun create(plugin: Plugin): CubexScheduler =
             if (plugin is CubexPlugin) bindTo(plugin) else CubexScheduler(plugin)
 
         @JvmStatic
-        fun detectFolia(): Boolean = FOLIA
+        public fun detectFolia(): Boolean = FOLIA
 
         private fun probeFolia(): Boolean = try {
             Class.forName("io.papermc.paper.threadedregions.RegionizedServer")

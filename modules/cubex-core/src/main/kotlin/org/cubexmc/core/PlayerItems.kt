@@ -11,14 +11,14 @@ import org.bukkit.inventory.PlayerInventory
  * 写回是关键——主手、副手、四件盔甲、背包下标、末影箱各有各的 setter，
  * 调用方拿到 [ItemSlot] 就不必再关心"这一格该用哪个 API 放回去"。
  */
-class ItemSlot(
+public class ItemSlot(
     /** 人类可读的位置标识，例如 `hand`、`equipment[helmet]`、`inventory[12]`。 */
-    val label: String,
-    val stack: ItemStack?,
+    public val label: String,
+    public val stack: ItemStack?,
     private val setter: (ItemStack?) -> Unit,
 ) {
     /** 把这一格换成 [stack]；传 null 表示清空。 */
-    fun replace(stack: ItemStack?) {
+    public fun replace(stack: ItemStack?) {
         setter(stack)
     }
 }
@@ -32,10 +32,10 @@ class ItemSlot(
  *
  * 标签格式与 Clarity 下沉前逐字一致，因为它会出现在命令输出里。
  */
-object PlayerItems {
+public object PlayerItems {
 
     /** 主手。 */
-    fun handSlot(player: Player): ItemSlot {
+    public fun handSlot(player: Player): ItemSlot {
         val inventory = player.inventory
         return ItemSlot("hand", inventory.itemInMainHand) { inventory.setItemInMainHand(it) }
     }
@@ -46,7 +46,7 @@ object PlayerItems {
      * 用 `storageContents` 而不是 `contents`：后者在 [PlayerInventory] 上还会带出
      * 盔甲与副手，与 [equipmentSlots] 重复。
      */
-    fun storageSlots(player: Player): List<ItemSlot> {
+    public fun storageSlots(player: Player): List<ItemSlot> {
         val inventory = player.inventory
         return inventory.storageContents.mapIndexed { index, stack ->
             ItemSlot("inventory[$index]", stack) { inventory.setItem(index, it) }
@@ -54,7 +54,7 @@ object PlayerItems {
     }
 
     /** 副手与四件盔甲。 */
-    fun equipmentSlots(player: Player): List<ItemSlot> {
+    public fun equipmentSlots(player: Player): List<ItemSlot> {
         val inventory = player.inventory
         return listOf(
             ItemSlot("equipment[offhand]", inventory.itemInOffHand) { inventory.setItemInOffHand(it) },
@@ -66,15 +66,15 @@ object PlayerItems {
     }
 
     /** 末影箱。 */
-    fun enderSlots(player: Player): List<ItemSlot> = inventorySlots("ender", player.enderChest)
+    public fun enderSlots(player: Player): List<ItemSlot> = inventorySlots("ender", player.enderChest)
 
     /** 任意容器（箱子、潜影盒界面等）。 */
-    fun inventorySlots(label: String, inventory: Inventory): List<ItemSlot> =
+    public fun inventorySlots(label: String, inventory: Inventory): List<ItemSlot> =
         (0 until inventory.size).map { index ->
             ItemSlot("$label[$index]", inventory.getItem(index)) { inventory.setItem(index, it) }
         }
 
     /** 背包 + 装备 + 末影箱。**不含**主手——它已经在背包存储区里了。 */
-    fun allSlots(player: Player): List<ItemSlot> =
+    public fun allSlots(player: Player): List<ItemSlot> =
         storageSlots(player) + equipmentSlots(player) + enderSlots(player)
 }

@@ -7,7 +7,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 /**
  * A thread-safe, generic octree for spatial indexing.
  */
-class Octree<T> {
+public class Octree<T> {
     private val boundary: Range3D
     private val maxDepth: Int
     private val maxItems: Int
@@ -16,7 +16,7 @@ class Octree<T> {
     private var children: Array<Octree<T>>? = null
     private var depth: Int
 
-    constructor(boundary: Range3D, maxDepth: Int, maxItems: Int) : this(boundary, maxDepth, maxItems, 0)
+    public constructor(boundary: Range3D, maxDepth: Int, maxItems: Int) : this(boundary, maxDepth, maxItems, 0)
 
     private constructor(boundary: Range3D, maxDepth: Int, maxItems: Int, depth: Int) {
         this.boundary = boundary
@@ -25,7 +25,7 @@ class Octree<T> {
         this.depth = depth
     }
 
-    fun insert(range: Range3D, data: T): Boolean {
+    public fun insert(range: Range3D, data: T): Boolean {
         lock.writeLock().lock()
         try {
             if (!boundary.intersects(range)) return false
@@ -50,7 +50,7 @@ class Octree<T> {
         }
     }
 
-    fun remove(range: Range3D): Boolean {
+    public fun remove(range: Range3D): Boolean {
         lock.writeLock().lock()
         try {
             if (items.remove(range) != null) return true
@@ -69,7 +69,7 @@ class Octree<T> {
         }
     }
 
-    fun firstRange(point: Point3D): T? {
+    public fun firstRange(point: Point3D): T? {
         lock.readLock().lock()
         try {
             if (!boundary.contains(point)) return null
@@ -93,7 +93,7 @@ class Octree<T> {
         }
     }
 
-    fun getAllRanges(point: Point3D): List<T> {
+    public fun getAllRanges(point: Point3D): List<T> {
         val results = ArrayList<T>()
         lock.readLock().lock()
         try {
@@ -146,7 +146,7 @@ class Octree<T> {
         }
     }
 
-    fun clear() {
+    public fun clear() {
         lock.writeLock().lock()
         try {
             items.clear()

@@ -4,30 +4,30 @@ import net.kyori.adventure.text.Component
 import org.bukkit.command.CommandSender
 import org.cubexmc.core.Reloadable
 
-interface I18nService : Reloadable {
-    fun currentLocale(): String
-    fun setCurrentLocale(locale: String?)
+public interface I18nService : Reloadable {
+    public fun currentLocale(): String
+    public fun setCurrentLocale(locale: String?)
     override fun reload()
-    fun raw(key: String?): String
-    fun raw(key: String?, locale: String?): String
-    fun rawOrNull(key: String?): String?
-    fun rawOrNull(key: String?, locale: String?): String?
-    fun rawList(key: String?): List<String>
-    fun rawList(key: String?, locale: String?): List<String>
-    fun message(key: String?): String
-    fun message(key: String?, placeholders: Map<String, *>?): String
-    fun message(key: String?, locale: String?, placeholders: Map<String, *>?): String
-    fun message(key: String?, vararg positionalArgs: Any?): String
-    fun messageList(key: String?, placeholders: Map<String, *>?): List<String>
-    fun messageList(key: String?, locale: String?, placeholders: Map<String, *>?): List<String>
+    public fun raw(key: String?): String
+    public fun raw(key: String?, locale: String?): String
+    public fun rawOrNull(key: String?): String?
+    public fun rawOrNull(key: String?, locale: String?): String?
+    public fun rawList(key: String?): List<String>
+    public fun rawList(key: String?, locale: String?): List<String>
+    public fun message(key: String?): String
+    public fun message(key: String?, placeholders: Map<String, *>?): String
+    public fun message(key: String?, locale: String?, placeholders: Map<String, *>?): String
+    public fun message(key: String?, vararg positionalArgs: Any?): String
+    public fun messageList(key: String?, placeholders: Map<String, *>?): List<String>
+    public fun messageList(key: String?, locale: String?, placeholders: Map<String, *>?): List<String>
     /** Renders a caller-owned template through the same prefix/placeholder/color pipeline. */
-    fun render(template: String?, placeholders: Map<String, *>?): String
-    fun component(key: String?): Component
-    fun component(key: String?, placeholders: Map<String, *>?): Component
-    fun component(key: String?, locale: String?, placeholders: Map<String, *>?): Component
-    fun componentList(key: String?, placeholders: Map<String, *>?): List<Component>
-    fun componentList(key: String?, locale: String?, placeholders: Map<String, *>?): List<Component>
-    fun componentOf(renderedMessage: String?): Component
-    fun send(sender: CommandSender?, key: String?, placeholders: Map<String, *>?)
-    fun send(sender: CommandSender?, key: String?, locale: String?, placeholders: Map<String, *>?)
+    public fun render(template: String?, placeholders: Map<String, *>?): String
+    public fun component(key: String?): Component
+    public fun component(key: String?, placeholders: Map<String, *>?): Component
+    public fun component(key: String?, locale: String?, placeholders: Map<String, *>?): Component
+    public fun componentList(key: String?, placeholders: Map<String, *>?): List<Component>
+    public fun componentList(key: String?, locale: String?, placeholders: Map<String, *>?): List<Component>
+    public fun componentOf(renderedMessage: String?): Component
+    public fun send(sender: CommandSender?, key: String?, placeholders: Map<String, *>?)
+    public fun send(sender: CommandSender?, key: String?, locale: String?, placeholders: Map<String, *>?)
 }

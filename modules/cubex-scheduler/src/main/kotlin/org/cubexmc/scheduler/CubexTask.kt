@@ -2,12 +2,12 @@ package org.cubexmc.scheduler
 
 import org.cubexmc.core.Terminable
 
-interface CubexTask : Terminable {
-    fun cancel()
+public interface CubexTask : Terminable {
+    public fun cancel()
 
-    fun isCancelled(): Boolean
+    public fun isCancelled(): Boolean
 
-    fun nativeHandle(): Any?
+    public fun nativeHandle(): Any?
 
-    override fun close() = cancel()
+    override fun close(): Unit = cancel()
 }

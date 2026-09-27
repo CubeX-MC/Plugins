@@ -17,13 +17,13 @@ import org.bukkit.persistence.PersistentDataType
  * that render through `cubex-i18n` hand in already-styled text. Passing the wrong styler would either
  * double-process or leave raw codes visible, so it is an explicit constructor argument.
  */
-fun interface TextStyler {
-    fun style(input: String): String
+public fun interface TextStyler {
+    public fun style(input: String): String
 
-    companion object {
+    public companion object {
         /** Leaves text exactly as given — correct for output already rendered by `cubex-i18n`. */
         @JvmField
-        val NONE: TextStyler = TextStyler { it }
+        public val NONE: TextStyler = TextStyler { it }
     }
 }
 
@@ -34,7 +34,7 @@ fun interface TextStyler {
  * The builder mutates one [ItemMeta] and only writes it back in [build], so a builder can be reused
  * up to the point it is built.
  */
-class ItemBuilder @JvmOverloads constructor(
+public class ItemBuilder @JvmOverloads constructor(
     material: Material,
     amount: Int = 1,
     private val styler: TextStyler = TextStyler.NONE,
@@ -43,73 +43,73 @@ class ItemBuilder @JvmOverloads constructor(
     private val meta: ItemMeta? = item.itemMeta
     private val loreLines: MutableList<String> = ArrayList()
 
-    fun name(name: String?): ItemBuilder = apply {
+    public fun name(name: String?): ItemBuilder = apply {
         if (name != null) meta?.setDisplayName(styler.style(name))
     }
 
-    fun amount(amount: Int): ItemBuilder = apply {
+    public fun amount(amount: Int): ItemBuilder = apply {
         item.amount = amount.coerceIn(1, item.maxStackSize.coerceAtLeast(1))
     }
 
     /** Replaces the whole lore. */
-    fun lore(vararg lines: String?): ItemBuilder = lore(lines.toList())
+    public fun lore(vararg lines: String?): ItemBuilder = lore(lines.toList())
 
     /** Replaces the whole lore. */
-    fun lore(lines: List<String?>?): ItemBuilder = apply {
+    public fun lore(lines: List<String?>?): ItemBuilder = apply {
         loreLines.clear()
         lines?.forEach { line -> if (line != null) loreLines.add(styler.style(line)) }
     }
 
-    fun addLore(vararg lines: String?): ItemBuilder = apply {
+    public fun addLore(vararg lines: String?): ItemBuilder = apply {
         lines.forEach { line -> if (line != null) loreLines.add(styler.style(line)) }
     }
 
-    fun addLore(lines: List<String?>?): ItemBuilder = apply {
+    public fun addLore(lines: List<String?>?): ItemBuilder = apply {
         lines?.forEach { line -> if (line != null) loreLines.add(styler.style(line)) }
     }
 
-    fun addEmptyLore(): ItemBuilder = apply { loreLines.add("") }
+    public fun addEmptyLore(): ItemBuilder = apply { loreLines.add("") }
 
-    fun enchant(enchantment: Enchantment, level: Int): ItemBuilder = apply {
+    public fun enchant(enchantment: Enchantment, level: Int): ItemBuilder = apply {
         meta?.addEnchant(enchantment, level, true)
     }
 
     /** The enchanted shimmer without a real enchantment, used to mark a selected button. */
-    fun glow(): ItemBuilder = apply {
+    public fun glow(): ItemBuilder = apply {
         val currentMeta = meta ?: return@apply
         GLOW_ENCHANTMENT?.let { currentMeta.addEnchant(it, 1, true) }
         currentMeta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
     }
 
     /** Prefer a cosmetic glint override; older servers use the harmless fishing enchantment. */
-    fun cosmeticGlow(): ItemBuilder = apply { applyGlowEffect(meta) }
+    public fun cosmeticGlow(): ItemBuilder = apply { applyGlowEffect(meta) }
 
     /** Hide decorative item details without changing [hideAttributes]'s existing contract. */
-    fun hideDetails(): ItemBuilder = apply {
+    public fun hideDetails(): ItemBuilder = apply {
         meta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_UNBREAKABLE)
         runCatching { ItemFlag.valueOf("HIDE_POTION_EFFECTS") }.getOrNull()?.let { meta?.addItemFlags(it) }
     }
 
-    fun flags(vararg flags: ItemFlag): ItemBuilder = apply {
+    public fun flags(vararg flags: ItemFlag): ItemBuilder = apply {
         if (flags.isNotEmpty()) meta?.addItemFlags(*flags)
     }
 
-    fun hideAttributes(): ItemBuilder = apply { meta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES) }
+    public fun hideAttributes(): ItemBuilder = apply { meta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES) }
 
-    fun customModelData(data: Int?): ItemBuilder = apply { meta?.setCustomModelData(data) }
+    public fun customModelData(data: Int?): ItemBuilder = apply { meta?.setCustomModelData(data) }
 
-    fun skullOwner(player: OfflinePlayer?): ItemBuilder = apply {
+    public fun skullOwner(player: OfflinePlayer?): ItemBuilder = apply {
         val currentMeta = meta
         if (currentMeta is SkullMeta && player != null) currentMeta.owningPlayer = player
     }
 
-    fun data(key: NamespacedKey?, value: String?): ItemBuilder = apply {
+    public fun data(key: NamespacedKey?, value: String?): ItemBuilder = apply {
         if (key != null && value != null) {
             meta?.persistentDataContainer?.set(key, PersistentDataType.STRING, value)
         }
     }
 
-    fun data(key: NamespacedKey?, value: Int): ItemBuilder = apply {
+    public fun data(key: NamespacedKey?, value: Int): ItemBuilder = apply {
         if (key != null) meta?.persistentDataContainer?.set(key, PersistentDataType.INTEGER, value)
     }
 
@@ -117,22 +117,22 @@ class ItemBuilder @JvmOverloads constructor(
      * Tags this stack as a GUI button. Any button that escapes into a player's inventory can then be
      * recognised and removed — Metro added this after buttons leaked into survival inventories.
      */
-    fun guiMarker(key: NamespacedKey?): ItemBuilder = apply {
+    public fun guiMarker(key: NamespacedKey?): ItemBuilder = apply {
         if (key != null) {
             meta?.persistentDataContainer?.set(key, PersistentDataType.BYTE, 1.toByte())
         }
     }
 
-    fun build(): ItemStack {
+    public fun build(): ItemStack {
         val currentMeta = meta ?: return item
         if (loreLines.isNotEmpty()) currentMeta.lore = ArrayList(loreLines)
         item.itemMeta = currentMeta
         return item
     }
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun applyGlowEffect(meta: ItemMeta?) {
+        public fun applyGlowEffect(meta: ItemMeta?) {
             if (meta == null) return
             try {
                 val method = meta.javaClass.getMethod("setEnchantmentGlintOverride", java.lang.Boolean::class.java)
@@ -172,7 +172,7 @@ class ItemBuilder @JvmOverloads constructor(
 
         @JvmStatic
         @JvmOverloads
-        fun of(material: Material, styler: TextStyler = TextStyler.NONE): ItemBuilder =
+        public fun of(material: Material, styler: TextStyler = TextStyler.NONE): ItemBuilder =
             ItemBuilder(material, 1, styler)
     }
 }

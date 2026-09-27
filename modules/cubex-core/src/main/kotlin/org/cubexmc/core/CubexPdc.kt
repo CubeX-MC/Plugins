@@ -18,13 +18,13 @@ import org.bukkit.persistence.PersistentDataType
  *
  * 纯解码逻辑放在 [CubexPdc]，扩展函数只是薄薄一层 —— 这样解码能被单测直接覆盖，不需要 mock 服务器。
  */
-object CubexPdc {
+public object CubexPdc {
 
     /** 标记位写入的值。读取一律按"键是否存在"判断，与下沉前各插件的 `has(key, BYTE)` 语义一致。 */
-    const val FLAG_VALUE: Byte = 1
+    public const val FLAG_VALUE: Byte = 1
 
     /** 解析 UUID；空值或格式不合法都返回 null，绝不抛。 */
-    fun decodeUuid(raw: String?): UUID? {
+    public fun decodeUuid(raw: String?): UUID? {
         if (raw.isNullOrEmpty()) return null
         return try {
             UUID.fromString(raw)
@@ -39,7 +39,7 @@ object CubexPdc {
      * 用 `valueOf` 会抛 `IllegalArgumentException` —— 枚举增删项是很常见的版本演进，
      * 旧存档里留着已删除的名字不该让插件炸掉。
      */
-    fun <E : Enum<E>> decodeEnum(raw: String?, values: Array<E>): E? {
+    public fun <E : Enum<E>> decodeEnum(raw: String?, values: Array<E>): E? {
         if (raw.isNullOrEmpty()) return null
         return values.firstOrNull { it.name == raw }
     }
@@ -48,43 +48,43 @@ object CubexPdc {
 // —— 布尔标记（底层是 BYTE）——
 
 /** 是否带有该标记。按键是否存在判断，忽略值——与下沉前各处的 `has(key, BYTE)` 完全一致。 */
-fun PersistentDataContainer.hasFlag(key: NamespacedKey): Boolean = has(key, PersistentDataType.BYTE)
+public fun PersistentDataContainer.hasFlag(key: NamespacedKey): Boolean = has(key, PersistentDataType.BYTE)
 
-fun PersistentDataContainer.setFlag(key: NamespacedKey) {
+public fun PersistentDataContainer.setFlag(key: NamespacedKey) {
     set(key, PersistentDataType.BYTE, CubexPdc.FLAG_VALUE)
 }
 
-fun PersistentDataContainer.clearFlag(key: NamespacedKey) {
+public fun PersistentDataContainer.clearFlag(key: NamespacedKey) {
     remove(key)
 }
 
 // —— UUID（底层是 STRING）——
 
 /** 读 UUID；缺失或格式损坏都返回 null。 */
-fun PersistentDataContainer.getUuid(key: NamespacedKey): UUID? =
+public fun PersistentDataContainer.getUuid(key: NamespacedKey): UUID? =
     CubexPdc.decodeUuid(get(key, PersistentDataType.STRING))
 
-fun PersistentDataContainer.setUuid(key: NamespacedKey, value: UUID) {
+public fun PersistentDataContainer.setUuid(key: NamespacedKey, value: UUID) {
     set(key, PersistentDataType.STRING, value.toString())
 }
 
 // —— 枚举（底层是 STRING，存 name）——
 
 /** 读枚举；缺失或名字已不存在都返回 null。 */
-inline fun <reified E : Enum<E>> PersistentDataContainer.getEnum(key: NamespacedKey): E? =
+public inline fun <reified E : Enum<E>> PersistentDataContainer.getEnum(key: NamespacedKey): E? =
     CubexPdc.decodeEnum(get(key, PersistentDataType.STRING), enumValues<E>())
 
-fun <E : Enum<E>> PersistentDataContainer.setEnum(key: NamespacedKey, value: E) {
+public fun <E : Enum<E>> PersistentDataContainer.setEnum(key: NamespacedKey, value: E) {
     set(key, PersistentDataType.STRING, value.name)
 }
 
 // —— 基础类型的带默认值读取 ——
 
-fun PersistentDataContainer.getStringOr(key: NamespacedKey, fallback: String): String =
+public fun PersistentDataContainer.getStringOr(key: NamespacedKey, fallback: String): String =
     get(key, PersistentDataType.STRING) ?: fallback
 
-fun PersistentDataContainer.getIntOr(key: NamespacedKey, fallback: Int): Int =
+public fun PersistentDataContainer.getIntOr(key: NamespacedKey, fallback: Int): Int =
     get(key, PersistentDataType.INTEGER) ?: fallback
 
-fun PersistentDataContainer.getLongOr(key: NamespacedKey, fallback: Long): Long =
+public fun PersistentDataContainer.getLongOr(key: NamespacedKey, fallback: Long): Long =
     get(key, PersistentDataType.LONG) ?: fallback

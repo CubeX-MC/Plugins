@@ -1,6 +1,6 @@
 package org.cubexmc.core
 
-fun interface Reloadable {
+public fun interface Reloadable {
     @Throws(Exception::class)
-    fun reload()
+    public fun reload()
 }

@@ -3,7 +3,7 @@ package org.cubexmc.core
 import java.util.Locale
 
 /** Shared, platform-neutral guards for Bukkit- and Paper-style command completion callbacks. */
-object CubexCommandSuggestions {
+public object CubexCommandSuggestions {
     /**
      * Completes the root argument when the platform supplies zero or one argument.
      *
@@ -13,13 +13,13 @@ object CubexCommandSuggestions {
      * It returns `null` once deeper arguments are present so the caller can continue routing.
      */
     @JvmStatic
-    fun root(arguments: Array<out String>, candidates: Iterable<String>): List<String>? {
+    public fun root(arguments: Array<out String>, candidates: Iterable<String>): List<String>? {
         if (arguments.size > 1) return null
         return matching(candidates, arguments.firstOrNull().orEmpty())
     }
 
     @JvmStatic
-    fun matching(candidates: Iterable<String>, prefix: String): List<String> {
+    public fun matching(candidates: Iterable<String>, prefix: String): List<String> {
         val normalizedPrefix = prefix.lowercase(Locale.ROOT)
         return candidates.filter { it.lowercase(Locale.ROOT).startsWith(normalizedPrefix) }
     }

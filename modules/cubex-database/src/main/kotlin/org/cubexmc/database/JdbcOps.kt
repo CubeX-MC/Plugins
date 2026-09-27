@@ -4,19 +4,19 @@ import java.sql.Connection
 import java.sql.SQLException
 
 /** A connection-scoped action that is allowed to fail with [SQLException]. */
-fun interface SQLFunction<T> {
+public fun interface SQLFunction<T> {
     @Throws(SQLException::class)
-    fun apply(connection: Connection): T
+    public fun apply(connection: Connection): T
 }
 
 /**
  * Small try-with-resources helpers for the per-operation connection style used by
  * EcoBalancer and RuleGems. Plugins holding one long-lived connection (BookLite) do not need these.
  */
-object JdbcOps {
+public object JdbcOps {
     @JvmStatic
     @Throws(SQLException::class)
-    fun <T> withConnection(database: SQLiteDatabase, action: SQLFunction<T>): T =
+    public fun <T> withConnection(database: SQLiteDatabase, action: SQLFunction<T>): T =
         database.openConnection().use { connection -> action.apply(connection) }
 
     /**
@@ -25,7 +25,7 @@ object JdbcOps {
      */
     @JvmStatic
     @Throws(SQLException::class)
-    fun <T> inTransaction(database: SQLiteDatabase, action: SQLFunction<T>): T =
+    public fun <T> inTransaction(database: SQLiteDatabase, action: SQLFunction<T>): T =
         database.openConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false

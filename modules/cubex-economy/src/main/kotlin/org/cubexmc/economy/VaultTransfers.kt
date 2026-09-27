@@ -13,14 +13,14 @@ import java.util.logging.Logger
  * do not retry or refund blindly; the operator must reconcile it with the economy provider.
  * Call on the server thread. This is not a durable transaction or a crash recovery journal.
  */
-class VaultTransfers @JvmOverloads constructor(
+public class VaultTransfers @JvmOverloads constructor(
     private val economy: Economy,
     private val lookup: OfflinePlayerLookup = BukkitOfflinePlayerLookup,
     private val logger: Logger = Logger.getLogger("CubeX"),
 ) {
-    enum class Result { SUCCESS, NO_ECONOMY, INVALID_AMOUNT, INSUFFICIENT, ROLLBACK_FAILED, REVIEW_REQUIRED, FAILED }
+    public enum class Result { SUCCESS, NO_ECONOMY, INVALID_AMOUNT, INSUFFICIENT, ROLLBACK_FAILED, REVIEW_REQUIRED, FAILED }
 
-    fun transfer(fromName: String, toName: String, amount: Double): Result {
+    public fun transfer(fromName: String, toName: String, amount: Double): Result {
         if (!amount.isFinite() || amount <= 0.0) return Result.INVALID_AMOUNT
         val from: Account
         val to: Account
@@ -104,9 +104,9 @@ class VaultTransfers @JvmOverloads constructor(
         class Bank(val name: String) : Account
     }
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun hook(plugin: Plugin): VaultTransfers? {
+        public fun hook(plugin: Plugin): VaultTransfers? {
             val vault = plugin.server.pluginManager.getPlugin("Vault") ?: return null
             if (!vault.isEnabled) return null
             val registration = plugin.server.servicesManager.getRegistration(Economy::class.java) ?: return null

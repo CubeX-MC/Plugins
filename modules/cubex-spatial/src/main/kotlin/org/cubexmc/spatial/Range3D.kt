@@ -3,7 +3,7 @@ package org.cubexmc.spatial
 /**
  * An immutable, axis-aligned 3D bounding box (AABB).
  */
-class Range3D(
+public class Range3D(
     x1: Double,
     y1: Double,
     z1: Double,
@@ -11,22 +11,22 @@ class Range3D(
     y2: Double,
     z2: Double,
 ) {
-    @JvmField val minX: Double = kotlin.math.min(x1, x2)
-    @JvmField val minY: Double = kotlin.math.min(y1, y2)
-    @JvmField val minZ: Double = kotlin.math.min(z1, z2)
-    @JvmField val maxX: Double = kotlin.math.max(x1, x2)
-    @JvmField val maxY: Double = kotlin.math.max(y1, y2)
-    @JvmField val maxZ: Double = kotlin.math.max(z1, z2)
+    @JvmField public val minX: Double = kotlin.math.min(x1, x2)
+    @JvmField public val minY: Double = kotlin.math.min(y1, y2)
+    @JvmField public val minZ: Double = kotlin.math.min(z1, z2)
+    @JvmField public val maxX: Double = kotlin.math.max(x1, x2)
+    @JvmField public val maxY: Double = kotlin.math.max(y1, y2)
+    @JvmField public val maxZ: Double = kotlin.math.max(z1, z2)
 
-    fun contains(p: Point3D): Boolean =
+    public fun contains(p: Point3D): Boolean =
         p.x >= minX && p.x < maxX && p.y >= minY && p.y < maxY && p.z >= minZ && p.z < maxZ
 
-    fun intersects(o: Range3D): Boolean =
+    public fun intersects(o: Range3D): Boolean =
         (minX <= o.maxX && maxX >= o.minX) &&
             (minY <= o.maxY && maxY >= o.minY) &&
             (minZ <= o.maxZ && maxZ >= o.minZ)
 
-    fun subdivide(): Array<Range3D> {
+    public fun subdivide(): Array<Range3D> {
         val mx = (minX + maxX) / 2
         val my = (minY + maxY) / 2
         val mz = (minZ + maxZ) / 2

@@ -18,7 +18,7 @@ import org.bukkit.plugin.EventExecutor
  * 或者监听器本身有状态时，照旧写 `Listener` 并用 `CubexPlugin.registerListener`。
  * 这层糖只覆盖“一个事件 → 一段逻辑”的常见情形。
  */
-object CubexEvents {
+public object CubexEvents {
 
     /**
      * 构造只对 [type] 生效的 [EventExecutor]。
@@ -26,7 +26,7 @@ object CubexEvents {
      * Bukkit 会把**子类事件**也派发给父类的注册（例如注册 `PlayerEvent` 会收到 `PlayerJoinEvent`），
      * 所以这里必须再做一次类型检查，否则 `handler` 会拿到它并不想要的事件。
      */
-    fun <T : Event> executor(type: Class<T>, handler: (T) -> Unit): EventExecutor =
+    public fun <T : Event> executor(type: Class<T>, handler: (T) -> Unit): EventExecutor =
         EventExecutor { _, event ->
             if (type.isInstance(event)) {
                 handler(type.cast(event))
@@ -42,7 +42,7 @@ object CubexEvents {
  *
  * 需要在编译期就知道事件类型时用 [onEvent]，本函数是它的非 inline 落点。
  */
-fun <T : Event> CubexPlugin.registerEventHandler(
+public fun <T : Event> CubexPlugin.registerEventHandler(
     type: Class<T>,
     priority: EventPriority = EventPriority.NORMAL,
     ignoreCancelled: Boolean = false,
@@ -70,7 +70,7 @@ fun <T : Event> CubexPlugin.registerEventHandler(
  *
  * 等价于手写 `Listener` + `registerEvent` + `bind(注销动作)`，但少了忘记最后一步的可能。
  */
-inline fun <reified T : Event> CubexPlugin.onEvent(
+public inline fun <reified T : Event> CubexPlugin.onEvent(
     priority: EventPriority = EventPriority.NORMAL,
     ignoreCancelled: Boolean = false,
     noinline handler: (T) -> Unit,

@@ -7,7 +7,7 @@ import org.bukkit.command.TabCompleter
 import org.bukkit.event.Listener
 import org.bukkit.plugin.java.JavaPlugin
 
-abstract class CubexPlugin : JavaPlugin(), TerminableConsumer {
+public abstract class CubexPlugin : JavaPlugin(), TerminableConsumer {
     private val terminables = TerminableRegistry()
     private val sharedText = CubexText()
     private val sharedMessager = Messager()
@@ -41,7 +41,7 @@ abstract class CubexPlugin : JavaPlugin(), TerminableConsumer {
     protected abstract fun enablePlugin()
 
     @Throws(Exception::class)
-    protected open fun disablePlugin() = Unit
+    protected open fun disablePlugin(): Unit = Unit
 
     protected open fun abortEnable(reason: String?): Unit {
         throw EnableAbortException(
@@ -53,16 +53,16 @@ abstract class CubexPlugin : JavaPlugin(), TerminableConsumer {
         logger.log(Level.SEVERE, "Failed to enable plugin.", throwable)
     }
 
-    fun log(): CubexLogger {
+    public fun log(): CubexLogger {
         val existing = structuredLogger
         if (existing != null) return existing
 
         return CubexLogger(logger).also { structuredLogger = it }
     }
 
-    fun messager(): Messager = sharedMessager
+    public fun messager(): Messager = sharedMessager
 
-    fun text(): CubexText = sharedText
+    public fun text(): CubexText = sharedText
 
     protected fun registerListener(listener: Listener) {
         server.pluginManager.registerEvents(listener, this)

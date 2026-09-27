@@ -1,6 +1,6 @@
 package org.cubexmc.config
 
-class MigrationPlan private constructor(name: String?, private val resourcePathValue: String) {
+public class MigrationPlan private constructor(name: String?, private val resourcePathValue: String) {
     private val nameValue = name?.takeUnless { it.isBlank() } ?: resourcePathValue
     private var versionKeyValue = "version"
     private var missingVersionValue = 1
@@ -10,30 +10,30 @@ class MigrationPlan private constructor(name: String?, private val resourcePathV
     private var failurePolicyValue = MigrationFailurePolicy.ABORT
     private val stepValues = ArrayList<MigrationStep>()
 
-    fun versionKey(key: String?): MigrationPlan = apply { versionKeyValue = key?.takeUnless { it.isBlank() } ?: "version" }
-    fun missingVersion(version: Int): MigrationPlan = apply { missingVersionValue = version }
-    fun targetVersion(version: Int): MigrationPlan = apply { targetVersionValue = version }
-    fun backupDirectory(relativePath: String?): MigrationPlan = apply {
+    public fun versionKey(key: String?): MigrationPlan = apply { versionKeyValue = key?.takeUnless { it.isBlank() } ?: "version" }
+    public fun missingVersion(version: Int): MigrationPlan = apply { missingVersionValue = version }
+    public fun targetVersion(version: Int): MigrationPlan = apply { targetVersionValue = version }
+    public fun backupDirectory(relativePath: String?): MigrationPlan = apply {
         backupDirectoryValue = relativePath?.takeUnless { it.isBlank() } ?: "backups/migrations"
     }
-    fun restoreBackupOnSaveFailure(enabled: Boolean): MigrationPlan = apply { restoreBackupOnSaveFailureValue = enabled }
-    fun failurePolicy(policy: MigrationFailurePolicy?): MigrationPlan = apply {
+    public fun restoreBackupOnSaveFailure(enabled: Boolean): MigrationPlan = apply { restoreBackupOnSaveFailureValue = enabled }
+    public fun failurePolicy(policy: MigrationFailurePolicy?): MigrationPlan = apply {
         failurePolicyValue = policy ?: MigrationFailurePolicy.ABORT
     }
-    fun addStep(step: MigrationStep?): MigrationPlan = apply { if (step != null) stepValues.add(step) }
+    public fun addStep(step: MigrationStep?): MigrationPlan = apply { if (step != null) stepValues.add(step) }
 
-    fun name(): String = nameValue
-    fun resourcePath(): String = resourcePathValue
-    fun versionKey(): String = versionKeyValue
-    fun missingVersion(): Int = missingVersionValue
-    fun targetVersion(): Int = targetVersionValue
-    fun backupDirectory(): String = backupDirectoryValue
-    fun restoreBackupOnSaveFailure(): Boolean = restoreBackupOnSaveFailureValue
-    fun failurePolicy(): MigrationFailurePolicy = failurePolicyValue
-    fun steps(): List<MigrationStep> = stepValues.toList()
+    public fun name(): String = nameValue
+    public fun resourcePath(): String = resourcePathValue
+    public fun versionKey(): String = versionKeyValue
+    public fun missingVersion(): Int = missingVersionValue
+    public fun targetVersion(): Int = targetVersionValue
+    public fun backupDirectory(): String = backupDirectoryValue
+    public fun restoreBackupOnSaveFailure(): Boolean = restoreBackupOnSaveFailureValue
+    public fun failurePolicy(): MigrationFailurePolicy = failurePolicyValue
+    public fun steps(): List<MigrationStep> = stepValues.toList()
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun yaml(name: String?, resourcePath: String): MigrationPlan = MigrationPlan(name, resourcePath)
+        public fun yaml(name: String?, resourcePath: String): MigrationPlan = MigrationPlan(name, resourcePath)
     }
 }

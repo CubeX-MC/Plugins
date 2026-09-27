@@ -10,9 +10,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Level
 
-class MigrationRunner(private val plugin: CubexPlugin) {
+public class MigrationRunner(private val plugin: CubexPlugin) {
     @Throws(MigrationException::class)
-    fun run(plan: MigrationPlan?): MigrationReport {
+    public fun run(plan: MigrationPlan?): MigrationReport {
         if (plan == null) throw MigrationException("Migration plan is null.")
         val file = File(plugin.dataFolder, plan.resourcePath())
         val yaml = YamlConfiguration.loadConfiguration(file)

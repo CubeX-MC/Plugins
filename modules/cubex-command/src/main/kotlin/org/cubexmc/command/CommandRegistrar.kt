@@ -10,7 +10,7 @@ import org.cubexmc.core.Terminable
 import org.cubexmc.core.TerminableConsumer
 
 /** What to do when `plugin.yml` does not declare a command that the code tries to register. */
-enum class MissingCommandPolicy {
+public enum class MissingCommandPolicy {
     /** Log a SEVERE line and return null. The plugin keeps running with a dead command. */
     WARN,
 
@@ -25,7 +25,7 @@ enum class MissingCommandPolicy {
  * Deliberately not included: a command DSL, subcommand routing, and any wrapper over the Cloud
  * framework. Those stay in the plugins that use them.
  */
-class CommandRegistrar @JvmOverloads constructor(
+public class CommandRegistrar @JvmOverloads constructor(
     private val plugin: JavaPlugin,
     private val terminables: TerminableConsumer? = null,
     private val missingCommandPolicy: MissingCommandPolicy = MissingCommandPolicy.WARN,
@@ -40,7 +40,7 @@ class CommandRegistrar @JvmOverloads constructor(
      * declaration is never swallowed silently — see [MissingCommandPolicy].
      */
     @JvmOverloads
-    fun registerPluginCommand(
+    public fun registerPluginCommand(
         name: String,
         executor: CommandExecutor,
         tabCompleter: TabCompleter? = null,
@@ -69,7 +69,7 @@ class CommandRegistrar @JvmOverloads constructor(
      *
      * Returns null when the command map cannot be reached or the server refused the registration.
      */
-    fun registerDynamicCommand(fallbackPrefix: String, command: Command): Terminable? {
+    public fun registerDynamicCommand(fallbackPrefix: String, command: Command): Terminable? {
         val map = commandMap ?: CommandMaps.resolve(plugin.server, plugin.logger)
         if (map == null) {
             plugin.logger.severe(

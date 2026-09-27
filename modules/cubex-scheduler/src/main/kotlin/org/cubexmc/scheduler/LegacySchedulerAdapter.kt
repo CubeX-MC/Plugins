@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 
 /** Compatibility bridge for existing SchedulerUtil public surfaces. */
-class LegacySchedulerAdapter private constructor(builder: Builder) {
+public class LegacySchedulerAdapter private constructor(builder: Builder) {
     private val scheduler = builder.scheduler
     private val immediateMode = builder.immediateMode
     private val trackTasksForCancelAll = builder.trackTasksForCancelAll
@@ -28,10 +28,10 @@ class LegacySchedulerAdapter private constructor(builder: Builder) {
     @Volatile
     private var reflectedTickMethod: Method? = null
 
-    val isFolia: Boolean
+    public val isFolia: Boolean
         get() = CubexScheduler.detectFolia()
 
-    fun globalRun(task: Runnable, delayTicks: Long, periodTicks: Long): Any? {
+    public fun globalRun(task: Runnable, delayTicks: Long, periodTicks: Long): Any? {
         val delay = max(0L, delayTicks)
         if (isFolia) {
             return if (periodTicks <= 0L) scheduleFoliaGlobal(task, delay)
@@ -41,7 +41,7 @@ class LegacySchedulerAdapter private constructor(builder: Builder) {
         else Bukkit.getScheduler().runTaskTimer(scheduler.plugin(), task, delay, periodTicks)
     }
 
-    fun entityRun(entity: Entity, task: Runnable, delayTicks: Long, periodTicks: Long): Any? {
+    public fun entityRun(entity: Entity, task: Runnable, delayTicks: Long, periodTicks: Long): Any? {
         val delay = max(0L, delayTicks)
         if (isFolia) {
             return if (periodTicks <= 0L) {
@@ -55,7 +55,7 @@ class LegacySchedulerAdapter private constructor(builder: Builder) {
         else Bukkit.getScheduler().runTaskTimer(scheduler.plugin(), task, delay, periodTicks)
     }
 
-    fun regionRun(location: Location, task: Runnable, delayTicks: Long, periodTicks: Long): Any? {
+    public fun regionRun(location: Location, task: Runnable, delayTicks: Long, periodTicks: Long): Any? {
         val delay = max(0L, delayTicks)
         if (isFolia) {
             return if (periodTicks <= 0L) {
@@ -69,7 +69,7 @@ class LegacySchedulerAdapter private constructor(builder: Builder) {
         else Bukkit.getScheduler().runTaskTimer(scheduler.plugin(), task, delay, periodTicks)
     }
 
-    fun asyncRun(task: Runnable, delayTicks: Long) {
+    public fun asyncRun(task: Runnable, delayTicks: Long) {
         val delay = max(0L, delayTicks)
         if (isFolia) {
             if (delay == 0L) scheduler.runAsync(task) else scheduler.runAsyncLater(task, delay)
@@ -82,14 +82,14 @@ class LegacySchedulerAdapter private constructor(builder: Builder) {
         )
     }
 
-    fun cancelTask(taskHandle: Any?) = cancelTaskHandle(taskHandle)
+    public fun cancelTask(taskHandle: Any?): Unit = cancelTaskHandle(taskHandle)
 
-    fun cancelAllTasks() {
+    public fun cancelAllTasks() {
         if (trackTasksForCancelAll) scheduler.cancelAll()
         else Bukkit.getScheduler().cancelTasks(scheduler.plugin())
     }
 
-    fun safeTeleport(player: Player?, destination: Location?) {
+    public fun safeTeleport(player: Player?, destination: Location?) {
         if (player == null || destination == null) return
         if (isFolia || scheduler.isPaper) {
             scheduler.teleportAsync(player, destination)
@@ -100,17 +100,17 @@ class LegacySchedulerAdapter private constructor(builder: Builder) {
         }
     }
 
-    fun teleportEntity(entity: Entity?, destination: Location?): CompletableFuture<Boolean> =
+    public fun teleportEntity(entity: Entity?, destination: Location?): CompletableFuture<Boolean> =
         if (entity == null || destination == null) CompletableFuture.completedFuture(false)
         else scheduler.teleportAsync(entity, destination)
 
-    val currentTick: Long
+    public val currentTick: Long
         get() {
             if (!tickAccessEnabled) throw UnsupportedOperationException("Tick access is not enabled for this adapter.")
             return reflectedCurrentTick() ?: tickCounter.get()
         }
 
-    fun ensureTickCounter() {
+    public fun ensureTickCounter() {
         if (!tickAccessEnabled) throw UnsupportedOperationException("Tick access is not enabled for this adapter.")
         if (tickCounterStarted) return
         synchronized(this) {
@@ -163,29 +163,29 @@ class LegacySchedulerAdapter private constructor(builder: Builder) {
         return Bukkit.getScheduler().runTaskLater(scheduler.plugin(), task, delay)
     }
 
-    class Builder internal constructor(internal val scheduler: CubexScheduler) {
+    public class Builder internal constructor(internal val scheduler: CubexScheduler) {
         internal var immediateMode = BukkitImmediateMode.ALWAYS_SCHEDULE
         internal var trackTasksForCancelAll = false
         internal var tickAccessEnabled = false
 
-        fun immediateMode(immediateMode: BukkitImmediateMode): Builder = apply { this.immediateMode = immediateMode }
+        public fun immediateMode(immediateMode: BukkitImmediateMode): Builder = apply { this.immediateMode = immediateMode }
 
-        fun trackTasksForCancelAll(trackTasksForCancelAll: Boolean): Builder =
+        public fun trackTasksForCancelAll(trackTasksForCancelAll: Boolean): Builder =
             apply { this.trackTasksForCancelAll = trackTasksForCancelAll }
 
-        fun tickAccessEnabled(tickAccessEnabled: Boolean): Builder = apply { this.tickAccessEnabled = tickAccessEnabled }
+        public fun tickAccessEnabled(tickAccessEnabled: Boolean): Builder = apply { this.tickAccessEnabled = tickAccessEnabled }
 
-        fun build(): LegacySchedulerAdapter = LegacySchedulerAdapter(this)
+        public fun build(): LegacySchedulerAdapter = LegacySchedulerAdapter(this)
     }
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun builder(plugin: Plugin): Builder = Builder(CubexScheduler.create(plugin))
+        public fun builder(plugin: Plugin): Builder = Builder(CubexScheduler.create(plugin))
 
         @JvmStatic
-        fun builder(scheduler: CubexScheduler): Builder = Builder(scheduler)
+        public fun builder(scheduler: CubexScheduler): Builder = Builder(scheduler)
 
         @JvmStatic
-        fun cancelTaskHandle(taskHandle: Any?) = ManagedCubexTask.cancelNative(taskHandle)
+        public fun cancelTaskHandle(taskHandle: Any?): Unit = ManagedCubexTask.cancelNative(taskHandle)
     }
 }

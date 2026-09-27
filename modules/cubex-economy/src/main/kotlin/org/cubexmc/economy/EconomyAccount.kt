@@ -30,40 +30,40 @@ import java.util.UUID
  * - [PlayerName] 会先把名字解析成 UUID 再入账,好处是启动日志能打出**具体哪个账户**收钱,
  *   坏处是要依赖服务器的 profile 缓存 / profile 查询(见 [OfflinePlayerLookup])。
  */
-sealed interface EconomyAccount {
+public sealed interface EconomyAccount {
 
     /** 人类可读的短标签,用于日志与 `/<插件> 状态` 之类的输出。 */
-    fun label(): String
+    public fun label(): String
 
     /** 不入账:扣款后货币直接消失。 */
-    data object None : EconomyAccount {
+    public data object None : EconomyAccount {
         override fun label(): String = "none (money is destroyed)"
     }
 
     /** 按 UUID 精确指定的玩家账户。 */
-    data class PlayerUuid(val uuid: UUID) : EconomyAccount {
+    public data class PlayerUuid(val uuid: UUID) : EconomyAccount {
         override fun label(): String = "player uuid:$uuid"
     }
 
     /** 名字原样交给 Vault 的 name 重载,由经济插件认账户。 */
-    data class RawName(val name: String) : EconomyAccount {
+    public data class RawName(val name: String) : EconomyAccount {
         override fun label(): String = "economy account name:$name"
     }
 
     /** 先解析成 UUID 再入账的玩家账户。解析路径见 [OfflinePlayerLookup]。 */
-    data class PlayerName(val name: String) : EconomyAccount {
+    public data class PlayerName(val name: String) : EconomyAccount {
         override fun label(): String = "player $name"
     }
 
     /** Vault 的 bank 账户。 */
-    data class Bank(val name: String) : EconomyAccount {
+    public data class Bank(val name: String) : EconomyAccount {
         override fun label(): String = "bank $name"
     }
 
-    companion object {
-        const val UUID_PREFIX: String = "uuid:"
-        const val NAME_PREFIX: String = "name:"
-        const val BANK_PREFIX: String = "bank:"
+    public companion object {
+        public const val UUID_PREFIX: String = "uuid:"
+        public const val NAME_PREFIX: String = "name:"
+        public const val BANK_PREFIX: String = "bank:"
 
         /** 玩家名的宽松上限:真实 MC 名最长 16,留出余量但挡住"整句话粘进配置"的手滑。 */
         private const val MAX_PLAYER_NAME_LENGTH = 64
@@ -76,7 +76,7 @@ sealed interface EconomyAccount {
          *   但也绝不能猜一个账户把钱转过去。
          */
         @JvmStatic
-        fun parse(raw: String?): EconomyAccount {
+        public fun parse(raw: String?): EconomyAccount {
             val value = raw?.trim().orEmpty()
             if (value.isEmpty()) return None
 

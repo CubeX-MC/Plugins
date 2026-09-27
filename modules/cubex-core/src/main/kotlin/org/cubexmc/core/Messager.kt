@@ -3,8 +3,8 @@ package org.cubexmc.core
 import java.util.regex.Pattern
 import org.bukkit.command.CommandSender
 
-class Messager {
-    fun send(target: CommandSender?, message: String?) {
+public class Messager {
+    public fun send(target: CommandSender?, message: String?) {
         if (target == null || message == null) return
 
         for (line in LINE_BREAK.split(message, -1)) {
@@ -12,7 +12,7 @@ class Messager {
         }
     }
 
-    fun sendLines(target: CommandSender?, messages: Iterable<String>?) {
+    public fun sendLines(target: CommandSender?, messages: Iterable<String>?) {
         if (target == null) return
 
         for (message in messages ?: emptyList()) {

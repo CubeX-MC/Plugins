@@ -1,6 +1,6 @@
 package org.cubexmc.config
 
-class MigrationException : Exception {
-    constructor(message: String?) : super(message)
-    constructor(message: String?, cause: Throwable?) : super(message, cause)
+public class MigrationException : Exception {
+    public constructor(message: String?) : super(message)
+    public constructor(message: String?, cause: Throwable?) : super(message, cause)
 }

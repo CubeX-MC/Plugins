@@ -15,11 +15,11 @@ import org.bukkit.persistence.PersistentDataType
  * A stateless, PDC-backed ownership stack for scalar player state controlled by embedded plugins.
  * The fixed `cubex` key keeps independently relocated copies on one shared stack.
  */
-object PlayerStateLeaseStack {
-    fun hasLeases(player: Player, channel: String): Boolean =
+public object PlayerStateLeaseStack {
+    public fun hasLeases(player: Player, channel: String): Boolean =
         access(player, channel)?.load()?.order?.isNotEmpty() == true
 
-    fun apply(
+    public fun apply(
         player: Player,
         channel: String,
         token: String,
@@ -38,7 +38,7 @@ object PlayerStateLeaseStack {
         return true
     }
 
-    fun reapply(player: Player, channel: String, token: String, writeCurrent: Consumer<String>): Boolean {
+    public fun reapply(player: Player, channel: String, token: String, writeCurrent: Consumer<String>): Boolean {
         val access = access(player, channel) ?: return false
         val state = access.load()
         if (state.order.lastOrNull() != token) return token in state.order
@@ -47,7 +47,7 @@ object PlayerStateLeaseStack {
         return true
     }
 
-    fun remove(player: Player, channel: String, token: String, writeCurrent: Consumer<String>): Boolean {
+    public fun remove(player: Player, channel: String, token: String, writeCurrent: Consumer<String>): Boolean {
         val access = access(player, channel) ?: return false
         val state = access.load()
         val wasTop = state.order.lastOrNull() == token

@@ -4,25 +4,25 @@ import org.cubexmc.core.Reloadable
 import java.util.function.BooleanSupplier
 
 /** Ordered named reload stages with gating and per-stage failure reporting. */
-class ReloadChain private constructor() : Reloadable {
+public class ReloadChain private constructor() : Reloadable {
     private val entries = ArrayList<Entry>()
     private var failurePolicyValue = ReloadFailurePolicy.CONTINUE
 
-    fun failurePolicy(policy: ReloadFailurePolicy?): ReloadChain = apply {
+    public fun failurePolicy(policy: ReloadFailurePolicy?): ReloadChain = apply {
         failurePolicyValue = policy ?: ReloadFailurePolicy.CONTINUE
     }
 
-    fun add(name: String?, reloadable: Reloadable?): ReloadChain = apply {
+    public fun add(name: String?, reloadable: Reloadable?): ReloadChain = apply {
         if (reloadable != null) entries.add(Entry(name.orEmpty(), reloadable, null))
     }
 
-    fun addIf(name: String?, gate: BooleanSupplier?, reloadable: Reloadable?): ReloadChain = apply {
+    public fun addIf(name: String?, gate: BooleanSupplier?, reloadable: Reloadable?): ReloadChain = apply {
         if (reloadable != null) entries.add(Entry(name.orEmpty(), reloadable, gate))
     }
 
-    fun names(): List<String> = entries.map { it.name }
+    public fun names(): List<String> = entries.map { it.name }
 
-    fun run(): ReloadReport {
+    public fun run(): ReloadReport {
         val succeeded = ArrayList<String>()
         val skipped = ArrayList<String>()
         val failures = ArrayList<ReloadReport.Failure>()
@@ -54,8 +54,8 @@ class ReloadChain private constructor() : Reloadable {
 
     private class Entry(val name: String, val reloadable: Reloadable, val gate: BooleanSupplier?)
 
-    companion object {
+    public companion object {
         @JvmStatic
-        fun create(): ReloadChain = ReloadChain()
+        public fun create(): ReloadChain = ReloadChain()
     }
 }

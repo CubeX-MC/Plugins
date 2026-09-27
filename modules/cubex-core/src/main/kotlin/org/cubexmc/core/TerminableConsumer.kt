@@ -1,7 +1,7 @@
 package org.cubexmc.core
 
-interface TerminableConsumer {
-    fun <T : AutoCloseable> bind(terminable: T): T
+public interface TerminableConsumer {
+    public fun <T : AutoCloseable> bind(terminable: T): T
 
-    fun bind(closeAction: Runnable): Terminable
+    public fun bind(closeAction: Runnable): Terminable
 }

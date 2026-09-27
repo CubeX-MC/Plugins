@@ -8,10 +8,10 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 /** 按名字解析账户的结果。 */
-sealed interface NameLookup {
+public sealed interface NameLookup {
 
     /** 解析成功。[source] 说明走的是哪条路径,用于启动日志。 */
-    data class Found(val player: OfflinePlayer, val source: String) : NameLookup
+    public data class Found(val player: OfflinePlayer, val source: String) : NameLookup
 
     /**
      * 只拿到 Bukkit 按名字**编造**的离线 UUID —— profile 查询没跑或没查到。
@@ -19,10 +19,10 @@ sealed interface NameLookup {
      * 这个 UUID 和验证服务器(LittleSkin / Mojang)发的 v4 UUID 不是同一个账户,
      * 拿它入账就是把钱转进幽灵账户,所以必须和真正解析成功区分开。
      */
-    data object Fabricated : NameLookup
+    public data object Fabricated : NameLookup
 
     /** 完全解析不出来。 */
-    data object Unknown : NameLookup
+    public data object Unknown : NameLookup
 }
 
 /**
@@ -31,14 +31,14 @@ sealed interface NameLookup {
  * 抽成接口是为了让 [VaultEconomy] 的路由逻辑能脱离服务器单测 ——
  * `Bukkit` 的这几个方法都是静态的,mock 不动。
  */
-interface OfflinePlayerLookup {
+public interface OfflinePlayerLookup {
 
-    fun byUuid(uuid: UUID): OfflinePlayer
+    public fun byUuid(uuid: UUID): OfflinePlayer
 
-    fun byName(name: String): NameLookup
+    public fun byName(name: String): NameLookup
 
     /** Non-blocking online/profile-cache lookup; never enumerates player files. */
-    fun knownByName(name: String): NameLookup = NameLookup.Unknown
+    public fun knownByName(name: String): NameLookup = NameLookup.Unknown
 }
 
 /**
@@ -60,7 +60,7 @@ interface OfflinePlayerLookup {
  * 注意这里**没有**用 `Bukkit.getOfflinePlayers()`:那个方法每次调用都要列一遍
  * `playerdata` 目录,在主线程上是 O(存档数) 的开销,而且从不登录的账户根本不在里面。
  */
-object BukkitOfflinePlayerLookup : OfflinePlayerLookup {
+public object BukkitOfflinePlayerLookup : OfflinePlayerLookup {
 
     private val ifCachedMethod: Method? by lazy {
         try {

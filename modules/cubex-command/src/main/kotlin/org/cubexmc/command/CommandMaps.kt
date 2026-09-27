@@ -14,10 +14,10 @@ import org.bukkit.command.SimpleCommandMap
  * Paper exposes `Bukkit.getCommandMap()`; older Spigot builds only have a private `commandMap`
  * field on the CraftServer. RuleGems and FAWEReplacer each carried their own copy of this dance.
  */
-object CommandMaps {
+public object CommandMaps {
     @JvmStatic
     @JvmOverloads
-    fun resolve(server: Server, logger: Logger? = null): CommandMap? {
+    public fun resolve(server: Server, logger: Logger? = null): CommandMap? {
         try {
             val viaBukkit = Bukkit::class.java.getMethod("getCommandMap").invoke(null)
             if (viaBukkit is CommandMap) return viaBukkit
@@ -52,7 +52,7 @@ object CommandMaps {
      */
     @JvmStatic
     @JvmOverloads
-    fun unregister(map: CommandMap, command: Command, logger: Logger? = null): List<String> {
+    public fun unregister(map: CommandMap, command: Command, logger: Logger? = null): List<String> {
         val known = knownCommands(map, logger)
         val removed = if (known == null) emptyList() else removeMatching(known, command, logger)
         runCatching { command.unregister(map) }
@@ -113,7 +113,7 @@ object CommandMaps {
     @JvmStatic
     @JvmOverloads
     @Suppress("UNCHECKED_CAST")
-    fun knownCommands(map: CommandMap, logger: Logger? = null): MutableMap<String, Command>? =
+    public fun knownCommands(map: CommandMap, logger: Logger? = null): MutableMap<String, Command>? =
         try {
             val field = SimpleCommandMap::class.java.getDeclaredField("knownCommands")
             field.isAccessible = true

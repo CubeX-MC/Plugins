@@ -12,12 +12,12 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 /** Merges missing default YAML keys. Saving rewrites YAML and may drop comments. */
-class YamlDefaults(private val plugin: JavaPlugin) {
-    constructor(plugin: CubexPlugin) : this(plugin as JavaPlugin)
-    fun mergeResourceIntoDataFile(resourcePath: String, options: DefaultMergeOptions?): DefaultMergeResult =
+public class YamlDefaults(private val plugin: JavaPlugin) {
+    public constructor(plugin: CubexPlugin) : this(plugin as JavaPlugin)
+    public fun mergeResourceIntoDataFile(resourcePath: String, options: DefaultMergeOptions?): DefaultMergeResult =
         mergeResourceIntoDataFile(resourcePath, File(plugin.dataFolder, resourcePath), options)
 
-    fun mergeResourceIntoDataFile(
+    public fun mergeResourceIntoDataFile(
         resourcePath: String,
         targetFile: File,
         options: DefaultMergeOptions?,

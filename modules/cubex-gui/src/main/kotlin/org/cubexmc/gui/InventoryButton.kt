@@ -8,4 +8,4 @@ import org.bukkit.inventory.ItemStack
  * Ported from the AuctionHouse `InventoryButton` pattern — each button owns its own click
  * handler, so screens no longer need a central `when (slot)` dispatch.
  */
-class InventoryButton(val icon: ItemStack, val onClick: (InventoryClickEvent) -> Unit = {})
+public class InventoryButton(public val icon: ItemStack, public val onClick: (InventoryClickEvent) -> Unit = {})

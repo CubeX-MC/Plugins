@@ -6,7 +6,7 @@ import org.bukkit.plugin.PluginManager
 import org.bukkit.plugin.ServicesManager
 
 /** Identifies an optional Bukkit service without linking the consumer to its API classes. */
-data class OptionalServiceDescriptor(
+public data class OptionalServiceDescriptor(
     val pluginName: String,
     val apiClassName: String,
 ) {
@@ -16,7 +16,7 @@ data class OptionalServiceDescriptor(
     }
 }
 
-enum class ServiceUnavailableReason {
+public enum class ServiceUnavailableReason {
     PLUGIN_MISSING,
     PLUGIN_DISABLED,
     API_CLASS_MISSING,
@@ -24,17 +24,17 @@ enum class ServiceUnavailableReason {
     SERVICE_TYPE_MISMATCH,
 }
 
-sealed interface OptionalServiceConnection {
-    val descriptor: OptionalServiceDescriptor
+public sealed interface OptionalServiceConnection {
+    public val descriptor: OptionalServiceDescriptor
 
-    data class Connected(
+    public data class Connected(
         override val descriptor: OptionalServiceDescriptor,
         val provider: Plugin,
         val apiType: Class<*>,
         val service: Any,
     ) : OptionalServiceConnection
 
-    data class Unavailable(
+    public data class Unavailable(
         override val descriptor: OptionalServiceDescriptor,
         val reason: ServiceUnavailableReason,
         val detail: String = "",
@@ -51,13 +51,13 @@ sealed interface OptionalServiceConnection {
  * Connections are deliberately not cached. A domain adapter can retry after a provider is enabled,
  * disabled or reloaded without making the consumer plugin depend on that provider's lifecycle.
  */
-class OptionalServiceConnector(
+public class OptionalServiceConnector(
     private val pluginManager: PluginManager,
     private val servicesManager: ServicesManager,
 ) {
-    constructor(server: Server) : this(server.pluginManager, server.servicesManager)
+    public constructor(server: Server) : this(server.pluginManager, server.servicesManager)
 
-    fun connect(descriptor: OptionalServiceDescriptor): OptionalServiceConnection {
+    public fun connect(descriptor: OptionalServiceDescriptor): OptionalServiceConnection {
         val provider = pluginManager.getPlugin(descriptor.pluginName)
             ?: return OptionalServiceConnection.Unavailable(
                 descriptor,

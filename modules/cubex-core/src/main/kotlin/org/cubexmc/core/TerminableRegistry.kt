@@ -5,17 +5,17 @@ import java.util.Deque
 import java.util.Objects
 
 /** A LIFO resource group for a plugin or one of its domain managers. */
-class TerminableRegistry {
+public class TerminableRegistry {
     private val terminables: Deque<AutoCloseable> = ArrayDeque()
 
-    fun <T : AutoCloseable> bind(terminable: T): T {
+    public fun <T : AutoCloseable> bind(terminable: T): T {
         terminables.addLast(Objects.requireNonNull(terminable, "terminable"))
         return terminable
     }
 
-    fun bind(closeAction: Runnable): Terminable = bind(Terminable.of(closeAction))
+    public fun bind(closeAction: Runnable): Terminable = bind(Terminable.of(closeAction))
 
-    fun closeAll(failureHandler: CloseFailureHandler) {
+    public fun closeAll(failureHandler: CloseFailureHandler) {
         while (terminables.isNotEmpty()) {
             val terminable = terminables.removeLast()
             try {
@@ -26,7 +26,7 @@ class TerminableRegistry {
         }
     }
 
-    fun interface CloseFailureHandler {
-        fun handle(exception: Exception)
+    public fun interface CloseFailureHandler {
+        public fun handle(exception: Exception)
     }
 }

@@ -25,7 +25,7 @@ import java.math.BigDecimal
  * 不做跨账户事务。Vault 没有事务语义,`withdraw` 与 `deposit` 是两次独立操作;
  * 本类对这一点的取舍写在 [charge] 上。
  */
-class VaultEconomy @JvmOverloads constructor(
+public class VaultEconomy @JvmOverloads constructor(
     private val economy: Economy,
     private val logger: CubexLogger,
     private val lookup: OfflinePlayerLookup = BukkitOfflinePlayerLookup,
@@ -41,7 +41,7 @@ class VaultEconomy @JvmOverloads constructor(
      * 直接当成非空返回会插入一次 intrinsic 检查,第三方实现返回 null 时**整个 enable 炸掉**。
      * 一个日志用的名字不值得这个代价。
      */
-    fun provider(): String = economy.name ?: "unknown economy provider"
+    public fun provider(): String = economy.name ?: "unknown economy provider"
 
     /**
      * 设置(或重设)入账目标。enable 时调一次,reload 时再调一次。
@@ -54,35 +54,35 @@ class VaultEconomy @JvmOverloads constructor(
      * 解析失败**不抛异常**:记日志、把目标标成坏的,让插件照常跑。
      * 之后每次扣款都会再警告一次 —— 配置错导致的资金流失必须是吵闹的。
      */
-    fun useAccount(spec: EconomyAccount) {
+    public fun useAccount(spec: EconomyAccount) {
         if (spec == resolvedSpec && target !is Target.Broken) return
         resolvedSpec = spec
         target = resolve(spec)
     }
 
     /** 当前入账目标的人类可读描述。 */
-    fun accountDescription(): String = target.description
+    public fun accountDescription(): String = target.description
 
     /** 入账目标是否处于"配置有效且解析成功"的状态。[EconomyAccount.None] 也算有效。 */
-    fun accountUsable(): Boolean = target !is Target.Broken
+    public fun accountUsable(): Boolean = target !is Target.Broken
 
-    fun has(player: OfflinePlayer, amount: BigDecimal): Boolean {
+    public fun has(player: OfflinePlayer, amount: BigDecimal): Boolean {
         if (amount.signum() < 0) return false
         if (amount.signum() == 0) return true
         return economy.has(player, amount.toDouble())
     }
 
-    fun balance(player: OfflinePlayer): BigDecimal = BigDecimal.valueOf(economy.getBalance(player))
+    public fun balance(player: OfflinePlayer): BigDecimal = BigDecimal.valueOf(economy.getBalance(player))
 
     /** 只扣款,不入账。需要走内循环的调用方应当用 [charge]。 */
-    fun withdraw(player: OfflinePlayer, amount: BigDecimal): EconomyResult {
+    public fun withdraw(player: OfflinePlayer, amount: BigDecimal): EconomyResult {
         if (amount.signum() < 0) return EconomyResult.fail("amount must not be negative")
         if (amount.signum() == 0) return EconomyResult.ok()
         return toResult(economy.withdrawPlayer(player, amount.toDouble()))
     }
 
     /** 只入账给指定玩家(退款、赔付)。入账到 `economy.account` 用 [charge]。 */
-    fun deposit(player: OfflinePlayer, amount: BigDecimal): EconomyResult {
+    public fun deposit(player: OfflinePlayer, amount: BigDecimal): EconomyResult {
         if (amount.signum() < 0) return EconomyResult.fail("amount must not be negative")
         if (amount.signum() == 0) return EconomyResult.ok()
         return toResult(economy.depositPlayer(player, amount.toDouble()))
@@ -99,7 +99,7 @@ class VaultEconomy @JvmOverloads constructor(
      * 因此入账失败只记 WARNING 并在结果里挂上 [EconomyResult.depositFailed],
      * 交给服主对账 —— 这是唯一一处会让货币总量下降的路径,必须留痕。
      */
-    fun charge(player: OfflinePlayer, amount: BigDecimal): EconomyResult {
+    public fun charge(player: OfflinePlayer, amount: BigDecimal): EconomyResult {
         if (amount.signum() < 0) return EconomyResult.fail("amount must not be negative")
         if (amount.signum() == 0) return EconomyResult.ok()
 
@@ -123,7 +123,7 @@ class VaultEconomy @JvmOverloads constructor(
      * 兜底不是多余的:Vault 的 `format` 是第三方实现,返回 null 会把一条**日志或提示**
      * 变成一次 NPE —— 而它最常出现的地方恰好是入账失败的警告里。
      */
-    fun format(amount: BigDecimal): String =
+    public fun format(amount: BigDecimal): String =
         economy.format(amount.toDouble()) ?: amount.toPlainString()
 
     @Suppress("DEPRECATION") // NamedAccount 走的就是 Vault 的 name 重载,这是它的全部意义。
@@ -266,10 +266,10 @@ class VaultEconomy @JvmOverloads constructor(
             Target("misconfigured (${spec.label()}: $detail)")
     }
 
-    companion object {
+    public companion object {
         /** Vault 或经济插件缺席时返回 null;调用方据此决定是降级还是 abortEnable。 */
         @JvmStatic
-        fun hook(plugin: Plugin, logger: CubexLogger): VaultEconomy? {
+        public fun hook(plugin: Plugin, logger: CubexLogger): VaultEconomy? {
             if (plugin.server.pluginManager.getPlugin("Vault") == null) return null
             val registration = plugin.server.servicesManager.getRegistration(Economy::class.java) ?: return null
             return VaultEconomy(registration.provider, logger)

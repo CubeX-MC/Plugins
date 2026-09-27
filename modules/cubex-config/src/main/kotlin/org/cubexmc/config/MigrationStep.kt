@@ -1,10 +1,10 @@
 package org.cubexmc.config
 
-interface MigrationStep {
-    fun fromVersion(): Int
-    fun toVersion(): Int
-    fun description(): String
+public interface MigrationStep {
+    public fun fromVersion(): Int
+    public fun toVersion(): Int
+    public fun description(): String
 
     @Throws(Exception::class)
-    fun migrate(context: MigrationContext)
+    public fun migrate(context: MigrationContext)
 }

@@ -1,6 +1,6 @@
 package org.cubexmc.config
 
-class NoOpMigrationStep(
+public class NoOpMigrationStep(
     private val fromVersionValue: Int,
     private val toVersionValue: Int,
     description: String?,
@@ -9,5 +9,5 @@ class NoOpMigrationStep(
     override fun fromVersion(): Int = fromVersionValue
     override fun toVersion(): Int = toVersionValue
     override fun description(): String = descriptionValue
-    override fun migrate(context: MigrationContext) = Unit
+    override fun migrate(context: MigrationContext): Unit = Unit
 }

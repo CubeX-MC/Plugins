@@ -4,12 +4,12 @@ import org.bukkit.configuration.ConfigurationSection
 import java.util.Locale
 import java.util.regex.Pattern
 
-class LegacyTextToMiniMessageStep @JvmOverloads constructor(
+public class LegacyTextToMiniMessageStep @JvmOverloads constructor(
     private val fromVersionValue: Int,
     private val toVersionValue: Int,
     private val angleBrackets: AngleBrackets = AngleBrackets.ESCAPE,
 ) : MigrationStep {
-    enum class AngleBrackets { ESCAPE, PRESERVE }
+    public enum class AngleBrackets { ESCAPE, PRESERVE }
 
     override fun fromVersion(): Int = fromVersionValue
     override fun toVersion(): Int = toVersionValue
@@ -19,7 +19,7 @@ class LegacyTextToMiniMessageStep @JvmOverloads constructor(
         convertSection(context.yaml(), "")
     }
 
-    fun convert(input: String?): String {
+    public fun convert(input: String?): String {
         if (input.isNullOrEmpty()) return input.orEmpty()
         val output = StringBuilder(input.length)
         var index = 0

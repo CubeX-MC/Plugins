@@ -3,7 +3,7 @@ package org.cubexmc.config
 import org.cubexmc.core.CubexPlugin
 import org.cubexmc.core.Reloadable
 
-object ConfigReload {
+public object ConfigReload {
     @JvmStatic
-    fun bukkitConfig(plugin: CubexPlugin): Reloadable = Reloadable { plugin.reloadConfig() }
+    public fun bukkitConfig(plugin: CubexPlugin): Reloadable = Reloadable { plugin.reloadConfig() }
 }

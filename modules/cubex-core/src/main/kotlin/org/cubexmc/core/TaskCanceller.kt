@@ -1,6 +1,6 @@
 package org.cubexmc.core
 
-fun interface TaskCanceller {
+public fun interface TaskCanceller {
     @Throws(Exception::class)
-    fun cancel(taskHandle: Any)
+    public fun cancel(taskHandle: Any)
 }

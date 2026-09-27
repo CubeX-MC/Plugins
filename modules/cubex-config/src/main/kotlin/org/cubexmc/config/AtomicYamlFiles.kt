@@ -13,10 +13,10 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 
 /** Strict, stateless file operations. Callers own schema validation and runtime state. */
-object AtomicYamlFiles {
+public object AtomicYamlFiles {
     @JvmStatic
     @Throws(IOException::class, InvalidConfigurationException::class)
-    fun read(file: File): YamlConfiguration {
+    public fun read(file: File): YamlConfiguration {
         val yaml = YamlConfiguration()
         try {
             Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8).use { yaml.load(it) }
@@ -30,7 +30,7 @@ object AtomicYamlFiles {
     /** Stages and validates before replacement. Non-atomic filesystems use a same-directory move. */
     @JvmStatic
     @Throws(IOException::class, InvalidConfigurationException::class)
-    fun write(file: File, yaml: YamlConfiguration) {
+    public fun write(file: File, yaml: YamlConfiguration) {
         val target = file.toPath().toAbsolutePath()
         Files.createDirectories(target.parent)
         val temporary = Files.createTempFile(target.parent, ".${file.name}-", ".tmp")

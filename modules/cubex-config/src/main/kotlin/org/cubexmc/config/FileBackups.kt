@@ -8,12 +8,12 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 /** Unique destinations prevent successive upgrade steps from overwriting an earlier backup. */
-object FileBackups {
+public object FileBackups {
     private val timestamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
 
     @JvmStatic
     @Throws(IOException::class)
-    fun copyUnique(source: File, directory: File): File {
+    public fun copyUnique(source: File, directory: File): File {
         Files.createDirectories(directory.toPath())
         val prefix = "${source.nameWithoutExtension}-${LocalDateTime.now().format(timestamp)}-"
         val suffix = source.extension.takeIf { it.isNotEmpty() }?.let { ".$it" }.orEmpty()

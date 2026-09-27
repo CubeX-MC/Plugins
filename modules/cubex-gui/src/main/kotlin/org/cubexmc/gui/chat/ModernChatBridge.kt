@@ -33,7 +33,7 @@ import org.bukkit.plugin.Plugin
  * （CMI 很常见，本仓库这几家自己也在监听），Paper 就对全服走 legacy 链路，现代事件一次都不触发。
  * 它保证的是：**两条链路哪条来都能接住**。配合 [ChatInputState] 的去重，同一行不会被处理两次。
  */
-object ModernChatBridge {
+public object ModernChatBridge {
 
     private const val EVENT_CLASS = "io.papermc.paper.event.player.AsyncChatEvent"
     private const val COMPONENT_CLASS = "net.kyori.adventure.text.Component"
@@ -43,14 +43,14 @@ object ModernChatBridge {
     private val support: Support? by lazy { resolve() }
 
     /** 本服是否支持现代聊天事件。仅用于日志/诊断。 */
-    val isAvailable: Boolean get() = support != null
+    public val isAvailable: Boolean get() = support != null
 
     /**
      * 注册现代聊天事件监听。[handler] 返回 `true` 表示这行归调用方、必须挡在公屏之外。
      *
      * @return 注册出来的 [Listener]（交给调用方决定何时 [unregister]），Spigot 上为 null。
      */
-    fun register(
+    public fun register(
         plugin: Plugin,
         priority: EventPriority = EventPriority.LOWEST,
         ignoreCancelled: Boolean = true,
@@ -80,7 +80,7 @@ object ModernChatBridge {
     }
 
     /** 注销 [register] 返回的监听器；传 null 是合法的空操作。 */
-    fun unregister(listener: Listener?) {
+    public fun unregister(listener: Listener?) {
         if (listener != null) {
             HandlerList.unregisterAll(listener)
         }
