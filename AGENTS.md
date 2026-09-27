@@ -38,7 +38,7 @@ Linux/CI 上是 `./gradlew`，任务名相同。
 ## 硬约束
 
 - **两种打包模式，由插件自己声明**（`CubeXLib` 已落地；**当前 12 个插件仍全部是内嵌模式**，
-  外置模式的打包与门禁已验证、实服跨插件类可见性待验，见 [`PLAN.md`](PLAN.md) §7.1）：
+  外置模式的打包、门禁与实服跨插件类可见性均已验证（2026-08-20），见 [`PLAN.md`](PLAN.md) §7.1）：
   - **内嵌（默认）**——无状态 `modules/cubex-*` shade + relocate 进自己的 jar，jar 可单独安装。**所有对外发布的插件必须用这个模式**。
   - **外置（opt-in）**——在自己的 build 脚本里写 `cubex { packaging.set(CubexPackagingMode.EXTERNAL) }`，
     不 shade 任何 `cubex-*`，直接类型调用。`depend: [CubeXLib]` **由构建注入，不要手写**。只给自服 / 团队内部插件用。

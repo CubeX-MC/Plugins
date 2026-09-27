@@ -977,11 +977,13 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
 - [ ] 若要加 `.cursorrules` / `.github/copilot-instructions.md`，**只放一行指向 [`AGENTS.md`](AGENTS.md)
       的指针**，按 [`CLAUDE.md`](CLAUDE.md) 的先例。三份会漂移的规则副本对 agent 是**反效果**——
       读到互相矛盾的规则比没有规则更糟
-- [ ] 给 `modules/` 的约定插件加 `explicitApi()`。理由不是对外契约（对内不需要），
-      而是**显式返回类型让 agent 少猜**。
-      **排在 Regions 本轮之后（2026-09-09 用户确认）**：实际试开过一次（`kotlin { explicitApi() }`），
-      光 `cubex-core` 一个模块就报几十处 "Visibility must be specified"，十个模块加起来是几百处纯机械的 `public`。
-      这种横扫式大 diff 不能和 Regions 在途的改动撞在一起
+- [x] **给 `modules/` 的约定插件加 `explicitApi()`**（2026-09-27）。理由不是对外契约（对内不需要），
+      而是**显式返回类型让 agent 少猜**。原定排在 Regions 本轮之后（2026-09-09 用户确认），
+      Regions 本轮代码已落地、只剩实服项后执行。开关在 `buildSrc/cubex-kotlin-library.gradle.kts`，
+      只作用于 10 个 `cubex-*` 模块，插件与 cookbook 不开；新建模块自动继承。
+      落地是一个纯机械提交：约 520 处补 `public`（按编译器报错位置脚本插入）+ 9 处表达式体补 `: Unit`，
+      **没有收窄任何可见性**（改成 `internal` 会动到 12 个插件的调用面，不属于这一步）。
+      `gradlew build jarGateAll` 与 `-p buildSrc test` 全绿
 - ❌ ~~`docs/ai-prompts/` few-shot 提示词模板库~~ —— 可编译可测试的 cookbook（§7.3）是更好的
       grounding 数据；提示词模板没有任何机制阻止它腐烂
 

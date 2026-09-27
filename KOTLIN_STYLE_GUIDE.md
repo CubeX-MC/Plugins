@@ -27,6 +27,9 @@ This guide is intentionally small. Kotlin migration is behavior-preserving first
 - Use `@JvmOverloads` only when Java callers need default-argument overloads.
 - Use `@JvmStatic` for companion/object factories that Java callers should invoke as static methods.
 - Avoid exposing top-level functions, inline/reified APIs, or Kotlin-only DSLs as plugin/shared-module public API.
+- `modules/cubex-*` compile in Kotlin explicit API mode (`cubex-kotlin-library` sets `explicitApi()`): every non-private
+  declaration needs a visibility modifier and every public function/property a declared type, including expression
+  bodies such as `fun close(): Unit = cancel()`. Plugins do not enable it.
 
 ## Migration Style
 
