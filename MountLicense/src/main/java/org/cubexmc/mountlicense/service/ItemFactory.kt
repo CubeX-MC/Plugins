@@ -10,6 +10,7 @@ import org.cubexmc.mountlicense.lang.LanguageManager
 import java.util.UUID
 import kotlin.math.max
 import org.cubexmc.core.getUuid
+import org.cubexmc.core.setUuid
 
 class ItemFactory(
     private val plugin: MountLicensePlugin,
@@ -69,7 +70,7 @@ class ItemFactory(
     fun bindKey(item: ItemStack?, vehicleId: UUID, shortLabel: String): Boolean {
         if (!isKey(item)) return false
         val meta: ItemMeta = item?.itemMeta ?: return false
-        meta.persistentDataContainer.set(keys.keyBoundVehicle(), PersistentDataType.STRING, vehicleId.toString())
+        meta.persistentDataContainer.setUuid(keys.keyBoundVehicle(), vehicleId)
 
         val ph = HashMap<String, String>()
         ph["short_id"] = shortLabel

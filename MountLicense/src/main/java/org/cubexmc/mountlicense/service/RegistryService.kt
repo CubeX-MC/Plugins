@@ -25,6 +25,7 @@ import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
 import java.util.logging.Level
 import org.cubexmc.core.getUuid
+import org.cubexmc.core.setUuid
 
 class RegistryService(
     private val plugin: MountLicensePlugin,
@@ -190,8 +191,8 @@ class RegistryService(
         val plate = generatePlate()
 
         val pdc: PersistentDataContainer = target.persistentDataContainer
-        pdc.set(keys.vehicleId(), PersistentDataType.STRING, vehicleId.toString())
-        pdc.set(keys.ownerUuid(), PersistentDataType.STRING, player.uniqueId.toString())
+        pdc.setUuid(keys.vehicleId(), vehicleId)
+        pdc.setUuid(keys.ownerUuid(), player.uniqueId)
         pdc.set(keys.profile(), PersistentDataType.STRING, profile.id())
         pdc.set(keys.state(), PersistentDataType.STRING, "ACTIVE")
         pdc.set(keys.createdAt(), PersistentDataType.LONG, now)
