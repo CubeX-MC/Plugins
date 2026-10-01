@@ -5,7 +5,7 @@ import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
-import org.bukkit.persistence.PersistentDataType
+import org.cubexmc.core.hasFlag
 import org.cubexmc.contract.ContractPlugin
 import org.cubexmc.contract.integration.regions.RegionFundingExecutor
 import org.cubexmc.contract.integration.regions.RegionFundingMetadata
@@ -2097,7 +2097,7 @@ class ContractService(
 
     private fun isRuleGemItem(item: ItemStack): Boolean {
         val meta = item.itemMeta ?: return false
-        return meta.persistentDataContainer.has(RULEGEMS_MARKER_KEY, PersistentDataType.BYTE)
+        return meta.persistentDataContainer.hasFlag(RULEGEMS_MARKER_KEY)
     }
 
     private class MediatorSpec(
