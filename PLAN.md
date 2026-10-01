@@ -541,7 +541,8 @@ schedule 不退化成"固定时间 + 秒级频率"，保留策略系统表达 da
 
 - [x] `cubex-spatial` 抽取并双侧接入（见 §2.9）
 - [ ] `LegacySchedulerAdapter` 调用面逐步收敛到 `CubexScheduler` 原生 API（非阻塞，别为此制造大 diff）。
-      第一段已将 Metro / Railway 的 `ScheduledTaskLifecycle` 启动任务改为原生全局调度与 `CubexTask.cancel()`；
+      已将 Metro / Railway 的 `ScheduledTaskLifecycle` 启动任务和 `MapIntegrationLifecycle` 刷新任务
+      改为原生全局调度与 `CubexTask.cancel()`；
       原有注入式测试接口保留，两侧 `build` / `jarGate` 通过。其他调用点继续分批迁移
 
 **Railway 同源维护铁律（2026-08-02 用户确认，不要"顺手修"）**：
