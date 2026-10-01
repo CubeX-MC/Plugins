@@ -1,8 +1,9 @@
-lang-version: 5
+lang-version: 6
 prefix: '<gray>[<gold>EcoBalancer<gray>]<reset>'
 messages:
   # reload
   reload_success: '<prefix> <green>Configuration file has been successfully reloaded.'
+  reload_failed: '<prefix> <red>Reload failed at <stage>. Check the server log.'
   # help
   commands:
     help: '<white>/ecobal help <gold>- Help'

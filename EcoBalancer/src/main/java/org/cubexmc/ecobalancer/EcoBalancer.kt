@@ -15,8 +15,12 @@ import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.RegisteredServiceProvider
 import org.cubexmc.config.MigrationException
+import org.cubexmc.config.ReloadChain
+import org.cubexmc.config.ReloadFailurePolicy
+import org.cubexmc.config.ReloadReport
 import org.cubexmc.config.ResourceFiles
 import org.cubexmc.core.CubexPlugin
+import org.cubexmc.core.Reloadable
 import org.cubexmc.economy.VaultEconomy
 import org.cubexmc.ecobalancer.commands.EcoTabCompleter
 import org.cubexmc.ecobalancer.commands.UtilCommand
@@ -137,7 +141,10 @@ class EcoBalancer : CubexPlugin() {
         policyManager = PolicyManager(this)
         policyManager.initialize()
 
-        loadConfiguration()
+        val startupReload = loadConfiguration()
+        if (!startupReload.ok()) {
+            abortEnable("EcoBalancer configuration failed at ${startupReload.failures().first().stage()}.")
+        }
 
         val databaseFile = File(dataFolder, "records.db")
         if (!databaseFile.exists()) {
@@ -150,9 +157,7 @@ class EcoBalancer : CubexPlugin() {
 
         DatabaseUtils.initializeTables(this, logger)
 
-        val initialDelay = calculateDelayForDaily(Calendar.getInstance(), 0, 0)
-        val cleanupPeriod = 24L * 60L * 60L * 20L
-        SchedulerUtils.runTaskTimer(this, Runnable { cleanupRecords() }, initialDelay, cleanupPeriod)
+        scheduleRecordCleanup()
 
         if (config.getBoolean("file-logging", true)) {
             initFileLogger(true)
@@ -258,16 +263,31 @@ class EcoBalancer : CubexPlugin() {
             return economy.getBalance(accountName)
         }
 
-    fun loadConfiguration() {
-        SchedulerUtils.cancelAllTasks(this)
-        loadLangFile()
-        updateFileLoggerFromConfig()
-        recordRetentionDays = config.getInt("record-retention-days", 30)
-        scheduleCheck(calculateNextDelay())
-        scheduleDailySnapshot()
-        isTaxAccountEnabled = config.getBoolean("tax-account", true)
-        taxAccountName = if (isTaxAccountEnabled) config.getString("tax-account-name", "tax") else null
-        applyTaxAccount()
+    fun reloadConfiguration(): ReloadReport = loadConfiguration(reloadDisk = true)
+
+    private fun loadConfiguration(reloadDisk: Boolean = false): ReloadReport {
+        val chain = ReloadChain.create().failurePolicy(ReloadFailurePolicy.ABORT)
+        if (reloadDisk) chain.add("config", Reloadable { reloadConfig() })
+        val report = chain
+            .add("tasks", Reloadable { SchedulerUtils.cancelAllTasks(this) })
+            .add("language", Reloadable { loadLangFile() })
+            .add("file-logging", Reloadable { updateFileLoggerFromConfig() })
+            .add("schedule", Reloadable {
+                recordRetentionDays = config.getInt("record-retention-days", 30)
+                if (reloadDisk) scheduleRecordCleanup()
+                scheduleCheck(calculateNextDelay())
+                scheduleDailySnapshot()
+            })
+            .add("tax-account", Reloadable {
+                isTaxAccountEnabled = config.getBoolean("tax-account", true)
+                taxAccountName = if (isTaxAccountEnabled) config.getString("tax-account-name", "tax") else null
+                applyTaxAccount()
+            })
+            .run()
+        for (failure in report.failures()) {
+            logger.log(Level.SEVERE, "EcoBalancer reload failed at ${failure.stage()}.", failure.cause())
+        }
+        return report
     }
 
     private fun loadLangFile() {
@@ -1092,17 +1112,19 @@ class EcoBalancer : CubexPlugin() {
         DatabaseUtils.cleanupRecords(this, recordRetentionDays, logger)
     }
 
+    private fun scheduleRecordCleanup() {
+        val initialDelay = calculateDelayForDaily(Calendar.getInstance(), 0, 0)
+        val cleanupPeriod = 24L * 60L * 60L * 20L
+        SchedulerUtils.runTaskTimer(this, Runnable { cleanupRecords() }, initialDelay, cleanupPeriod)
+    }
+
     private fun scheduleDailySnapshot() {
-        try {
-            val checkTime = config.getString("check-time", "00:00") ?: "00:00"
-            val hourOfDay = checkTime.split(":")[0].toInt()
-            val minute = checkTime.split(":")[1].toInt()
-            val initialDelay = calculateDelayForDaily(Calendar.getInstance(), hourOfDay, minute)
-            val dayPeriod = 24L * 60L * 60L * 20L
-            SchedulerUtils.runTaskTimer(this, Runnable { createEconomicSnapshot() }, initialDelay, dayPeriod)
-        } catch (throwable: Throwable) {
-            logger.log(Level.WARNING, "Failed to schedule daily economic snapshot task", throwable)
-        }
+        val checkTime = config.getString("check-time", "00:00") ?: "00:00"
+        val hourOfDay = checkTime.split(":")[0].toInt()
+        val minute = checkTime.split(":")[1].toInt()
+        val initialDelay = calculateDelayForDaily(Calendar.getInstance(), hourOfDay, minute)
+        val dayPeriod = 24L * 60L * 60L * 20L
+        SchedulerUtils.runTaskTimer(this, Runnable { createEconomicSnapshot() }, initialDelay, dayPeriod)
     }
 
     private fun createEconomicSnapshot() {

@@ -58,9 +58,6 @@ class MigrateCommand(private val plugin: EcoBalancer) : CommandExecutor {
 
                 if (configMigrated) {
                     sender.sendMessage(plugin.getFormattedMessage("messages.migration.run_config_migrated", null))
-                    plugin.reloadConfig()
-                    plugin.loadConfiguration()
-                    sender.sendMessage(plugin.getFormattedMessage("messages.migration.run_config_reloaded", null))
                 } else {
                     sender.sendMessage(plugin.getFormattedMessage("messages.migration.run_config_not_needed", null))
                 }
@@ -71,6 +68,15 @@ class MigrateCommand(private val plugin: EcoBalancer) : CommandExecutor {
                     sender.sendMessage(plugin.getFormattedMessage("messages.migration.run_lang_migrated", migratedLangPh))
                 } else {
                     sender.sendMessage(plugin.getFormattedMessage("messages.migration.run_lang_not_needed", null))
+                }
+                if (configMigrated || langMigrated) {
+                    val report = plugin.reloadConfiguration()
+                    if (report.ok()) {
+                        val key = if (configMigrated) "messages.migration.run_config_reloaded" else "messages.reload_success"
+                        sender.sendMessage(plugin.getFormattedMessage(key, null))
+                    } else {
+                        sender.sendMessage(plugin.getFormattedMessage("messages.reload_failed", mapOf("stage" to report.failures().first().stage())))
+                    }
                 }
             }
             "backup" -> {

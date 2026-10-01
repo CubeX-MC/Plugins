@@ -111,7 +111,8 @@ class ConfigMigrator(private val plugin: EcoBalancer) {
             .addStep(ModernizeLanguageStep(1, resourcePath))
             .addStep(ModernizeLanguageStep(2, resourcePath))
             .addStep(ModernizeLanguageStep(3, resourcePath))
-            .addStep(MergeLanguageDefaultsStep(LEGACY_MINIMESSAGE_LANG_VERSION, resourcePath))
+            .addStep(MergeLanguageDefaultsStep(LEGACY_MINIMESSAGE_LANG_VERSION, 5, resourcePath))
+            .addStep(MergeLanguageDefaultsStep(5, CURRENT_LANG_VERSION, resourcePath))
     }
 
     private inner class LegacyConfigMigrationStep(private val fromVersionValue: Int) : MigrationStep {
@@ -133,20 +134,21 @@ class ConfigMigrator(private val plugin: EcoBalancer) {
     }
 
     /**
-     * v4 -> v5：只把新增的默认键合进来。
+     * v4 -> v5 和 v5 -> v6：只把新增的默认键合进来。
      *
      * 故意**不**复用 [ModernizeLanguageStep]：v4 的文件已经是 MiniMessage，
      * 再跑一遍 legacy 转换只会去动服主改过的文案（比如正文里真的写了 `&`）。
      */
     private inner class MergeLanguageDefaultsStep(
         private val fromVersionValue: Int,
+        private val toVersionValue: Int,
         private val resourcePath: String,
     ) : MigrationStep {
         override fun fromVersion(): Int = fromVersionValue
 
-        override fun toVersion(): Int = CURRENT_LANG_VERSION
+        override fun toVersion(): Int = toVersionValue
 
-        override fun description(): String = "Merge language keys added in v$CURRENT_LANG_VERSION."
+        override fun description(): String = "Merge language keys added in v$toVersionValue."
 
         override fun migrate(context: MigrationContext) {
             val defaults = loadDefaultResource(resourcePath)
@@ -486,6 +488,6 @@ class ConfigMigrator(private val plugin: EcoBalancer) {
         val CURRENT_CONFIG_VERSION: Int = 5
 
         @JvmField
-        val CURRENT_LANG_VERSION: Int = 5
+        val CURRENT_LANG_VERSION: Int = 6
     }
 }

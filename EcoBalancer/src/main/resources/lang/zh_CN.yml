@@ -1,8 +1,9 @@
-lang-version: 5
+lang-version: 6
 prefix: '<gray>[<gold>EcoBalancer<gray>]<reset>'
 messages:
   # reload
   reload_success: '<prefix> <green>配置文件已成功重载。'
+  reload_failed: '<prefix> <red>重载在 <stage> 阶段失败，请查看服务端日志。'
   # help
   commands:
     help: '<white>/ecobal help <gold>- 帮助'

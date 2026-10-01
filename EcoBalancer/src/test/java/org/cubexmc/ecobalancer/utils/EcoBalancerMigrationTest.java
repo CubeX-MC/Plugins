@@ -59,7 +59,7 @@ class EcoBalancerMigrationTest {
                 config.getStringList("debt-commands").get(0));
 
         YamlConfiguration lang = YamlConfiguration.loadConfiguration(langDir.resolve("en_US.yml").toFile());
-        assertEquals(5, lang.getInt("lang-version"));
+        assertEquals(6, lang.getInt("lang-version"));
         assertEquals("<gray>[<gold>EcoBalancer<gray>]<reset>", lang.getString("prefix"));
         assertEquals("<prefix> <green>Reloaded", lang.getString("messages.reload_success"));
         assertEquals("<gold>Header<reset>", lang.getString("messages.stats_hist_header"));
@@ -98,12 +98,35 @@ class EcoBalancerMigrationTest {
 
         // Assert
         YamlConfiguration lang = YamlConfiguration.loadConfiguration(langDir.resolve("en_US.yml").toFile());
-        assertEquals(5, lang.getInt("lang-version"));
+        assertEquals(6, lang.getInt("lang-version"));
         assertNotNull(lang.getString("messages.tax.economy_failed"),
                 "a key added in v5 must reach servers that were already on v4");
         assertEquals("<gray>[<gold>Taxes & Fees<gray>]<reset>", lang.getString("prefix"),
                 "v4 text is already MiniMessage; the merge step must not run legacy conversion over it");
         assertEquals("<prefix> <green>Reloaded", lang.getString("messages.reload_success"));
+        assertNotNull(lang.getString("messages.reload_failed"));
+    }
+
+    @Test
+    void versionFiveLanguageGainsReloadFailureMessageWithoutChangingOperatorText() throws Exception {
+        EcoBalancer plugin = mockPlugin();
+        Path langDir = Files.createDirectories(tempDir.resolve("lang"));
+        Files.writeString(langDir.resolve("en_US.yml"), """
+                lang-version: 5
+                prefix: '<gray>[<gold>Taxes & Fees<gray>]<reset>'
+                messages:
+                  reload_success: '<prefix> <green>Custom reload text'
+                """, StandardCharsets.UTF_8);
+
+        ConfigMigrator migrator = new ConfigMigrator(plugin);
+        assertTrue(migrator.migrateLanguageFile("en_US"));
+
+        YamlConfiguration lang = YamlConfiguration.loadConfiguration(langDir.resolve("en_US.yml").toFile());
+        assertEquals(6, lang.getInt("lang-version"));
+        assertNotNull(lang.getString("messages.reload_failed"));
+        assertEquals("<prefix> <green>Custom reload text", lang.getString("messages.reload_success"));
+        assertEquals("<gray>[<gold>Taxes & Fees<gray>]<reset>", lang.getString("prefix"));
+        assertFalse(migrator.migrateLanguageFile("en_US"));
     }
 
     @Test

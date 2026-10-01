@@ -5,7 +5,6 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.cubexmc.ecobalancer.EcoBalancer
-import org.cubexmc.ecobalancer.utils.SchedulerUtils
 import java.util.Arrays
 import java.util.Locale
 
@@ -45,10 +44,12 @@ class UtilCommand(private val plugin: EcoBalancer) : CommandExecutor {
 
         return when (subCommand) {
             "reload" -> {
-                SchedulerUtils.cancelAllTasks(plugin)
-                plugin.reloadConfig()
-                plugin.loadConfiguration()
-                sender.sendMessage(plugin.getFormattedMessage("messages.reload_success", null))
+                val report = plugin.reloadConfiguration()
+                if (report.ok()) {
+                    sender.sendMessage(plugin.getFormattedMessage("messages.reload_success", null))
+                } else {
+                    sender.sendMessage(plugin.getFormattedMessage("messages.reload_failed", mapOf("stage" to report.failures().first().stage())))
+                }
                 true
             }
             "help" -> {

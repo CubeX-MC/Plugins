@@ -49,7 +49,7 @@ EcoBalancer 目前正在测试中。我们建议在部署前进行严格评估�
 
 ### 基础命令
 - `/ecobal help`：显示帮助信息
-- `/ecobal reload`：重新加载配置文件
+- `/ecobal reload`：重新加载配置和语言文件，并重新安排任务；失败时提示出错阶段，详情见服务端日志
 - `/ecobal checkall [filters...]`：根据配置与过滤参数更新玩家余额
 - `/ecobal checkplayer <player>`：根据配置设置更新指定离线玩家的余额
 - `/ecobal gui`：打开 GUI 仪表盘/策略菜单
