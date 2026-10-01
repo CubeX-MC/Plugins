@@ -59,7 +59,7 @@ class EcoBalancerMigrationTest {
                 config.getStringList("debt-commands").get(0));
 
         YamlConfiguration lang = YamlConfiguration.loadConfiguration(langDir.resolve("en_US.yml").toFile());
-        assertEquals(6, lang.getInt("lang-version"));
+        assertEquals(7, lang.getInt("lang-version"));
         assertEquals("<gray>[<gold>EcoBalancer<gray>]<reset>", lang.getString("prefix"));
         assertEquals("<prefix> <green>Reloaded", lang.getString("messages.reload_success"));
         assertEquals("<gold>Header<reset>", lang.getString("messages.stats_hist_header"));
@@ -98,7 +98,7 @@ class EcoBalancerMigrationTest {
 
         // Assert
         YamlConfiguration lang = YamlConfiguration.loadConfiguration(langDir.resolve("en_US.yml").toFile());
-        assertEquals(6, lang.getInt("lang-version"));
+        assertEquals(7, lang.getInt("lang-version"));
         assertNotNull(lang.getString("messages.tax.economy_failed"),
                 "a key added in v5 must reach servers that were already on v4");
         assertEquals("<gray>[<gold>Taxes & Fees<gray>]<reset>", lang.getString("prefix"),
@@ -122,11 +122,33 @@ class EcoBalancerMigrationTest {
         assertTrue(migrator.migrateLanguageFile("en_US"));
 
         YamlConfiguration lang = YamlConfiguration.loadConfiguration(langDir.resolve("en_US.yml").toFile());
-        assertEquals(6, lang.getInt("lang-version"));
+        assertEquals(7, lang.getInt("lang-version"));
         assertNotNull(lang.getString("messages.reload_failed"));
         assertEquals("<prefix> <green>Custom reload text", lang.getString("messages.reload_success"));
         assertEquals("<gray>[<gold>Taxes & Fees<gray>]<reset>", lang.getString("prefix"));
         assertFalse(migrator.migrateLanguageFile("en_US"));
+    }
+
+    @Test
+    void versionSixLanguageGainsGuiKeysWithoutChangingCustomTitle() throws Exception {
+        EcoBalancer plugin = mockPlugin();
+        Path langDir = Files.createDirectories(tempDir.resolve("lang"));
+        Files.writeString(langDir.resolve("zh_CN.yml"), """
+                lang-version: 6
+                messages:
+                  gui:
+                    main_menu_title: '<gold>我的经济菜单'
+                """, StandardCharsets.UTF_8);
+
+        ConfigMigrator migrator = new ConfigMigrator(plugin);
+        assertTrue(migrator.migrateLanguageFile("zh_CN"));
+
+        YamlConfiguration lang = YamlConfiguration.loadConfiguration(langDir.resolve("zh_CN.yml").toFile());
+        assertEquals(7, lang.getInt("lang-version"));
+        assertEquals("<gold>我的经济菜单", lang.getString("messages.gui.main_menu_title"));
+        assertEquals("<aqua><bold>经济仪表盘", lang.getString("messages.gui.dash_header_name"));
+        assertEquals("上一页", lang.getString("messages.gui.btn_prev_page").replace("<green>", ""));
+        assertFalse(migrator.migrateLanguageFile("zh_CN"));
     }
 
     @Test

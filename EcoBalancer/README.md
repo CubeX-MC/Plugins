@@ -39,7 +39,7 @@ EcoBalancer 是一个智能的 Minecraft 经济插件，通过对不活跃玩家
 
 **注意**：\
 EcoBalancer 目前正在测试中。我们建议在部署前进行严格评估。如有bug反馈或建议，请提交 issue。
-另外，更新时请确保删除旧的配置文件和语言文件。
+更新时请保留旧的配置和语言文件；插件启动时会迁移并备份，缺失的语言键也可通过 `/eb migrate run` 合并。
 
 **前置插件**：Vault
 
@@ -53,6 +53,7 @@ EcoBalancer 目前正在测试中。我们建议在部署前进行严格评估�
 - `/ecobal checkall [filters...]`：根据配置与过滤参数更新玩家余额
 - `/ecobal checkplayer <player>`：根据配置设置更新指定离线玩家的余额
 - `/ecobal gui`：打开 GUI 仪表盘/策略菜单
+- GUI 文案可在 `lang/en_US.yml` 或 `lang/zh_CN.yml` 的 `messages.gui` 中调整
 - `/ecobal migrate <check|run|backup>`：检查/执行迁移并创建备份
 - `/ecobal tax ...`：管理税收配置与策略执行
 - `/ecobal tax status`：查看当前征税任务进度

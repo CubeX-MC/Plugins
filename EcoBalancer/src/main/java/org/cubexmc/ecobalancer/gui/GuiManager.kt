@@ -52,7 +52,7 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
         val active = plugin.policyManager.getActivePolicy()
         val activePolicyName = active?.name ?: tr("messages.gui.none", "None")
         val scheduleInfo = if (active != null) {
-            "${active.scheduleType} @ ${active.checkTime}"
+            "${scheduleTypeLabel(active.scheduleType)} @ ${active.checkTime}"
         } else {
             tr("messages.gui.na", "N/A")
         }
@@ -254,7 +254,12 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
         if (page < 1) page = 1
         if (page > totalPages) page = totalPages
 
-        val inv = Bukkit.createInventory(null, 54, tr("messages.gui.tax_policies_title", "&6Tax Policies") + " - Page " + page)
+        val inv = Bukkit.createInventory(
+            null,
+            54,
+            tr("messages.gui.tax_policies_title", "&6Tax Policies") +
+                tr("messages.gui.page_suffix", " - Page ") + page + tr("messages.gui.page_unit", ""),
+        )
         val active = plugin.policyManager.getActivePolicy()
         val activeName = active?.name ?: ""
 
@@ -295,7 +300,7 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
             val lore = ArrayList<String>()
             lore.add("§7$desc")
             lore.add("")
-            lore.add(tr("messages.gui.tp_item_schedule", "&7Schedule: &f") + capitalize(schedule) + " @ " + time)
+            lore.add(tr("messages.gui.tp_item_schedule", "&7Schedule: &f") + scheduleTypeLabel(schedule) + " @ " + time)
             lore.add(tr("messages.gui.tp_item_routine", "&7Routine: ") + if (isRoutine) tr("messages.gui.yes_auto", "&aYes (Auto)") else tr("messages.gui.no_manual", "&cNo (Manual)"))
             lore.add("")
             if (isActive) {
@@ -359,7 +364,7 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
             ),
         )
 
-        inv.setItem(18, createItem(Material.COMPASS, tr("messages.gui.pd_toggle_schedule_type", "&eToggle Schedule Type"), tr("messages.gui.pd_schedule_type", "&7Type: &f") + capitalize(policy.scheduleType), "", tr("messages.gui.pd_desc_schedule_type", "&7Select daily, weekly, or monthly execution."), "", tr("messages.gui.click_toggle", "&aClick to toggle")))
+        inv.setItem(18, createItem(Material.COMPASS, tr("messages.gui.pd_toggle_schedule_type", "&eToggle Schedule Type"), tr("messages.gui.pd_schedule_type", "&7Type: &f") + scheduleTypeLabel(policy.scheduleType), "", tr("messages.gui.pd_desc_schedule_type", "&7Select daily, weekly, or monthly execution."), "", tr("messages.gui.click_toggle", "&aClick to toggle")))
         inv.setItem(19, createItem(Material.CLOCK, tr("messages.gui.pd_edit_time", "&eEdit Time"), tr("messages.gui.pd_time", "&7Time: &f") + policy.checkTime, "", tr("messages.gui.pd_desc_time", "&7The exact time of day to trigger the policy."), "", tr("messages.gui.click_edit_chat", "&aClick to edit in chat")))
 
         if ("weekly".equals(policy.scheduleType, ignoreCase = true)) {
@@ -437,9 +442,26 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
 
     private fun formatDaysOfWeek(days: List<Int>?): String {
         if (days.isNullOrEmpty()) return ""
-        val dayNames = arrayOf("", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+        val dayNames = arrayOf(
+            "",
+            tr("messages.gui.day_sun", "Sun"),
+            tr("messages.gui.day_mon", "Mon"),
+            tr("messages.gui.day_tue", "Tue"),
+            tr("messages.gui.day_wed", "Wed"),
+            tr("messages.gui.day_thu", "Thu"),
+            tr("messages.gui.day_fri", "Fri"),
+            tr("messages.gui.day_sat", "Sat"),
+        )
         return days.filter { it in 1..7 }.joinToString(", ") { dayNames[it] }
     }
+
+    private fun scheduleTypeLabel(value: String?): String =
+        when (value?.lowercase(Locale.ROOT)) {
+            "daily" -> tr("messages.gui.schedule_daily", "Daily")
+            "weekly" -> tr("messages.gui.schedule_weekly", "Weekly")
+            "monthly" -> tr("messages.gui.schedule_monthly", "Monthly")
+            else -> capitalize(value)
+        }
 
     private fun createItem(mat: Material, data: Int, name: String, vararg lore: String): ItemStack {
         val item = ItemStack(mat, 1, data.toShort())
@@ -611,11 +633,11 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
                 val meta = current.itemMeta
                 if (meta != null && meta.hasDisplayName()) {
                     val name = meta.displayName
-                    if (name.contains("Previous Page")) {
+                    if (name == tr("messages.gui.btn_prev_page", "&aPrevious Page")) {
                         val page = viewingPolicyPage.getOrDefault(player.uniqueId, 1)
                         openTaxPolicies(player, page - 1)
                         return
-                    } else if (name.contains("Next Page")) {
+                    } else if (name == tr("messages.gui.btn_next_page", "&aNext Page")) {
                         val page = viewingPolicyPage.getOrDefault(player.uniqueId, 1)
                         openTaxPolicies(player, page + 1)
                         return
@@ -678,7 +700,7 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
     private fun promptForInput(player: Player, prompt: String, callback: Consumer<String>) {
         player.closeInventory()
         player.sendMessage(tr("messages.gui.chat_prefix", "&e[EcoBalancer] &f") + prompt)
-        player.sendMessage(tr("messages.gui.chat_cancel_hint", "&7Type 'cancel' to abort."))
+        player.sendMessage(plugin.getFormattedMessage("messages.gui.chat_cancel_hint", mapOf("keyword" to tr("messages.gui.chat_cancel_keyword", "cancel"))))
         // 与下沉前一致:本插件的提问没有超时(0 表示永不过期)。
         chatInputs.open(player.uniqueId, allowClear = false, timeoutMillis = 0L, payload = callback)
     }
@@ -686,12 +708,12 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
     private fun handlePolicyDetailsClick(player: Player, current: ItemStack, title: String, click: ClickType) {
         var policyName = viewingPolicyDetails[player.uniqueId]
         if (policyName == null) {
-            policyName = title.replace(tr("messages.gui.policy_title_prefix", "&6Policy: "), "").replace(" (Brackets)", "")
+            policyName = title.replace(tr("messages.gui.policy_title_prefix", "&6Policy: "), "").replace(tr("messages.gui.be_suffix", " (Brackets)"), "")
         }
 
         val policy = plugin.policyManager.getPolicy(policyName) ?: return
         val currentPolicyName = policyName(policy, policyName)
-        val isBracketsView = title.contains("(Brackets)")
+        val isBracketsView = title.endsWith(tr("messages.gui.be_suffix", " (Brackets)"))
 
         if (isBracketsView) {
             handleBracketsClick(player, current, click, policyName, policy)
@@ -855,7 +877,7 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
             }
             Material.GOLD_NUGGET -> {
                 val meta = current.itemMeta
-                if (meta != null && meta.hasDisplayName() && meta.displayName.startsWith(tr("messages.gui.be_bracket_prefix", "&eBracket: ")) && click.isShiftClick) {
+                if (meta != null && click.isShiftClick) {
                     val lore = meta.lore
                     if (lore != null) {
                         for (line in lore) {
@@ -926,8 +948,10 @@ class GuiManager(private val plugin: EcoBalancer) : Listener {
     }
 
     private fun tr(key: String, fallback: String): String {
-        val value = plugin.langConfig.getString(key, fallback) ?: fallback
-        return ChatColor.translateAlternateColorCodes('&', value)
+        if (plugin.langConfig.getString(key) != null) {
+            return plugin.getFormattedMessage(key, null)
+        }
+        return ChatColor.translateAlternateColorCodes('&', fallback)
     }
 
     private fun policyName(policy: TaxPolicy, fallback: String): String = policy.name ?: fallback
