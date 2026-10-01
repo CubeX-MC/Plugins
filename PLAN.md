@@ -509,7 +509,7 @@ Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证�
 免税与欠款策略。
 
 - [ ] R2 事件税收框架（见 §4）
-- [ ] 接入 `ReloadChain`，让 reload 失败能定位到具体阶段
+- [x] 接入 `ReloadChain`：启动与 `/ecobal reload`、迁移后重载按 config/tasks/language/file-logging/schedule/tax-account 阶段执行；失败时日志与命令指出阶段，不再误报成功。重载重新注册每日记录清理任务；lang-version 5→6 只合并新增的失败提示键
 
 **实现约束（对比 QuickTax 时的已定取舍，别照搬回来）**：不用静态全局 `isCollecting`/`task` 存运行状态 ·
 异步线程不直接访问 Vault 后只靠异常兜底 · 不拼接 SQL 字符串批量写 · 统计继续用 SQLite 而非 YAML ·
@@ -897,8 +897,13 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
       `hasFlag`/`setFlag`/`clearFlag`（BYTE 当布尔）· `getUuid`/`setUuid` · `getEnum`/`setEnum` ·
       `getStringOr`/`getIntOr`/`getLongOr`。
       重点不是少打字，是把"**外部数据不可信**"收敛到一处——PDC 内容可被手改、被别的插件写坏、被迁移留半截。
-      现状是 MountLicense 为此写了**四处一模一样**的 `try/catch UUID.fromString`，而枚举名解析各处**完全没有防护**
-      （`valueOf` 遇到已删除的枚举项会抛）。MountLicense 的 4 处已切换，其余插件的机械替换未做
+      下沉前 MountLicense 为此写了**四处一模一样**的 `try/catch UUID.fromString`，而枚举名解析各处**完全没有防护**
+      （`valueOf` 遇到已删除的枚举项会抛）。MountLicense 的 4 处已切换；RuleGems 的宝石物品、
+      展示实体的标记与 UUID 读写，以及四处 GUI 的 UUID 读取也已切换，`RuleGems:build jarGate` 通过。
+      Metro/Railway 的矿车 BYTE 标记读写已切到 `hasFlag`/`setFlag`，Railway 的列车 UUID 写入切到
+      `setUuid`；两侧各自的 `build`/`jarGate` 已通过，PDC 键名、底层类型和值未变。
+      MountLicense 的 UUID 写入及 Contract 的 RuleGems 标记检查也已切换，各自 `build`/`jarGate` 通过。
+      余下的业务字符串与可空读取保留原 PDC 操作，以免改变语义
 - [x] **`Cooldown`**（[`Cooldown.kt`](modules/cubex-core/src/main/kotlin/org/cubexmc/core/Cooldown.kt)，10 条单测）：
       时长是 supplier（reload 立刻生效）、`<= 0` 表示不设冷却、被拒绝的尝试**不**续期、
       `remainingSeconds` 向上取整并与下沉前的算法逐值对齐（单测锁住）。RuleGems 两处已切换
