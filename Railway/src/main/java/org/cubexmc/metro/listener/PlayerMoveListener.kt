@@ -12,7 +12,7 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.metadata.FixedMetadataValue
-import org.bukkit.persistence.PersistentDataType
+import org.cubexmc.core.hasFlag
 import org.cubexmc.metro.Metro
 import org.cubexmc.metro.model.Line
 import org.cubexmc.metro.model.Stop
@@ -358,7 +358,7 @@ class PlayerMoveListener(private val plugin: Metro) : Listener {
     private fun isInMetroMinecart(player: Player): Boolean {
         val minecart = player.vehicle as? Minecart ?: return false
         val minecartKey = MetroConstants.getMinecartKey()
-        if (minecartKey != null && minecart.persistentDataContainer.has(minecartKey, PersistentDataType.BYTE)) {
+        if (minecartKey != null && minecart.persistentDataContainer.hasFlag(minecartKey)) {
             return true
         }
         return plugin.lineServiceManager?.getTrainByMinecart(minecart.uniqueId) != null

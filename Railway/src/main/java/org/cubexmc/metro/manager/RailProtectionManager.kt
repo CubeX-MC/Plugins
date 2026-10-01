@@ -11,7 +11,7 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
-import org.bukkit.persistence.PersistentDataType
+import org.cubexmc.core.hasFlag
 import org.cubexmc.metro.Metro
 import org.cubexmc.metro.model.Line
 import org.cubexmc.metro.model.RoutePoint
@@ -205,7 +205,7 @@ class RailProtectionManager(private val plugin: Metro) : Listener {
         }
         val minecart = player.vehicle as? Minecart ?: return false
         val minecartKey = MetroConstants.getMinecartKey() ?: return false
-        return minecart.persistentDataContainer.has(minecartKey, PersistentDataType.BYTE)
+        return minecart.persistentDataContainer.hasFlag(minecartKey)
     }
 
     @Synchronized

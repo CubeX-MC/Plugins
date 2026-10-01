@@ -9,7 +9,7 @@ import org.bukkit.entity.Entity
 import org.bukkit.entity.HumanEntity
 import org.bukkit.entity.Minecart
 import org.bukkit.entity.Player
-import org.bukkit.persistence.PersistentDataType
+import org.cubexmc.core.setUuid
 import org.bukkit.util.Vector
 import org.cubexmc.metro.Metro
 import org.cubexmc.metro.control.TrainControlMode
@@ -90,7 +90,7 @@ class TrainInstance(
 
     private fun tagMinecarts() {
         for (cart in consist.getCars()) {
-            cart.persistentDataContainer.set(key, PersistentDataType.STRING, id.toString())
+            cart.persistentDataContainer.setUuid(key, id)
         }
     }
 

@@ -19,6 +19,7 @@ import org.bukkit.event.vehicle.VehicleEnterEvent
 import org.bukkit.event.vehicle.VehicleExitEvent
 import org.bukkit.event.vehicle.VehicleMoveEvent
 import org.bukkit.persistence.PersistentDataType
+import org.cubexmc.core.hasFlag
 import org.bukkit.util.Vector
 import org.cubexmc.metro.Metro
 import org.cubexmc.metro.event.TrainEnterStopEvent
@@ -342,7 +343,7 @@ class VehicleListener(private val plugin: Metro) : Listener {
 
     private fun isMetroMinecart(minecart: Minecart): Boolean {
         val minecartKey = MetroConstants.getMinecartKey() ?: return false
-        return minecart.persistentDataContainer.has(minecartKey, PersistentDataType.BYTE)
+        return minecart.persistentDataContainer.hasFlag(minecartKey)
     }
 
     private fun isRailwayTrainMinecart(minecart: Minecart): Boolean =

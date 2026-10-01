@@ -7,7 +7,7 @@ import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Minecart
-import org.bukkit.persistence.PersistentDataType
+import org.cubexmc.core.hasFlag
 import org.cubexmc.config.ReloadChain
 import org.cubexmc.config.ReloadFailurePolicy
 import org.cubexmc.config.ReloadReport
@@ -350,7 +350,7 @@ class Metro : CubexPlugin() {
         for (world in Bukkit.getWorlds()) {
             for (entity in world.entities) {
                 if (entity is Minecart &&
-                    entity.persistentDataContainer.has(minecartKey, PersistentDataType.BYTE)
+                    entity.persistentDataContainer.hasFlag(minecartKey)
                 ) {
                     entity.eject()
                     entity.remove()
