@@ -68,12 +68,15 @@ flush-data → default-files → config-migrations → config
 
 ## 调度约定
 
-`SchedulerUtil` 经反射使用 Folia API，因此可以继续对 Spigot API 编译：
+`cubex-scheduler` 的 `CubexScheduler` 经 FoliaLib 适配 Paper/Bukkit 与 Folia；尚未迁移的
+`SchedulerUtil` 调用委派给 `LegacySchedulerAdapter`：
 
 - global：插件级工作（自动保存协调、延迟地图刷新、线路服务心跳）；
 - entity：读写玩家、矿车等实体；
 - region：按位置读写世界 / 方块（生成矿车、传送门目的地、铁轨检查）；
 - async：只做文件 I/O 或对已生成快照的序列化，不碰任何 Bukkit 世界状态。
+
+聊天输入回调复用插件级 `CubexScheduler`，在玩家的 entity scheduler 执行。
 
 `SchedulerUtil` / `LegacySchedulerAdapter` 向 `CubexScheduler` 原生 API 的收敛是非阻塞待办
 （根 `PLAN.md` §5.7），不要为此制造大 diff。
