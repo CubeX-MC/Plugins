@@ -614,6 +614,8 @@ class TrainMovementTaskExtendedTest {
             bukkitMock.when(org.bukkit.Bukkit::getServer).thenReturn(server);
             bukkitMock.when(org.bukkit.Bukkit::getScheduler).thenReturn(mock(org.bukkit.scheduler.BukkitScheduler.class));
 
+            when(plugin.getTaskScheduler$Railway()).thenReturn(mock(org.cubexmc.scheduler.CubexScheduler.class));
+
             World world = mock(World.class);
             Location cartLocation = new Location(world, 100, 64, 100);
             Location stopLocation = new Location(world, 100, 64, 100);
