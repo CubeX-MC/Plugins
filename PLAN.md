@@ -635,8 +635,10 @@ Vault 模式共享信誉服务，bStats 31877。
       `ModernChatBridge` 目前是防御性的，等 Paper 真移除时才成为承重件
 - [x] **B 轮现代聊天链路已验**（Contract，2026-08-20）：`AsyncChatEvent` 分支确实生效。
       至此 §2 阶段全部通过 —— **本轮重构零回归**，MountLicense 的损坏 UUID 也确认被安静忽略
-- [ ] EcoBalancer 的 `lang/*.yml` **完全没有 `messages.gui.*` 这组键**，
-      GUI 文案全靠代码里的 fallback，服主无法翻译。属既有缺口，单独修
+- [x] EcoBalancer GUI 文案键补齐：原记录有误，语言文件已有 52 个 `messages.gui.*` 键，
+      但源码实际引用 214 个。现已补齐两种语言的全部 GUI 键，并把 `tr()` 的主路径改为
+      `I18nService` 渲染 MiniMessage；翻页、税阶标题和星期名也按语言文件匹配。
+      `lang-version` 6→7 只合并缺失键，保留服主改过的文案；测试核对全部引用
 - [x] 给 Contract / Clarity 补 `docs/release-checklist.md`（2026-08-25）；StateCharge / Reputations
       此前已完成，Metro/Railway/Regions 已有。两份新清单均覆盖 `jarGate` 不查的
       `plugin.yml`、bStats id、SQLite 平台内容和 Adventure 副本
