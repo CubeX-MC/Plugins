@@ -1,6 +1,22 @@
-# Contract
-
-![](https://bstats.org/signatures/bukkit/Contract.svg)
+<div align="center">
+  <h1>Contract</h1>
+  <p>玩家对玩家合同平台：资金托管、流程可审计、争议可裁决</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/Contract"><img src="https://img.shields.io/github/stars/CubeX-MC/Contract?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/Contract/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/Contract?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/Contract/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/Contract?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Paper-1.18%2B-5D8AA8?style=flat-square" alt="Paper 1.18+">
+  </p>
+  <p>
+    <a href="https://github.com/CubeX-MC/Contract">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/Contract/issues">问题反馈</a>
+  </p>
+  <p>
+    <img src="https://bstats.org/signatures/bukkit/Contract.svg" alt="bStats">
+  </p>
+</div>
 
 玩家对玩家合同平台。当前版本提供 SERVICE 委托、WAGER 对赌、PARTNERSHIP 合作和 SALE 交易四类合同，重点保证 Vault/物品托管、接受邀请、确认、裁决、取消退款和管理员仲裁流程正确。
 

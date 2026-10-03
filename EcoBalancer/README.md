@@ -1,6 +1,24 @@
-# EcoBalancer: 智能经济平衡插件
-
-[English](README_en.md) | 简体中文
+<div align="center">
+  <img src="img/ecobalancer.webp" width="112" alt="EcoBalancer Logo">
+  <h1>EcoBalancer</h1>
+  <p>智能的 Minecraft 经济平衡插件</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/EcoBalancer"><img src="https://img.shields.io/github/stars/CubeX-MC/EcoBalancer?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/EcoBalancer/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/EcoBalancer?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/EcoBalancer/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/EcoBalancer?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Spigot%20%2F%20Paper-1.16%2B-5D8AA8?style=flat-square" alt="Spigot / Paper 1.16+">
+  </p>
+  <p>
+    <a href="README_en.md">English</a>
+    ·
+    <a href="https://github.com/CubeX-MC/EcoBalancer">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/EcoBalancer/issues">问题反馈</a>
+    ·
+    <a href="https://modrinth.com/plugin/ecobalancer">Modrinth</a>
+  </p>
+</div>
 
 EcoBalancer 是一个智能的 Minecraft 经济插件，通过对不活跃玩家实施智能税收系统来优化服务器经济。它促进公平竞争，创造活跃的游戏环境，并为服务器经济提供智能管理解决方案。
 

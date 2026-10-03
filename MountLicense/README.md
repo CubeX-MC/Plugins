@@ -1,6 +1,22 @@
-# MountLicense
-
-![](https://bstats.org/signatures/bukkit/MountLicense.svg)
+<div align="center">
+  <h1>MountLicense</h1>
+  <p>载具牌照插件：把可骑乘实体注册为玩家的私有交通资产</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/MountLicense"><img src="https://img.shields.io/github/stars/CubeX-MC/MountLicense?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/MountLicense/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/MountLicense?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/MountLicense/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/MountLicense?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Spigot%20%2F%20Paper-1.18.2%2B-5D8AA8?style=flat-square" alt="Spigot / Paper 1.18.2+">
+  </p>
+  <p>
+    <a href="https://github.com/CubeX-MC/MountLicense">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/MountLicense/issues">问题反馈</a>
+  </p>
+  <p>
+    <img src="https://bstats.org/signatures/bukkit/MountLicense.svg" alt="bStats">
+  </p>
+</div>
 
 载具牌照插件。把马、驴、骡、猪、炽足兽、羊驼、骆驼、乐魂、鹦鹉螺、船、矿车等可骑乘实体注册为玩家的私有交通资产，并提供基础的所有权与索引管理。
 

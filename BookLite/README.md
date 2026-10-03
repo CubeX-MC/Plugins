@@ -1,6 +1,23 @@
-# BookLite
-
-![](https://bstats.org/signatures/bukkit/BookLite.svg)
+<div align="center">
+  <h1>BookLite</h1>
+  <p>把成书正文剥离出物品数据的轻量化存储插件</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/BookLite"><img src="https://img.shields.io/github/stars/CubeX-MC/BookLite?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/BookLite/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/BookLite?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/BookLite/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/BookLite?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Spigot%20%2F%20Paper-1.18%2B-5D8AA8?style=flat-square" alt="Spigot / Paper 1.18+">
+    <img src="https://img.shields.io/badge/Folia-supported-brightgreen?style=flat-square" alt="Folia">
+  </p>
+  <p>
+    <a href="https://github.com/CubeX-MC/BookLite">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/BookLite/issues">问题反馈</a>
+  </p>
+  <p>
+    <img src="https://bstats.org/signatures/bukkit/BookLite.svg" alt="bStats">
+  </p>
+</div>
 
 BookLite 是一个面向 Paper / Spigot 服务器的轻量化成书存储插件。
 
