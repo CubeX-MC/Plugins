@@ -1,6 +1,24 @@
-# EcoBalancer: A Smart Minecraft Economy Plugin
-
-English | [简体中文](README.md)
+<div align="center">
+  <img src="img/ecobalancer.webp" width="112" alt="EcoBalancer Logo">
+  <h1>EcoBalancer</h1>
+  <p>A smart Minecraft economy plugin that taxes inactive players</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/EcoBalancer"><img src="https://img.shields.io/github/stars/CubeX-MC/EcoBalancer?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/EcoBalancer/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/EcoBalancer?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/EcoBalancer/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/EcoBalancer?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Spigot%20%2F%20Paper-1.16%2B-5D8AA8?style=flat-square" alt="Spigot / Paper 1.16+">
+  </p>
+  <p>
+    <a href="README.md">简体中文</a>
+    ·
+    <a href="https://github.com/CubeX-MC/EcoBalancer">GitHub</a>
+    ·
+    <a href="https://github.com/CubeX-MC/EcoBalancer/issues">Issues</a>
+    ·
+    <a href="https://modrinth.com/plugin/ecobalancer">Modrinth</a>
+  </p>
+</div>
 
 EcoBalancer is a smart Minecraft economy plugin that optimizes your server's economy through an intelligent tax system for inactive players. It promotes fair competition, creates an active gaming environment, and provides smart management solutions for your server's economy.
 

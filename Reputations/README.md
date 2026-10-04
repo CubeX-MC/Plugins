@@ -1,6 +1,14 @@
-# Reputations
-
-![](https://bstats.org/signatures/bukkit/Reputations.svg)
+<div align="center">
+  <h1>Reputations</h1>
+  <p>跨插件共享的玩家信誉服务</p>
+  <p>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Spigot%20%2F%20Paper-1.18%2B-5D8AA8?style=flat-square" alt="Spigot / Paper 1.18+">
+  </p>
+  <p>
+    <img src="https://bstats.org/signatures/bukkit/Reputations.svg" alt="bStats">
+  </p>
+</div>
 
 跨插件共享的玩家信誉服务：各插件注册自己的信誉字段并更新数值，玩家在一个界面里看到全部。
 
