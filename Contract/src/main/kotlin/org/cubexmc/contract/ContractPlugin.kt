@@ -21,6 +21,7 @@ import org.cubexmc.contract.config.LangV2ToV3Step
 import org.cubexmc.contract.config.LangV3ToV4Step
 import org.cubexmc.contract.config.LangV4ToV5Step
 import org.cubexmc.contract.config.LangV5ToV6Step
+import org.cubexmc.contract.config.LangV6ToV7Step
 import org.cubexmc.contract.economy.EconomyService
 import org.cubexmc.contract.gui.ContractGui
 import org.cubexmc.contract.integrations.ContractPlaceholderExpansion
@@ -301,12 +302,13 @@ class ContractPlugin : CubexPlugin() {
         migrations.run(
             MigrationPlan.yaml("Contracts lang $locale", "lang/$locale.yml")
                 .versionKey("lang-version")
-                .targetVersion(6)
+                .targetVersion(7)
                 .addStep(LegacyTextToMiniMessageStep(1, 2))
                 .addStep(LangV2ToV3Step(this))
                 .addStep(LangV3ToV4Step(this))
                 .addStep(LangV4ToV5Step(this))
-                .addStep(LangV5ToV6Step(this)),
+                .addStep(LangV5ToV6Step(this))
+                .addStep(LangV6ToV7Step(this)),
         )
     }
 

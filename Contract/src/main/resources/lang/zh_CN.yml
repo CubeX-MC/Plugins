@@ -1,4 +1,4 @@
-lang-version: 6
+lang-version: 7
 prefix: "<#F4D03F>[Contract]<#F1F5F9> "
 
 status:
@@ -103,6 +103,12 @@ objective-prompts:
 
 ui:
   err-alliance-create-permission: "你没有创建联盟合同的权限。"
+  err-alliance-action-permission: "你没有执行此联盟操作的权限。"
+  err-alliance-action-member: "只有该联盟已注资的成员可以执行此操作。"
+  err-alliance-settlement-blocked: "该联盟仍有未决的注资或结算记录，请先联系管理员核账后继续。"
+  err-alliance-settlement-review: "联盟操作 <id> 需要核对，请管理员检查付款计划及经济插件记录后再处理。"
+  err-alliance-breach-status: "具名违约裁决只适用于全员签署后进入争议的联盟。"
+  err-alliance-close-blocked: "联盟必须先结算托管资金才能关闭，请使用核验后的退款或具名违约裁决。"
   err-alliance-accept-permission: "你没有接受联盟邀请的权限。"
   err-alliance-funding-blocked: "你或该联盟仍有未完成的资金记录，请先联系管理员核对；本次未扣款。"
   err-alliance-funding-review: "资金操作 <id> 需要核对，请勿重复支付；请管理员检查该操作的资金日志。"

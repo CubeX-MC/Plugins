@@ -12,7 +12,7 @@ enum class ContractType {
 
     // —— Types below are tracked individually in PLAN.md §5.1. ——
 
-    /** Model and phased funding exist; terminal settlement and player creation remain pending. */
+    /** UUID funding and terminal settlement services exist; player creation remains pending. */
     ALLIANCE,
 
     /** Item-for-money swap with command/GUI creation and role-owned settlement. */

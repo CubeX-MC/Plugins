@@ -30,6 +30,9 @@
       不降级到不认识 `PENDING_ACCEPT_MULTI` / `ALL_APPROVE` 的版本，也不绕过异常签署加载保护。
 - [ ] 开发测试中的 ALLIANCE 注资日志若有 `funding-phase`，核对成员 UUID、金额和签署操作 ID；
       PREPARED/REFUNDING 不确定窗口需结合经济插件记录人工核对，不直接删日志或降级。
+- [ ] 开发测试中的 ALLIANCE 终态记录核对 UUID 分配、发起人、`alliance-settlement-op` 与
+      READY/PAYING/PAID；PAYING 不重付，未决注资/付款不能经退款、直接关闭或清理绕过。
+      含新计划时不降级旧恢复实现。自动化证据见 `alliance-settlement-evidence.md`。
 - [ ] 清除旧 Contract JAR，只部署最终 shadow JAR，避免重复加载。
 - [ ] 启动日志确认 Vault economy 已连接，且没有 migration、pending transaction、escrow、
       scheduler 或语言资源错误。
@@ -49,6 +52,9 @@
       中英文各完成一次创建、接受、审批和领取反馈。
 - [ ] 从 `lang-version: 4` 升至 5，确认多方待签署标签补齐，原有中英文定制状态文案保留。
 - [ ] 从 `lang-version: 5` 升至 6，确认注资/恢复提示补齐并保留自定义文本。
+- [ ] 从 `lang-version: 6` 升至 7，确认联盟终态与付款核对提示补齐并保留自定义文本。
+- [ ] 在隔离环境通过 service 测试入口验证 ALLIANCE 部分/全员注资、全员审批、取消/超时、具名违约、
+      逐付款中断与重启恢复；记录真实余额、剩余托管和 journal，不能把模拟 YAML 测试当作已验收。
 - [ ] 正常停服与一次可控异常终止后，核对 `余额 + 托管` 守恒、pending journal 可解释且没有双付。
 - [ ] 在真实 Folia 完成创建、聊天输入、结算、reload 与停服流程，无线程违规。
 - [ ] 记录数据格式、回滚版本与恢复步骤；存在未人工核对的 payout/settlement 时不得发布。

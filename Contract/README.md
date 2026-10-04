@@ -305,7 +305,7 @@ display:
 | `messages` | 命令与聊天消息（走 MiniMessage，支持 `<prefix>`） |
 
 `lang-version: 3` 会把旧的 `&#RRGGBB` 转成 MiniMessage；v5 补齐多方待签署状态显示，
-当前 v6 补齐注资与故障核对提示。此前 `lang-version: 4` 增加 SALE
+v6 补齐注资与故障核对提示，当前 v7 补齐联盟终态操作与付款核对提示。此前 `lang-version: 4` 增加 SALE
 命令、向导、确认与领取文案。`/contract admin reload` 与启动迁移会把 jar 内新增的键补进服务器
 已有语言文件，管理员自己改过的措辞与已存在条目都不会被覆盖。
 
@@ -336,6 +336,17 @@ plugins/Contract/events.log
 资金日志采用原子替换写入；日志损坏时不会把它当作空文件覆盖。若开发测试的联盟注资记录中出现
 `funding-phase: PREPARED` 或 `REFUNDING`，代表外部扣款/退款结果尚不确定，自动恢复不会猜测或重复支付。
 请保留原日志、合同文件和经济插件交易记录，按操作 ID 核对；不要直接清空日志解锁，也不要带着未决记录降级。
+
+ALLIANCE 目前只开放内部 service：逐成员注资、全员审批、未全签取消/超时退款、全签争议退款及具名 UUID
+违约裁决已接入，玩家创建命令/GUI 尚未开放。成功与退款返还本金；违约者本金按整数分均分给其余成员，
+尾差按 UUID 排序分配。本阶段不收联盟创建费或结算佣金。
+
+联盟结算先在 `pending-transactions.yml` 保存 `alliance-settlement` v1 UUID 付款计划与发起人，
+合同同时保存 `metadata.alliance-settlement-op`。逐收款人 `READY` 代表尚未执行，可在恢复时继续；
+`PAID` 代表已确认付款，不再重付；`PAYING` 代表外部付款结果不确定，停止自动执行并等待人工核账。
+即使 Vault 返回失败，也不会自动重试该笔付款。未决注资/结算阻止新签署、二次结算、直接关闭与存档清理。
+请同时备份合同、pending、事件日志与经济插件记录；含新结算计划时不得降级到旧恢复实现，也不得删日志解锁。
+当前没有自动核账或人工解锁命令；真实 Paper/Folia/Vault 余额验收仍待完成。
 
 ## 已知边界
 

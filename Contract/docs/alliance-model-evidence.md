@@ -2,6 +2,8 @@
 
 > 本文保留模型切片完成时的验证结果；后续注资 service 的实现与证据见
 > [`alliance-funding-evidence.md`](alliance-funding-evidence.md)，当前待办仍以根 PLAN 为准。
+> 2026-10-01 的 CT-A01 终态 service 与恢复门禁见 [`alliance-settlement-evidence.md`](alliance-settlement-evidence.md)。
+> 下文保留 2026-08-27 的历史范围与结果。
 
 ## Task / starting state
 

@@ -3,6 +3,7 @@ package org.cubexmc.contract.storage
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.cubexmc.contract.ContractPlugin
+import org.cubexmc.contract.model.AllianceSettlement
 import java.io.File
 import java.io.IOException
 import java.math.BigDecimal
@@ -136,6 +137,43 @@ class PendingTransactionStore {
 
     @Throws(IOException::class)
     @Synchronized
+    fun beginAllianceSettlement(contractId: String, settlement: AllianceSettlement): String {
+        require(contractId.isNotBlank())
+        require(loadAll().none { it.contractId() == contractId }) { "Contract has unresolved funding or settlement" }
+        val id = UUID.randomUUID().toString()
+        val yaml = loadYaml()
+        val section = yaml.createSection("pending.$id")
+        section["type"] = PendingType.SETTLEMENT.name
+        section["purpose"] = ALLIANCE_SETTLEMENT
+        section["amount"] = "0"
+        section["contract-id"] = contractId
+        section["created-at"] = System.currentTimeMillis()
+        section.createSection("alliance-settlement", settlement.toMap())
+        saveYaml(yaml)
+        return id
+    }
+
+    @Throws(IOException::class)
+    @Synchronized
+    fun advanceAlliancePayment(id: String, recipient: UUID, expected: AllianceSettlement.Phase, next: AllianceSettlement.Phase) {
+        val yaml = loadYaml()
+        val section = requireNotNull(yaml.getConfigurationSection("pending.$id")) { "Settlement intent missing" }
+        require(section.getString("purpose") == ALLIANCE_SETTLEMENT && section.getString("type") == PendingType.SETTLEMENT.name)
+        val settlement = readAllianceSettlement(section).advance(recipient, expected, next)
+        section["alliance-settlement"] = null
+        section.createSection("alliance-settlement", settlement.toMap())
+        saveYaml(yaml)
+    }
+
+    private fun readAllianceSettlement(section: ConfigurationSection): AllianceSettlement {
+        val payload = requireNotNull(section.getConfigurationSection("alliance-settlement")) { "Missing alliance allocation" }
+        val map = LinkedHashMap(payload.getValues(false))
+        map["agreement"] = requireNotNull(payload.getConfigurationSection("agreement")).getValues(false)
+        return AllianceSettlement.fromMap(map)
+    }
+
+    @Throws(IOException::class)
+    @Synchronized
     fun clear(id: String) {
         val yaml = loadYaml()
         yaml["pending.$id"] = null
@@ -170,10 +208,15 @@ class PendingTransactionStore {
                     require(amount.signum() > 0)
                     amount.setScale(2, RoundingMode.UNNECESSARY)
                 }
-                entries.add(PendingEntry(id, type, playerUuid, amount, purpose, createdAt, contractId, payoutKey, settlementId, phase))
+                val allianceSettlement = if (purpose == ALLIANCE_SETTLEMENT || section.contains("alliance-settlement")) {
+                    require(purpose == ALLIANCE_SETTLEMENT && type == PendingType.SETTLEMENT && !contractId.isNullOrBlank() &&
+                        playerUuid == null && phase == null && amount.signum() == 0) { "Invalid alliance settlement intent" }
+                    readAllianceSettlement(section)
+                } else null
+                entries.add(PendingEntry(id, type, playerUuid, amount, purpose, createdAt, contractId, payoutKey, settlementId, phase, allianceSettlement))
             } catch (ex: RuntimeException) {
-                if (section.contains("funding-phase") || section.getString("purpose", "")?.startsWith("alliance-") == true) {
-                    throw IllegalStateException("Invalid alliance funding intent $id; manual review required", ex)
+                if (section.contains("funding-phase") || section.contains("alliance-settlement") || section.getString("purpose", "")?.startsWith("alliance-") == true) {
+                    throw IllegalStateException("Invalid alliance intent $id; manual review required", ex)
                 }
                 logger.warn("Skipping malformed pending transaction $id: ${ex.message}")
             }
@@ -222,6 +265,7 @@ class PendingTransactionStore {
     enum class FundingPhase { PREPARED, WITHDRAWN, REFUNDING, REFUNDED, REJECTED }
 
     companion object {
+        const val ALLIANCE_SETTLEMENT = "alliance-settlement"
         @JvmStatic
         fun isAllianceFunding(purpose: String?): Boolean = purpose == "alliance-create" || purpose == "alliance-accept"
     }
@@ -237,6 +281,7 @@ class PendingTransactionStore {
         private val payoutKey: String?,
         private val settlementId: String?,
         private val fundingPhase: FundingPhase? = null,
+        private val allianceSettlement: AllianceSettlement? = null,
     ) {
         fun id(): String = id
         fun type(): PendingType = type
@@ -248,6 +293,7 @@ class PendingTransactionStore {
         fun payoutKey(): String? = payoutKey
         fun settlementId(): String? = settlementId
         fun fundingPhase(): FundingPhase? = fundingPhase
+        fun allianceSettlement(): AllianceSettlement? = allianceSettlement
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -260,7 +306,8 @@ class PendingTransactionStore {
                 createdAt == other.createdAt &&
                 contractId == other.contractId &&
                 payoutKey == other.payoutKey &&
-                settlementId == other.settlementId && fundingPhase == other.fundingPhase
+                settlementId == other.settlementId && fundingPhase == other.fundingPhase &&
+                allianceSettlement?.toMap() == other.allianceSettlement?.toMap()
         }
 
         override fun hashCode(): Int {
@@ -274,6 +321,7 @@ class PendingTransactionStore {
             result = 31 * result + (payoutKey?.hashCode() ?: 0)
             result = 31 * result + (settlementId?.hashCode() ?: 0)
             result = 31 * result + (fundingPhase?.hashCode() ?: 0)
+            result = 31 * result + (allianceSettlement?.toMap()?.hashCode() ?: 0)
             return result
         }
 

@@ -231,6 +231,28 @@ class ContractsMigrationTest {
         return Path.of("src", "main", "resources", "lang", "zh_CN.yml");
     }
 
+    @Test
+    void langVersionSixAddsSettlementFeedbackWithoutReplacingEdits() throws Exception {
+        for (String locale : java.util.List.of("zh_CN", "en_US")) {
+            Path langFile = tempDir.resolve("lang").resolve(locale + ".yml");
+            Files.createDirectories(langFile.getParent());
+            Files.writeString(langFile, "lang-version: 6\nui:\n  err-alliance-invalid: Custom terms\n");
+            ContractPlugin plugin = mockPlugin();
+            when(plugin.getResource("lang/" + locale + ".yml")).thenAnswer(i ->
+                Files.newInputStream(Path.of("src/main/resources/lang/" + locale + ".yml")));
+            MigrationRunner runner = new MigrationRunner(plugin);
+            MigrationPlan plan = MigrationPlan.yaml("Settlement lang", "lang/" + locale + ".yml")
+                .versionKey("lang-version").targetVersion(7).addStep(new LangV6ToV7Step(plugin));
+            assertTrue(runner.run(plan).migrated());
+            assertTrue(runner.run(plan).skipped());
+            YamlConfiguration lang = YamlConfiguration.loadConfiguration(langFile.toFile());
+            assertEquals(7, lang.getInt("lang-version"));
+            assertEquals("Custom terms", lang.getString("ui.err-alliance-invalid"));
+            assertNotNull(lang.getString("ui.err-alliance-settlement-blocked"));
+            assertNotNull(lang.getString("ui.err-alliance-settlement-review"));
+        }
+    }
+
     private ContractPlugin mockPlugin() {
         ContractPlugin plugin = mock(ContractPlugin.class);
         // Mockito's inline mock maker intercepts final methods too, so log() would otherwise

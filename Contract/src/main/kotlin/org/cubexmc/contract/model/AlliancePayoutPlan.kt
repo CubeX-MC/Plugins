@@ -43,8 +43,10 @@ class AlliancePayoutPlan private constructor(transfers: List<Transfer>) {
             require(contract.status() in setOf(ContractStatus.PENDING_ACCEPT_MULTI, ContractStatus.IN_PROGRESS, ContractStatus.DISPUTED)) {
                 "Alliance refund requires a live alliance"
             }
-            val stakes = fundedStakes(contract)
-            return AlliancePayoutPlan(stakes.map { (id, amount) -> Transfer(id, id, amount) })
+            require(contract.status() == ContractStatus.PENDING_ACCEPT_MULTI || agreement(contract).allAccepted()) {
+                "Active alliance is missing funded signatures"
+            }
+            return principalRefund(contract)
         }
 
         @JvmStatic
@@ -52,7 +54,7 @@ class AlliancePayoutPlan private constructor(transfers: List<Transfer>) {
             require(contract.status() == ContractStatus.IN_PROGRESS && agreement(contract).allApproved()) {
                 "Alliance success requires every signature and approval on an active alliance"
             }
-            return refund(contract)
+            return principalRefund(contract)
         }
 
         /** Caller owns the disputed outcome/authority; this method only allocates principal. */
@@ -61,7 +63,18 @@ class AlliancePayoutPlan private constructor(transfers: List<Transfer>) {
             require(contract.status() == ContractStatus.DISPUTED && agreement(contract).allAccepted()) {
                 "Alliance breach requires a fully signed disputed alliance"
             }
-            val stakes = fundedStakes(contract)
+            return principalBreach(contract, defaulterUuid)
+        }
+
+        // Recovery validates the original allocation even after the terminal contract save.
+        internal fun principalRefund(contract: Contract): AlliancePayoutPlan {
+            val stakes = principalByUuid(contract).filterKeys { agreement(contract).hasAccepted(it) }
+            return AlliancePayoutPlan(stakes.map { (id, amount) -> Transfer(id, id, amount) })
+        }
+
+        internal fun principalBreach(contract: Contract, defaulterUuid: UUID): AlliancePayoutPlan {
+            require(agreement(contract).allAccepted()) { "Alliance breach requires every funded signature" }
+            val stakes = principalByUuid(contract)
             val forfeited = requireNotNull(stakes[defaulterUuid]) { "Alliance defaulter must be a funded member" }
             val beneficiaries = stakes.keys.filter { it != defaulterUuid }.sortedBy { it.toString() }
             val transfers = ArrayList<Transfer>()
@@ -112,12 +125,5 @@ class AlliancePayoutPlan private constructor(transfers: List<Transfer>) {
 
         private fun agreement(contract: Contract): AllianceAgreement = contract.checkedAllianceAgreement()
 
-        private fun fundedStakes(contract: Contract): Map<UUID, BigDecimal> {
-            val agreement = agreement(contract)
-            require(contract.status() == ContractStatus.PENDING_ACCEPT_MULTI || agreement.allAccepted()) {
-                "Active alliance is missing funded signatures"
-            }
-            return principalByUuid(contract).filterKeys { agreement.hasAccepted(it) }
-        }
     }
 }

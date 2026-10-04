@@ -108,7 +108,9 @@ Keep platform and artifact claims synchronized across:
   source/recipient UUID principal allocations. It does not call Vault or write a journal.
   `Contract.createAlliance` is a model factory; `ContractService.createAlliance` and
   its ALLIANCE accept dispatch call `service/AllianceFundingService` under the service
-  monitor for actual creator/member escrow. Terminal payout execution is not connected.
+  monitor for actual creator/member escrow. `service/AllianceSettlementService` connects
+  UUID approvals, cancellation/timeout refunds and admin-authorized named breach rulings.
+  `model/AllianceSettlement` snapshots allocations and recipient payment phases in the journal.
 - Localization: `config/LanguageManager`, `resources/lang/zh_CN.yml`, and
   `resources/lang/en_US.yml`.
 - Shared scheduling/config/i18n/runtime support: shaded `modules/cubex-*`.
@@ -206,8 +208,9 @@ runtimes cannot read `PENDING_ACCEPT_MULTI` / `ALL_APPROVE` and may skip them.
 Principal plans return each funded member's own stake on refund, require unanimous
 signing and approval for success, and split a named defaulter's stake among all other
 members on a disputed breach. Integer-cent division plus UUID-sorted remainder
-allocation conserves every source pool; fees/commission policy and terminal execution
-remain outside this calculation. Funding now persists the signature plus matching
+allocation conserves every source pool; fees/commission remain outside this calculation.
+The current service executes principal only, without alliance creation fees or commission.
+Funding persists the signature plus matching
 `metadata.alliance-funding-op-<uuid>`; the final signature activates the contract.
 An already funded invited member counts toward `limits.max-active-accepted-contracts`
 even while other signatures are pending. Creation uses `limits.max-open-contracts`;
@@ -226,10 +229,21 @@ strict YAML reads and same-directory atomic replacement without stale-backup fal
 unsupported atomic moves fail the write rather than downgrading to an unsafe overwrite.
 Do not downgrade with phased entries: older recovery cannot interpret them safely.
 
-Terminal service work must persist settlement intent before external effects and
-block settlement/retention while funding is unresolved; the old role-based executor
-must not execute ALLIANCE. See PLAN §5.1, `alliance-model-evidence.md`, and
-`alliance-funding-evidence.md`.
+ALLIANCE SETTLEMENT journal entries use purpose `alliance-settlement` and a nested
+`alliance-settlement` v1 snapshot: outcome, optional defaulter UUID, actor, full principal
+terms, funded signatures/approvals, source/recipient transfers and recipient payment phases.
+`metadata.alliance-settlement-op` anchors the operation in the contract before external effects.
+READY may resume, PAID is skipped, and PAYING stays for manual reconciliation even after
+a failed Vault response. Missing contracts, modified terms, conflicting operations or
+invalid payloads fail closed; no stale journal is discarded by generic recovery.
+Funding recovery runs first; unresolved funding or any competing intent prevents execution.
+Unresolved records block new signatures, settlement and retention. Admin direct-close and
+the role-based executor cannot process ALLIANCE; active cancellation enters dispute, while
+unsigned cancellation/timeout returns only funded stakes. Approval/cancellation/dispute use
+existing player permissions; named breach service requires `contract.admin.settle` and a
+fully signed disputed alliance. Player creation/GUI remains CT-A02. Language version is 7.
+Do not downgrade with the new settlement payload or clear uncertain records to unlock actions.
+See PLAN §5.1 and `alliance-settlement-evidence.md`; real Vault/Paper/Folia acceptance remains pending.
 
 The active artifact defines the shipped batch/template/scheduling invariants.
 Recurring schedules, replenishment and bulk settlement remain out of scope.

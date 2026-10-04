@@ -1,4 +1,4 @@
-lang-version: 6
+lang-version: 7
 prefix: "<#F4D03F>[Contract]<#F1F5F9> "
 
 status:
@@ -103,6 +103,12 @@ objective-prompts:
 
 ui:
   err-alliance-create-permission: "You do not have permission to create an alliance contract."
+  err-alliance-action-permission: "You do not have permission to perform this alliance action."
+  err-alliance-action-member: "Only funded members of this alliance may perform this action."
+  err-alliance-settlement-blocked: "This alliance has an unresolved funding or settlement record. Ask an admin to reconcile it before continuing."
+  err-alliance-settlement-review: "Alliance operation <id> requires review. Ask an admin to check its payment plan and economy records before retrying."
+  err-alliance-breach-status: "A named breach ruling requires a fully signed alliance in dispute."
+  err-alliance-close-blocked: "An alliance cannot be closed without settling its escrow. Use a verified refund or named breach ruling."
   err-alliance-accept-permission: "You do not have permission to accept an alliance invitation."
   err-alliance-funding-blocked: "You or this alliance have an unresolved funding record. Ask an admin to review it; no money was withdrawn this time."
   err-alliance-funding-review: "Funding operation <id> requires review. Do not pay again; ask an admin to check its funding journal."

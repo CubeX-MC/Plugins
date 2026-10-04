@@ -113,7 +113,8 @@ class LanguageParityTest {
                     record(defined, missing, simple.group(1), file);
                 }
                 Matcher conditional = UI_KEY_CONDITIONAL.matcher(source);
-                if (file.getFileName().toString().equals("AllianceFundingService.kt")) {
+                if (file.getFileName().toString().equals("AllianceFundingService.kt") ||
+                        file.getFileName().toString().equals("AllianceSettlementService.kt")) {
                     Matcher failures = FUNDING_FAIL_KEY.matcher(source);
                     while (failures.find()) record(defined, missing, failures.group(1), file);
                 }

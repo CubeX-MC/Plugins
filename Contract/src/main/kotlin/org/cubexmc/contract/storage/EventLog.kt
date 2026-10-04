@@ -13,6 +13,17 @@ class EventLog(private val plugin: ContractPlugin) {
     private val file: File = File(plugin.dataFolder, "events.log")
 
     fun append(contractId: String, type: String, detail: String?) {
+        try {
+            appendRequired(contractId, type, detail)
+        } catch (ex: IOException) {
+            plugin.log().warn("Failed to append event log: ${ex.message}")
+        }
+    }
+
+    /** Financial callers can fail closed when their write-ahead audit cannot be written. */
+    @Throws(IOException::class)
+    @Synchronized
+    fun appendRequired(contractId: String, type: String, detail: String?) {
         if (!plugin.dataFolder.exists()) {
             plugin.dataFolder.mkdirs()
         }
@@ -21,11 +32,7 @@ class EventLog(private val plugin: ContractPlugin) {
             " | " + type +
             " | " + sanitize(detail) +
             System.lineSeparator()
-        try {
-            FileWriter(file, true).use { writer -> writer.write(line) }
-        } catch (ex: IOException) {
-            plugin.log().warn("Failed to append event log: ${ex.message}")
-        }
+        FileWriter(file, true).use { writer -> writer.write(line) }
     }
 
     private fun sanitize(detail: String?): String {

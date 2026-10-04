@@ -1,5 +1,8 @@
 # ALLIANCE 注资与恢复验证 · 2026-08-27
 
+> 后续 CT-A01 终态 service（2026-10-01）见 [`alliance-settlement-evidence.md`](alliance-settlement-evidence.md)。
+> 本文保留注资切片的历史结果；当前执行入口仍是根 PLAN。
+
 ## Task / starting state
 
 - 请求：继续推进根 PLAN，真人测试继续暂缓。

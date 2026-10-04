@@ -207,8 +207,9 @@ internal class AllianceFundingService(
     }
 
     private fun blocked(player: UUID, contractId: String?): Boolean = try {
-        pending.loadAll().any { PendingTransactionStore.isAllianceFunding(it.purpose()) &&
-            (it.playerUuid() == player || contractId != null && it.contractId() == contractId) }
+        (contractId != null && storage.findById(contractId).orElse(null)?.metadata?.containsKey(AllianceSettlementService.OPERATION) == true) ||
+            pending.loadAll().any { (PendingTransactionStore.isAllianceFunding(it.purpose()) && it.playerUuid() == player) ||
+                (contractId != null && it.contractId() == contractId) }
     } catch (ex: Exception) {
         plugin.log().severe("Cannot read funding journal; alliance actions blocked: ${ex.message}")
         true

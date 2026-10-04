@@ -45,12 +45,18 @@ class ContractService(
     private val batchAcceptances: BatchAcceptanceStore,
 ) : RegionFundingExecutor {
     private val allianceFunding = AllianceFundingService(plugin, storage, economy, pending, eventLog)
+    private val allianceSettlement = AllianceSettlementService(plugin, storage, economy, pending, eventLog)
 
     /** Service-only entry until the full alliance lifecycle and player confirmation flow are wired. */
     @Synchronized
     fun createAlliance(creator: Player, creatorStake: BigDecimal, allyStakes: Map<String, BigDecimal>,
                        days: Int, title: String, description: String): ServiceResult =
         allianceFunding.create(creator, creatorStake, allyStakes, days, title, description)
+
+    /** Service-only UUID adjudication; player command/GUI wiring belongs to CT-A02. */
+    @Synchronized
+    fun resolveAlliance(arbiter: Player, contract: Contract, defaulter: UUID): ServiceResult =
+        allianceSettlement.resolve(arbiter, contract, defaulter)
 
     /**
      * Resolves a `ui.*` language key for a player-facing failure reason. Resolved per call rather
@@ -479,9 +485,15 @@ class ContractService(
 
     @Synchronized
     fun recoverPendingTransactions() {
-        for (entry in pending.loadAll()) {
+        val entries = pending.loadAll()
+        for (entry in entries) {
             if (PendingTransactionStore.isAllianceFunding(entry.purpose()) || entry.fundingPhase() != null) {
                 allianceFunding.recover(entry)
+                continue
+            }
+            if (entry.purpose() == PendingTransactionStore.ALLIANCE_SETTLEMENT || entry.allianceSettlement() != null) continue
+            if (entry.contractId()?.let { storage.findById(it).orElse(null)?.type() } == ContractType.ALLIANCE) {
+                plugin.log().severe("Unrecognized legacy alliance journal ${entry.id()}; manual review required")
                 continue
             }
             when (entry.type()) {
@@ -490,6 +502,10 @@ class ContractService(
                 PendingTransactionStore.PendingType.SETTLEMENT,
                 -> recoverInterruptedSettlement(entry)
             }
+        }
+        // Funding is reconciled first. Never let generic recovery discard UUID payout state.
+        for (entry in entries) {
+            if (entry.purpose() == PendingTransactionStore.ALLIANCE_SETTLEMENT) allianceSettlement.recover(entry)
         }
     }
 
@@ -1518,6 +1534,7 @@ class ContractService(
 
     @Synchronized
     fun approve(player: Player, contract: Contract): ServiceResult {
+        if (contract.type() == ContractType.ALLIANCE) return allianceSettlement.approve(player, contract)
         if (contract.type() == ContractType.PARTNERSHIP || contract.type() == ContractType.SALE) {
             return approveMutualContract(player, contract)
         }
@@ -1553,6 +1570,7 @@ class ContractService(
     }
 
     private fun cancelInternal(player: Player, contract: Contract): ServiceResult {
+        if (contract.type() == ContractType.ALLIANCE) return allianceSettlement.cancel(player, contract)
         val playerUuid = player.uniqueId
         val isOwner = playerUuid == contract.ownerUuid()
         val isContractor = playerUuid == contract.contractorUuid()
@@ -1585,6 +1603,7 @@ class ContractService(
 
     @Synchronized
     fun dispute(player: Player, contract: Contract, reason: String): ServiceResult {
+        if (contract.type() == ContractType.ALLIANCE) return allianceSettlement.dispute(player, contract, reason)
         val playerUuid = player.uniqueId
         val isOwner = playerUuid == contract.ownerUuid()
         val isContractor = playerUuid == contract.contractorUuid()
@@ -1621,6 +1640,9 @@ class ContractService(
      */
     @Synchronized
     fun withdrawDispute(player: Player, contract: Contract): ServiceResult {
+        if (contract.type() == ContractType.ALLIANCE &&
+            (storage.findById(contract.id()).orElse(null) !== contract || allianceSettlement.held(contract)))
+            return ServiceResult.fail(ui("err-alliance-settlement-blocked"))
         if (contract.status() != ContractStatus.DISPUTED) {
             return ServiceResult.fail(ui("err-withdraw-not-disputed"))
         }
@@ -1666,6 +1688,7 @@ class ContractService(
 
     @Synchronized
     fun adminRefund(contract: Contract, adminName: String): ServiceResult {
+        if (contract.type() == ContractType.ALLIANCE) return allianceSettlement.refund(contract, adminName)
         if (contract.status().isFinal()) {
             return ServiceResult.fail(ui("err-contract-final"))
         }
@@ -1682,6 +1705,7 @@ class ContractService(
 
     @Synchronized
     fun adminClose(contract: Contract, adminName: String): ServiceResult {
+        if (contract.type() == ContractType.ALLIANCE) return ServiceResult.fail(ui("err-alliance-close-blocked"))
         if (contract.status().isFinal()) {
             return ServiceResult.fail(ui("err-contract-final"))
         }
@@ -1743,6 +1767,7 @@ class ContractService(
         val closedDays = plugin.config.getInt("retention.closed-contract-days", 30)
         var removed = 0
         for (contract in storage.all()) {
+            if (contract.type() == ContractType.ALLIANCE && allianceSettlement.held(contract)) continue
             if (contract.hasStoredItems()) {
                 continue
             }
@@ -1772,6 +1797,7 @@ class ContractService(
 
     private fun expireAwaitingAcceptance(contract: Contract): ServiceResult =
         when (contract.status()) {
+            ContractStatus.PENDING_ACCEPT_MULTI -> allianceSettlement.expire(contract)
             ContractStatus.OPEN -> refund(contract, ContractStatus.EXPIRED, "EXPIRED", "contract expired before acceptance")
             ContractStatus.PENDING_ACCEPT -> refundPendingAcceptance(
                 contract,
@@ -1914,6 +1940,7 @@ class ContractService(
         detail: String,
         allowRegionLocked: Boolean = false,
     ): ServiceResult {
+        if (contract.type() == ContractType.ALLIANCE) return ServiceResult.fail(ui("err-alliance-settlement-blocked"))
         if (!allowRegionLocked && !contract.metadata[RegionFundingMetadata.REGION_ID].isNullOrBlank()) {
             return ServiceResult.fail(ui("err-auto-settle-blocked"))
         }
