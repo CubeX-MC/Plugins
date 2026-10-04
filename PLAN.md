@@ -13,6 +13,44 @@
 
 ---
 
+## 0. 当前执行入口（2026-10-01 核对）
+
+**计划尚未全部完成。** Kotlin 迁移、10 个共享模块、CubeXLib 双模式、脚手架/cookbook、
+薄糖层与 `explicitApi()` 已落地。剩余工作分别是代码实现、真实环境验收、发布准备和可选扩展。
+本日索引核对只检查计划、源码及已有证据；随后 CT-A01 已运行 Contract 完整构建/测试与 jarGate，
+证据见 §5.1，未运行实服测试。Metro/EcoBalancer 当前源码目录读取受限，其相关进度依据已提交记录，
+后续施工前仍须读取实际工作树。
+
+以下是执行索引；**勾选状态与证据只维护在指向的正文任务**。Regions 本轮具体验收任务以
+[`Regions/PLAN.md` §10.2](Regions/PLAN.md#102-真实服务端与玩家任务) 为唯一清单。
+旧日期的构建、冒烟和真人记录只适用于当时的包与环境，不自动覆盖新候选包。
+
+| 任务 ID / 入口 | 工作性质与当前边界 | 前置条件 / 顺序 |
+|---|---|---|
+| `R1-V01`，§4 R1 | 真实 WAGER 故障与余额验收；连接/加载及自动化前置已完成 | 优先执行；需 Paper、目标 Folia、真实 Vault provider 与参与者 |
+| `RG-V01`–`RG-V10`，Regions/PLAN §10.2；`REG-B01`，§5.2 | 本轮完整验收与首发数据基线；代码及隔离 Paper 冒烟已完成 | 按 Regions 清单准备环境并逐项保留记录；资金项引用 `R1-V01` |
+| `CT-A02`，§5.1（A01 自动化已完成） | ALLIANCE 玩家入口；模型、注资与终态 service 已完成 | 结算/恢复门禁已通过；A02 按正文接玩家流程并保留多人实服证据 |
+| `CT-V01`、`CT-V02`、`CT-B01`，§5.1 | SALE 真人链路、其余首发验收、首发数据基线 | SALE 真人验收维持原“暂缓”安排；准备工作与其他代码切片可独立推进 |
+| `RGEMS-V01`，§5.3 | 最新共享能力升级的实服验收 | 真实经济插件/银行与原服数据副本 |
+| `SC-V01`、`SC-B01`，§5.8 | StateCharge 正式 release 验收与数据基线 | 已实服使用；补未记录的矩阵，不把“投入使用”改成“未部署” |
+| `CL-V01`、`REP-V01`，§5.9–§5.10 | Clarity/Reputations 首发验收 | 各自发布检查单、目标版本及真人环境 |
+| `ECO-C01`，§4 R2 / §5.4 | 自定义事件税框架，未开工 | 可独立做；税收策略、账本与 Vault 线程约束保持现状 |
+| `RW-R01`–`RW-R07`，§5.7 Railway 本轮 | 线程、乘车权限、票务、reload、编组传送与资源占用修复 | 2026-10-02 审计发现；按正文施工顺序，不能以现有单测全绿认定完整可用 |
+| `RW-P01`–`RW-P05`，§5.7 Railway 本轮 | 三种物理模式的时序、状态、车距、轨道与兼容性补强 | 先统一运动命令与时间基准，再修各模式；默认仍为 reactive，未改变存档/配置 |
+| `RW-D01`、`RW-V01`，§5.7 Railway 本轮 | 使用说明对齐、物理/平台实服矩阵与成熟度验收 | 代码切片完成后；需真实 Paper/Folia、Vault、Java/Bedrock 玩家，缺证据保持未勾选 |
+| `MR-C01`，§5.7；`CT-R01`，§5.1 ITEM | 调度兼容层收敛、物品状态去重；非发布阻塞重构 | 分插件施工；不得混入玩法改动 |
+| `CT-C01`–`CT-C04`，§5.1 | LOAN、共享池、评价、周期租赁 | 按各条目的范围与模型前置推进；周期租赁最后做 |
+| `REG-D01`–`REG-D03`、`REG-E01`–`REG-E03`，§5.2 | Regions 长期方向，当前比赛链路不重做 | 本轮验收收口后；新资金语义另依赖 `R1-V01` |
+| `CT-E01`，§7.4；`LIB-S01`–`LIB-S03`，§7.5 | Contract 入账路由、有状态服务下沉 | 严守正文前置；不能以重构替代资金/多人验收 |
+| `BL-D01`、`ML-D01/02`、`SC-D01`、`REG-D04/05`、`RGEMS-D01` | 可选扩展或取舍，见各插件正文 | 先明确纳入/不纳入及完成标准；未选中的扩展不影响 core MVP |
+| `ML-V01`，§5.6；`REPO-V01`、`REPO-M01`，§6 | 补实服证据、最终包人工检查、历史目录维护 | 按当前候选包记录；目录维护先确认 worktree 与未保存改动 |
+
+每个任务完成时，在该条目后追加：`日期；实现提交或工作树范围；验证命令与结果；证据文件；
+仍未覆盖的环境/路径`。没有执行的真人、余额、线程或崩溃恢复场景继续保持未勾选；
+测试脚本和加载日志不能替代这些结果。纯 Markdown 更新只检查 diff 与链接，不为此构建全仓。
+
+---
+
 ## 1. 仓库现状速览
 
 | 维度 | 现状 |
@@ -23,7 +61,7 @@
 | Kotlin 化 | ✅ 2026-08-16 收口。全部插件与模块 opt-in Kotlin 并继承 `CubexPlugin` |
 | 字节码目标 | 全仓 Java 17；**Clarity 例外为 21**（1.21 属性 API）。`jarGate` 按各插件 release 分别校验 |
 | 正式 release | 已有：BookLite · MountLicense · Metro · Railway · RuleGems · EcoBalancer · FAWEReplacer。待首个 release：Contract · Regions · StateCharge · Clarity · Reputations。源码可见性另算：Contract · Regions · Clarity 已在镜像名单 |
-| 全仓验收 | `gradlew build jarGateAll` 全绿（12 插件 + CubeXLib + 9 模块，2026-08-19 复跑） |
+| 全仓自动化记录 | 最近记录为 `gradlew build jarGateAll` 与 `-p buildSrc test` 全绿（2026-09-27，§7.6）；这是历史验证，不代表 2026-10-01 工作树已重测或实服矩阵通过 |
 
 遗留 `.java` 仅：vendored bStats `Metrics.java`、Reputations 的公开 Java API
 （`org.cubexmc.reputations.api`，4 个文件，**故意保留**）、Metro/Railway 的互操作 shim。
@@ -241,7 +279,7 @@ stdlib。我们的 `jarGate` 强制 `unrelocatedKotlin=0` 且测试随每次构�
 `reward-source: contract`；Regions 用 `reward-funding.yml` 存 lease，重启/reload 以**同一 operation id**
 重放 lock/settle/refund，部分付款或状态不明 → `REVIEW_REQUIRED` 人工复核，绝不二次付款。
 
-- [ ] **真实 Paper/Folia + Vault 双插件故障注入验证** — 这是全仓剩余项里价值最高的一条：
+- [ ] **`R1-V01` 真实 Paper/Folia + Vault 双插件故障注入验证** — 这是全仓剩余项里价值最高的一条：
       它是"真钱跨插件流动 + 重启重放"唯一还没有实服证据的环节。
       场景至少覆盖：settle 中途关服、Vault provider 中途卸载、Contract 先于 Regions 卸载、
       同一 operation id 重复提交、`REVIEW_REQUIRED` 后的人工处理路径。
@@ -261,12 +299,18 @@ stdlib。我们的 `jarGate` 强制 `unrelocatedKotlin=0` 且测试随每次构�
       - [x] **Vault 失败回执的付款待办保全**：Contract 在入账调用返回失败后保留该笔 write-ahead
         `DEPOSIT`，将 WAGER 标记争议并以 `REVIEW_REQUIRED` 阻止第二次付款。自动化覆盖首笔失败与
         第二笔回执丢失的部分付款；真实 Vault 余额核对和人工处理仍待实服。
-      - [ ] **仍需真人余额链路**：真实 WAGER 的 settle 中途关服、Vault provider 中途卸载、
+      - **尚缺的验收证据**：真实 WAGER 的 settle 中途关服、Vault provider 中途卸载、
         Contract 先卸载、人工处理 `REVIEW_REQUIRED`，并在 Paper 与 Folia 核对余额守恒。
+      **执行入口**：[`Regions/REAL_PLAYER_TEST.md`](Regions/REAL_PLAYER_TEST.md) 的 Contract 奖励托管、
+      [`Contract/docs/release-checklist.md`](Contract/docs/release-checklist.md) 及两侧资金回归测试。
+      **完成条件**：每个场景记录双方/服务器账户前后余额、托管本金、operation id、两侧 lease/审计日志、
+      jar SHA-256 与环境版本；成功终态不双付，结果不确定时保留复核证据，缺 provider 不丢记录，
+      人工复核有可复现处理与处理后核账记录。Paper 与目标 Folia 分别通过；只加载服务或返回
+      CONTRACT_NOT_FOUND 不算本项完成。测试环境与真人缺席时记录具体缺口，不能用模拟 Vault 勾选。
 - ❌ ~~race / hide-and-seek / 赞助 / 多人分成的结果语义~~ —— 不是独立条目。
-      这些 Mode 在 Regions 侧本身还没做完，语义要和 §5.2 阶段 D 一起定，单列只会造成两处漂移。
+      竞速/捉迷藏运行链路现已补齐，新增资金语义仍统一在 §5.2 `REG-D02` 定义，单列会造成两处漂移。
 
-### R2 — EcoBalancer 基于自定义事件的税收（未开工，保留）
+### R2 — EcoBalancer 基于自定义事件的税收（`ECO-C01`，未开工）
 
 让税收不止"定时/交易"，而可挂在**自定义游戏事件**上（示例：`keepInventory` 生效时的死亡税）。
 需要**可扩展的"触发器 → 税目"框架**：事件源 + 条件 + 税率/税额 + 去向（销毁/系统/国库），
@@ -274,6 +318,13 @@ stdlib。我们的 `jarGate` 强制 `unrelocatedKotlin=0` 且测试随每次构�
 
 保留理由：这是本轮复审里**唯一新增玩家可见价值**的跨插件项，且已有天然落点——
 `TaxRunService` 的执行生命周期（账本、PAPI、进度状态都已挂在那里）。
+
+- [ ] **`ECO-C01` 事件税框架**：先在插件设计文档中定义可配置事件源、条件、税率/定额和
+      销毁/系统/国库去向；以一个实际事件（例如 keepInventory 生效的死亡）交付完整切片，再扩事件源。
+      复用 TaxRunService/TaxLedgerService/策略系统，不硬编码一税一监听、不提前下沉 quest。
+      **完成条件**：取消/重复事件、免税、欠款、reload 注册撤销、Vault 拒付/异常与账本金额都有回归；
+      异步事件的 Vault/实体访问按目标平台调度，真实事件触发后余额与账本相符；
+      `:EcoBalancer:build` / `:EcoBalancer:jarGate` 与实际 provider 实服验证有记录，双语配置/README 同步。
 
 ### R3 — Reputations 完善（大幅收窄）
 
@@ -336,7 +387,7 @@ Regions escrow API、bStats 均已完成。
 |---|---|---|
 | **BOUNTY** | **✅ 完全冗余，已删除** | `SERVICE` + `ResolutionRule.SYSTEM_OBJECTIVE` + `ContractObjective`（18 种 `ObjectiveType`，含 `KILL_PLAYER`/`KILL_ENTITY`）**已经实现**了"第一个完成 X 的人自动结算"，`ContractService` 里有 `SYSTEM_OBJECTIVE_COMPLETED` 结算路径。单独加 BOUNTY 只是把 OWNER/CONTRACTOR 改名成 POSTER/CLAIMER |
 | **SALE** | **✅ 自动化实现完成；真人验收待做** | 卖家主手整组物品与买家 Vault 价款均有签署确认；service 处理接受/双方审批，`ItemClaimPlan` 处理成功交换、返还与裁决，GUI/命令/收件箱/详情页均可创建、处理和领取。尚未做 Paper/Folia 真人链路 |
-| **ALLIANCE** | **底层与注资 service 完成；终态结算 / 玩家入口待接** | UUID 签署快照、动态本金分配计算、逐成员 Vault 注资与分阶段故障恢复已接入；终态付款、取消/超时及裁决仍待接，尚未开放玩家创建 |
+| **ALLIANCE** | **底层、注资与终态 service 自动化完成；玩家入口待接** | UUID 审批、逐成员注资、取消/超时退款与具名违约付款已接入；UUID 计划及 READY/PAYING/PAID 防双付恢复通过自动化，尚未开放玩家创建或完成真实余额验收 |
 | **LOAN** | ❌ **不可归约** | 需要 **initial-transfer**：创建时钱**直接转给** debtor 而非进托管。现有全部类型都是"押注进托管"，没有任何一条路径让资金在结算前离开托管。另需还款动作与到期自动判决 |
 
 **落地结论**
@@ -355,9 +406,10 @@ Regions escrow API、bStats 均已完成。
       - [x] 玩家入口（2026-08-25）：`/contract sale` 预填并打开签署确认，GUI 创建器新增 SALE；
         确认页回显完整主手物品组、买家与价款，确认后主手变化会失败关闭。详情页与行动收件箱
         覆盖接受、双方审批、争议裁决和结算物品领取；lang v3→v4 自动补齐双语键且保留服主改文。
-      - [ ] 按用户当前要求暂缓 Paper/Folia 真人验收；发布前仍需覆盖真实 Vault 余额、背包满、
-        确认页换手防护、重启后领取与中间人裁决
-- [ ] **ALLIANCE**：`createAlliance` + `PENDING_ACCEPT_MULTI` + **动态生成 payouts**
+      - [ ] **`CT-V01` SALE 真人验收（按既有用户安排暂缓）**：发布前覆盖 Paper/Folia 真实 Vault 余额、
+        背包满、确认页换手防护、重启后领取与中间人裁决；记录交换前后完整物品元数据、余额、
+        item-claims 与审计日志，证明未吞/复制物品、未双付。当前可完善脚本/候选包，不能把暂缓改成已通过。
+- **ALLIANCE 进度汇总**（具体待办为下方 CT-A01/CT-A02）：`createAlliance` + `PENDING_ACCEPT_MULTI` + **动态生成 payouts**
       （已定方案 B：违约时按当时状态构造规则；不采用方案 A 加 `SourceSelector`，避免模型膨胀）
       - [x] 底层切片（2026-08-27）：`createAlliance` 创建 3 人以上、OWNER + 多个 ALLY 的纯金钱合同；
         `AllianceAgreement` 是按 UUID 区分的不可变已注资签署/审批快照，全部签署后才允许审批。
@@ -375,14 +427,28 @@ Regions escrow API、bStats 均已完成。
         已落盘签署必须按 UUID、金额、操作 ID 匹配才清日志；PREPARED/REFUNDING 的不确定结果保留人工核对，
         不自动重付。共享日志改为严格读取和同目录原子替换，保留旧记录格式。证据见
         [`Contract/docs/alliance-funding-evidence.md`](Contract/docs/alliance-funding-evidence.md)。
-      - [ ] **下一可执行切片：终态结算 service**。接通全员审批、取消/超时退款和具名违约裁决；
-        在付款前持久化 UUID 分配计划与执行意图，保证中断后防双付，且任何未决注资记录都阻止结算/清理。
-        本轮只完成注资及其失败补偿，没有把纯分配计划直接循环付款。
-      - [ ] 玩家命令/GUI：完整成员与各自押金预览、一次确认、签署进度、审批、具名裁决；
+      - [x] **`CT-A01` 终态结算 service（自动化范围，2026-10-01）**：全员 UUID 审批、未全签取消/超时退款、
+        全签取消转争议、管理员退款与具名 UUID 违约裁决已接入；付款前持久化完整 source/recipient 分配、
+        发起人、签署快照及逐收款人 READY/PAYING/PAID，合同保存操作 ID。已确认付款跳过重放；
+        未执行付款可恢复，未知 Vault 结果保留人工核账锁。未决注资/结算阻止签署、二次结算、直接关闭和清理。
+        工作树范围：Contract 模型、service、pending、严格审计写入、lang v6→v7、测试与文档；无提交/推送。
+        验证：定向 87 项通过；`.\gradlew.bat :Contract:clean :Contract:build :Contract:jarGate --console=plain` 通过；
+        全员/部分签署、并发重复审批、尾差、落盘/付款中断与真实临时 YAML reload 均有自动化记录。
+        两份旧 alliance evidence 已补后续入口，完整记录见 [`Contract/docs/alliance-settlement-evidence.md`](Contract/docs/alliance-settlement-evidence.md)。
+        **未覆盖**：真实 Paper/Folia/Vault 余额、线程与真人链路；继续按 CT-V02/A02 保留实服证据，未以模拟测试代替。
+      - [ ] **`CT-A02` 玩家命令/GUI**：在 A01 通过后接完整成员与各自押金预览、一次确认、签署进度、审批、具名裁决；
         在 service 与恢复门禁完成前保持 ALLIANCE 不可从玩家入口创建。
-- [ ] **LOAN**：initial-transfer + 可选抵押物 + 到期自动判决（还款成功退抵押物 / 失败给 creditor）
-- [ ] **RECURRING 租赁**：推到最后。已定方案——不在 Contract 内加 schedule 字段，改为"父合同生成子合同"
-- [ ] **PARTNERSHIP 共享池**（sharedPool）未实现
+        **完成条件**：普通玩家完整创建→签署→审批/裁决→领取；权限、旧 GUI、换手/输入变化与重复确认
+        不能越权或重复注资，双语命令/help/页面完整，自动化与多人实服流程均留证。
+- [ ] **`CT-C01` LOAN**：先定 initial-transfer、还款、可选抵押物与到期自动判决模型，
+      不能复用“结算前钱始终在托管”的旧假设；按模型/存储→转账恢复 service→玩家入口拆批。
+      完成条件：放款/还款/逾期/抵押物返还或交付在故障重放后无双付/丢物，旧合同兼容；
+      双语文档、自动化与真实余额/物品验收齐备。
+- [ ] **`CT-C02` PARTNERSHIP 共享池**（sharedPool）：先确定所有权、注资/退出/分配及旧双边合同兼容；
+      以唯一持久化本金来源接 service/GUI，完成条件为分配守恒、并发/重复操作/重启恢复测试与实服核账。
+- [ ] **`CT-C04` RECURRING 租赁（最后做）**：父合同生成子合同，不在 Contract 内加 schedule 字段；
+      先定周期、取消、补发/漏期与余额不足语义。完成条件：每周期子合同唯一、重启/reload 不重复生成，
+      子合同独立结算/恢复，旧存档兼容，自动化及实服跨周期记录齐备。
 
 #### ITEM 资产（2026-08-17 完成）
 
@@ -400,8 +466,9 @@ GUI 有完整领取流程；`Asset` 的展示串重复问题也已修好。2026-
 - [x] 通用终态领取：`ItemClaimPlan` 依据实际 `PayoutRule` 把每个 source role 的实物路由给唯一
       participant recipient；`ContractService` 在 Vault 付款前先验证，并把领取权按 recipient/source
       双层角色持久化。领取存档失败恢复合同与背包；旧 SERVICE 展示型 stake 回退到 reward/delivery 池
-- [ ] 让 `deliveryItems`/`rewardItems` 与参与者 stake 共用同一份数据（现在是"同源写两处"，
-      已不再会不一致，但仍是两份状态）——重构项，不阻塞玩法
+- [ ] **`CT-R01` 物品状态去重**：让 `deliveryItems`/`rewardItems` 与参与者 stake 共用同一份数据
+      （现为同源写两处）——非发布阻塞重构。完成条件：旧 SERVICE/SALE 存档往返及领取/返还路径
+      不丢元数据、不重复交付，必要迁移有测试；仅提交本重构，Contract build/jarGate 通过。
 
 #### PlaceholderAPI（2026-08-17 完成）
 
@@ -412,13 +479,19 @@ GUI 有完整领取流程；`Asset` 的展示串重复问题也已修好。2026-
 
 #### 其他
 
-- [ ] **声望/评价系统**（`DESIGN.md` §8.4）：合同完成后双方互评，reputation 影响
-      `max-open-contracts` 上限。与 R3 一并设计，**别在 Contract 内另起一套**
-- [ ] **首发前冻结数据基线**（合同存档、`events.log`、escrow lease、`config-version`/`lang-version`）：
-      与 Regions §5.2 同一条纪律——公开版本之后任何格式变化必须提供单向迁移 + 自动化测试
+- [ ] **`CT-C03` 声望/评价系统**（`DESIGN.md` §8.4）：先明确互评资格、重复评价和上限计算；
+      合同完成后双方互评，reputation 影响 `max-open-contracts`，不预建 R3 已否决的 provider/tier 抽象。
+      完成条件：评价可持久化且不重复、旧计数与评价字段区分，Reputations 缺席时 Contract 独立运行，
+      可选桥失败只降级；自动化、权限/双语及真实玩家展示有记录。
+- [ ] **`CT-B01` 首发数据基线**：在最终候选包登记合同存档、`events.log`、pending journal、
+      escrow lease、config/lang 版本及旧格式边界；完成条件为发布检查单、备份/回退说明与已需迁移测试齐备。
+      公开版本之后任何格式变化必须提供单向迁移 + 自动化测试。
 - [x] 补 `Contract/docs/release-checklist.md`（2026-08-25）：含自动门禁、最终 JAR 的
       `plugin.yml` / bStats 31491 / 无 SQLite / Paper 提供 Adventure 四项人工确认、部署前恢复检查与真人验收
-- [ ] 首发前实服验证
+- [ ] **`CT-V02` 其余首发实服验证**：执行 `Contract/docs/release-checklist.md`，覆盖旧合同升级、
+      核心三类型、物品领取、权限/GUI/聊天、provider 缺席、重载/停服及不确定付款恢复；
+      资金跨插件与 SALE 分别引用 R1-V01/CT-V01 的同一份证据，不重复声称已验。
+      完成条件：当前候选包每项有环境、预期/实际与数据结果；记录仍不开放的类型，不把 ALLIANCE 底层算作玩家功能。
 
 **跨阶段不变量（底线，每阶段都必须维持）**
 1. **资金状态一致** — 任何时刻 `余额 + 托管 = 之前余额`，宕机/reload 后仍成立
@@ -438,32 +511,45 @@ GUI 有完整领取流程；`Asset` 的展示串重复问题也已修好。2026-
 
 ### 5.2 Regions（待首个正式 release）
 
-**本轮实施入口（2026-09-07）**：[Regions 使用体验、国际化与战斗玩法实施计划](Regions/PLAN.md)。按用户要求，以 Lands Nation 为工会战队伍，新增单命淘汰大乱斗，并完善双人 PVP；国际化、操作流程、语言迁移与运行恢复分为 M0–M7 实施。以下是历史基线与长期方向，本轮工作和验收以该文件为准，尚未实现。
+**本轮实施入口（2026-09-07，状态核对至 2026-10-01）**：[Regions 使用体验、国际化与战斗玩法实施计划](Regions/PLAN.md)。Nation 工会战、单命大乱斗、双人 PVP、国际化、流程与恢复的代码和自动化已落地；完整实服/真人验收尚未收口。以下保留历史基线与长期方向，本轮具体任务及勾选以该文件为准。
 
 阶段 A（授权与能力真实性）、B（模板化创作与发布）、C（运行时完整度与组合规则）代码层已收口；
 Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证。
 
-- [x] **`REAL_PLAYER_TEST.md` 真人验证已完成**（2026-08-17）：GUI 创建向导、玩家进出/死亡/断线状态清理、
-      异常关服、装备托管恢复、隔离试运行、Lands/RuleGems 授权、多人 Mode 流程
+- **历史真人记录（2026-08-17）**：旧计划曾把 GUI、状态清理、装备恢复、授权和多人流程记为完成。
+      本次未定位可复用的逐项真人证据；该记录不覆盖本轮八玩法候选包。当前待执行任务见
+      [`Regions/PLAN.md` §10.2](Regions/PLAN.md#102-真实服务端与玩家任务)，实际已有证据见
+      [`Regions/docs/completion-2026-09-22.md`](Regions/docs/completion-2026-09-22.md)。
 - [x] **接入 `MigrationRunner`**（2026-08-20）：此前 `RegionBaseline` 只做"版本对不上就抛异常"
       的校验，**没有任何迁移能力**。版本表仍留在 `RegionBaseline`（5 个文件的单一来源），
-      但备份、原子写、保存失败回滚与失败报告都交给 `cubex-config`。目前没有迁移步骤——
-      首个公开版本就是起点；以后改格式只需版本号 +1 并在那里 `addStep(...)`。
+      但备份、原子写、保存失败回滚与失败报告都交给 `cubex-config`。现已有语言 6→7→8→9→10→11
+      与模板迁移；以后格式升级继续增加版本与迁移步骤，覆盖旧值保留、失败与重复执行。
       至此 Regions 与 Contract 的模块接入完全一致
-- [ ] 错误文案键化（**2026-09-09 核对源码后收窄**）：校验与发布诊断已改成稳定错误码 +
-      双语 `errors.*`（见 [`Regions/PLAN.md`](Regions/PLAN.md) M1.2）；**剩下**`ServiceResult.reason`、
-      资金类 `FundingResult.detail` 与审计行的英文诊断文本，以及 GUI 文案仍按服务器语言渲染
-- [ ] 子命令升级为强类型 Brigadier 节点（当前 Lifecycle Command API + 权限过滤 + 参数补全已够用）
-- [ ] 第一个公开版本发布后**冻结**数据基线（当前源码为 `config-version: 4`、`regions-version: 4`、
-      `templates-version: 2`、`lang-version: 7`、`escrow-version: 1`，正式基线随首发确认）；此后任何格式变化必须提供
-      从公开版本起的单向迁移 + 自动化测试
-- [ ] **阶段 D — 自治活动与可信结算**：活动排期/报名/准备/开赛/结果/归档状态机；对接 Contract 托管
-      支持赞助、对赌、退款、自动结算（**race/hide-and-seek/多人分成的结算语义在这里定，见 R1**）；
-      记录参赛名单 + 规则 revision + 结果 + 强制操作 + 结算摘要；场地/活动/成绩/资金 placeholders
-- [ ] **阶段 E — 扩展生态**：稳定的 Source/Mode/Flag/Effect/Condition/Action 注册 API；
-      接入 Residence、WorldGuard 等 Source；模板导出/导入/签名/版本兼容检查。
-      **新 Mode 和新 Source 不得抢在 A-C 之前扩张**
-- [ ] 候选：GUI 层切到 `cubex-gui`（原计划已建议复用 Contract 的 Menu/InventoryButton 风格，现已成模块）
+- **本轮已落地的实现索引**：错误/状态/审计原因按语言键渲染，GUI 与广播按接收者 locale 渲染；
+      进区报名提示冷却、草稿 revision 守卫及重载菜单刷新也已实现。完成记录统一见 Regions/PLAN
+      M1/M2.5 与 §4.4；人工排版与真人双语验收仍在该文件，不在根计划重复维护。
+- [ ] **`REG-B01` 首发数据基线**：首发准备时核对最终 jar 与 `RegionBaseline`，登记全部存档/schema。
+      当前源码：config 4、regions 4、templates 2、lang 11、escrow 1、match-store 1；正式基线随首发确认。
+      完成条件：发布检查单记录版本、备份/回退边界与已有迁移链；公开版本之后的变化有单向迁移和自动化。
+- **阶段 D 的已实现部分**：报名/准备/开赛/结果/恢复链路、规则快照及决斗/工会战 WAGER 接口已存在。
+      剩余切片如下；本轮验收收口后再扩展，不重做已有状态机。
+- [ ] **`REG-D01` 活动排期与归档**：在既有比赛模型上定义活动生命周期、排期取消/重启语义与归档读取；
+      验证旧比赛存档兼容、同一活动不重复开赛、归档可追溯名单/revision/强制操作/结算摘要。
+- [ ] **`REG-D02` 新奖励语义**：在 `R1-V01` 通过后，先确定赞助、竞速/捉迷藏及多人分成的出资方、
+      胜负/并列/退出/中止规则，再接 Contract 幂等结算；自动化和真实余额测试均证明不重付、可恢复。
+- [ ] **`REG-D03` 活动占位符**：为场地/活动/成绩/资金提供只读快照及缺依赖降级；有键表、缓存失效测试
+      和真实 PAPI 返回值记录，不从占位符调用修改比赛或资金状态。
+- **阶段 E**：排在本轮验收与相关运行模型稳定之后；跨插件接口继续遵守根 AGENTS 的类型/隔离约束。
+- [ ] **`REG-E01` 注册 API**：Source/Mode/Flag/Effect/Condition/Action 的生命周期、冲突与注销契约，
+      同时接能力真实性校验；带可编译示例与缺 provider/重复注册/重载回归，不只开放字符串入口。
+- [ ] **`REG-E02` 新 Source**：在 E01 后按真实需求逐个接 Residence/WorldGuard；明确 owner/转让/失效
+      映射，在实际目标 provider 上验证授权、区域检测和依赖降级；不改变现有 owner AND admin 门禁。
+- [ ] **`REG-E03` 模板交换**：导出/导入、签名与版本兼容校验；先确定信任与升级语义，再验证损坏、
+      不兼容版本及提权 Action 被拒，往返不丢参数，带使用文档。
+- [ ] **`REG-D04` Brigadier 取舍（可选）**：当前 Lifecycle Command API 已够用；先证明强类型节点的
+      用户收益并确定迁移范围，若纳入则保留旧语法/权限/补全兼容并验收，否则明确退出当前版本。
+- [ ] **`REG-D05` GUI 框架取舍（可选）**：先评估迁到 `cubex-gui` Menu/InventoryButton 的收益与成本；
+      若纳入，分页面迁移并保留上下文、locale、revision 和授权测试；不因已引用该模块就标记整层迁移完成。
 
 **明确不进入下个里程碑**：除本轮已授权 `free_for_all` 之外的更多 Mode · 新 Source · 普通领主/非统治者管理 Region ·
 协作者角色系统 · 模板市场与 Web 管理 · 脚本语言 · 普通统治者可发布的控制台或 OP 提权 action。
@@ -489,13 +575,16 @@ Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证�
 - [x] **CubeX 接入补齐（2026-08-27）**：早期生命周期绑定、ReloadChain 与发布前校验、
       统一 I18nService/文本/GUI/转账；本次不改数据格式或补满次数。
       实现与验证见 [接入验收](RuleGems/docs/cubex-integration-evidence.md)。
-- [ ] 本轮升级的实服验收：实际经济插件/银行双向小额转账、原服数据升级与权限/GUI烟测；
-      不以自动化测试代替实服证据。
+- [ ] **`RGEMS-V01` 本轮升级实服验收**：执行 `RuleGems/docs/cubex-integration-evidence.md` §实服覆盖，
+      覆盖实际经济插件/银行双向小额转账、拒付/不确定结果、原服数据升级、权限/GUI、兑换/委任及 reload。
+      完成条件：当前 jar/hash、账户前后余额、迁移前后数据与日志逐项记录；如要恢复 Folia 支持声明，
+      还需目标 Folia 双区域验证。历史 P8 烟测不覆盖本轮升级，不以自动化代替本项。
 
 配置语法清理 + `redeem_requirements` 增强（同类多颗/异类多颗/混合配方/`any_of`/自引用）P1-P7 已落地。
 
 - [x] **P8 Paper/Folia 实服烟测已完成**（2026-08-17）
-- [ ] 旧写法的粗兼容与警告可在"后续大版本"删除（当前保留，旧服只有两个）
+- [ ] **`RGEMS-D01` 旧语法退出取舍（后续大版本）**：确认两个旧服完成迁移，再决定兼容/警告的退出版本；
+      完成条件：迁移指引、保留期与旧配置拒绝反馈明确，相关回归通过。当前版本继续保留，不提前删除。
 
 **仍生效的决策**：保持 **gem-centric，不做 power-centric**——不引入 `powers/` 一等配方目录、
 `PowerGrantInstance`、`RecipeEngine`、`RedemptionRecord` 或 power 级数据重键。
@@ -508,7 +597,7 @@ Paper 1.21.11 build 132 启动/reload/关闭/端到端控制台流程已验证�
 （统一执行入口 + 运行互斥）、`TaxLedgerService`（税款账本）、`EcoBalancerPlaceholderExpansion`、
 免税与欠款策略。
 
-- [ ] R2 事件税收框架（见 §4）
+- 事件税收的唯一任务与勾选为 §4 R2 `ECO-C01`；此处只保留索引。
 - [x] 接入 `ReloadChain`：启动与 `/ecobal reload`、迁移后重载按 config/tasks/language/file-logging/schedule/tax-account 阶段执行；失败时日志与命令指出阶段，不再误报成功。重载重新注册每日记录清理任务；lang-version 5→6 只合并新增的失败提示键
 
 **实现约束（对比 QuickTax 时的已定取舍，别照搬回来）**：不用静态全局 `isCollecting`/`task` 存运行状态 ·
@@ -522,8 +611,9 @@ schedule 不退化成"固定时间 + 秒级频率"，保留策略系统表达 da
 
 - [x] **讲台放置/读取/取下三段流程实服验证已完成**（2026-08-17）
 - [x] **卸载模式在玩家背包与容器中的实服验证已完成**（2026-08-17）
-- [ ] 决定 `export` / `import` / `scanloaded` 扩展工具是否进下个版本；**不做则从发布承诺中移除**
-      （曾在计划中提到但从未实现）
+- [ ] **`BL-D01` 扩展工具取舍**：分别决定 `export` / `import` / `scanloaded` 是否纳入下个版本。
+      未实现；不做则从发布承诺中移除。完成条件：逐工具记录纳入/不纳入；若纳入，补独立任务、
+      权限、导入冲突/格式/元数据规则和验收标准，先实现再承诺，不把决策勾选当作工具已实现。
 
 已知边界：仅基于 Bukkit/Spigot `BookMeta` API，**不承诺 1.20.5+ data component 细节完整保留**。
 
@@ -532,21 +622,29 @@ schedule 不退化成"固定时间 + 秒级频率"，保留策略系统表达 da
 注册、PDC 标识、YAML 索引、保护、停车/锁定、钥匙召回、定位、Phase 5a trust 已实现；核心路径有单测覆盖。
 
 - [x] **真实 Spigot/Paper 服务器回归已完成**（2026-08-17）——这是此前不能标稳定版的唯一原因
-- [ ] 记录本轮实服验证结果**和仍未覆盖的事件路径**
-- [ ] Phase 4 公共 station、Phase 5b 出租、Phase 6 可选集成（Vault 公共账本、Dynmap、Lands）
-      **均为未实现的可选扩展**，已明确退出 core MVP；README 不得承诺
-- [ ] 决定 v1 是否支持 Folia
+- [ ] **`ML-V01` 实服证据补齐**：定位现有注册/保护/钥匙召回/信任/PDC/经济路由记录，
+      按当前 jar 补缺失事件路径及升级/失败补偿验证；完成条件：文档逐项区分已执行/未覆盖，
+      余额与实体状态结果可复核，不因 2026-08-17 回归通过就声称新经济改动已验。
+- [ ] **`ML-D01` 可选扩展取舍**：Phase 4 公共 station、Phase 5b 出租、Phase 6 Vault 公共账本/
+      Dynmap/Lands 均未实现且退出 core MVP；逐项决定纳入顺序，纳入后拆成有权限、持久化/恢复与
+      实际 provider 验收条件的任务。不纳入则继续从 README 发布承诺排除。
+- [ ] **`ML-D02` v1 Folia 支持决策**：核对实际实体/区域调度路径并在目标 Folia 验证核心事件；
+      完成条件：明确支持或不支持，支持时附多区域/跨区域召回/停服恢复证据，README 与 plugin.yml 一致。
 
 ### 5.7 Metro / Railway（已公开）
 
 - [x] `cubex-spatial` 抽取并双侧接入（见 §2.9）
-- [ ] `LegacySchedulerAdapter` 调用面逐步收敛到 `CubexScheduler` 原生 API（非阻塞，别为此制造大 diff）。
+- [ ] **`MR-C01` 调度兼容层收敛**：`LegacySchedulerAdapter` 调用面逐步迁到 `CubexScheduler`
+      原生 API（非阻塞，分插件/调用域提交，别制造大 diff）。
       已将 Metro / Railway 的 `ScheduledTaskLifecycle` 启动任务和 `MapIntegrationLifecycle` 刷新任务
       改为原生全局调度与 `CubexTask.cancel()`；列车会话的一次性实体任务也改为原生实体调度，
       周期任务暂留兼容层以保持 Bukkit 零延迟语义；
       两侧聊天输入回调、Metro GUI 背包刷新复用插件级原生实体调度器，
       测试覆盖延迟回调、聊天去重和一 tick 后刷新；
       原有注入式测试接口保留，两侧 `build` / `jarGate` 通过。其他调用点继续分批迁移
+      **下一步**：只扫描两侧 `src` 列剩余调用点，按全局/实体/区域/周期任务确定语义；周期任务的 Bukkit
+      零延迟行为若仍不能等价迁移，保留并写理由。每批核对取消、禁用、任务内自取消及延迟语义，
+      跑对应测试与两侧 build/jarGate；全部调用点已迁移或明确保留时关闭，不按 import 消失判断正确性。
 
 **Railway 同源维护铁律（2026-08-02 用户确认，不要"顺手修"）**：
 Railway 的源码包**就是** `org.cubexmc.metro`，主类 `org.cubexmc.metro.Metro`，与 Metro 完全同名——
@@ -555,6 +653,226 @@ Railway 的源码包**就是** `org.cubexmc.metro`，主类 `org.cubexmc.metro.M
 `org.cubexmc.metro.lib.*` 也**不要改**。上游同步：`git fetch upstream` → merge，历史上仅 11 个文件有差异。
 "能不能直接复用 Metro 的 `.kt`"的两步判据原在 `KOTLIN_MIGRATION_RUNBOOK.md`（已删除，
 `git show 2783844:KOTLIN_MIGRATION_RUNBOOK.md` 可取回）。
+
+#### Railway 可用性与物理模式改进（2026-10-02）
+
+**结论与范围**：Railway 已有完整主体和可构建的部署 jar，但当前不能标为“完整可用”或“达到 Metro 成熟度”。
+本轮只检查并制定计划，没有修改生产源码。检查只扫描 `Railway/src`，不计历史 `.claude/worktrees`；
+Metro 对照采用 Git 已提交版本 `e73ae73`，不假定其不可见工作树或全部实服场景已通过。
+本计划保留 Railway 的线路服务/虚拟列车/编组定位、同包同主类和内嵌打包，不用直接覆盖 Metro 文件替代适配。
+`MR-C01` 是兼容层收敛；以下线程安全缺陷独立为发布阻塞任务，不能因替换调度器 import 就关闭。
+
+**已执行证据**：同次会话已运行 `.\gradlew.bat :Railway:test --rerun-tasks --console=plain`，
+93 个测试类、617 项测试全部通过（0 失败/错误/跳过）；随后 `:Railway:build :Railway:jarGate` 通过。
+门禁确认 EMBEDDED、无未重定位 Kotlin、Java 17 字节码。现有物理测试主要验证迁移互操作、数学 helper 与
+防御性拷贝，不能代替完整轨道运行、原生物理时序、真人挂载或 Folia 线程验收。
+另外在 `Railway/build/readiness-audit/` 创建 Mockito 模拟探针（不进入成品；目录可能被 clean 删除），运行
+`.\gradlew.bat -I Railway/build/readiness-audit/probe.init.gradle :Railway:readinessProbe --quiet`，结果如下。
+实施各切片时须把有关场景转换成正式回归测试，不能把未跟踪的临时探针当长期门禁。
+
+| 本次复现 | 实际结果 | 对应任务 |
+|---|---|---|
+| 乘客扣款成功、owner 入账返回 false | 返回 `CHARGED`，未退款 | `RW-R03` |
+| 玩家没有 `railway.use`，直接进入等待中的服务矿车 | 事件未取消，乘客已登记 | `RW-R02` |
+| Reactive 先从 x=0 移至 0.4，再外部移位至 x=10，经历 arrival/departure 后更新 | x=0.8；按新位置续行应为 10.4 | `RW-P02` |
+| 连续物理更新时实际经过 2 tick | 本次所有子步的 `timeFraction` 总和仍为 1，`currentTick=-1` | `RW-P01` |
+| Reactive 领车速度 0.4 | helper 目标车距 0.62；生成车距默认 1.6，controller 未读取配置车距 | `RW-P02` |
+| Kinematic 基础限速 0.2、已供电上坡、安全模式开启 | speed planner 返回 0.4，与单车设定上限 0.2 不一致 | `RW-P03` |
+
+以上是模拟调用结果；任务中的抖动、客户端同步、失控及负载影响仍须实服量测，未据此宣称已实服复现。
+
+**当前物理模式（按源码，而非旧注释）**：
+
+| 模式 | 选择与实际运动方式 | 当前边界 |
+|---|---|---|
+| `REACTIVE` | 默认 `train.control-mode: reactive`；领车按轨道方向与限速推算位置，后车用 PD 速度修正；每子步仍调用 NMS snap，失败回退 `cart.teleport` | “No teleports / vanilla”注释不符；缓存位置/速度跨停站保留；车距 0.5–1.2 硬编码，没有使用 `train-spacing` |
+| `KINEMATIC` | 线路 override 优先于全局；`train.physics-lead-kinematic: true` 时领车使用内部位置积分，false 时读原生领车位置；后车沿历史轨迹采样并 snap | 本开关只影响 Kinematic 领车；后车仍受直接位置控制；轨道连通性、载客回退与原生物理叠加需验收 |
+| `LEASHED` | 继承 Reactive，额外生成不可见 LivingEntity 并把 leash holder 指向前车 | 这是 Reactive 物理加绳索外观，不是第三套动力算法；跟随传送异步结果、不可拴实体和残留 dummy 尚缺运行回归 |
+
+选择入口已存在：`/rw line control <lineId> <kinematic|reactive|leashed|default>`，default 清除线路 override；
+`/rw line serviceinfo <lineId>` 查看实际配置。未设/非法全局模式的代码回退为 Kinematic，
+但打包默认配置为 Reactive，二者不要混写。
+
+**物理方向（2026-10-02 用户确认）**：TrainCarts 仅作为物理算法参考，不需要运行桥接或插件集成。
+Railway 自身实现轨道几何、轨迹跟随、车距控制和制动；三种模式均须在没有 TrainCarts 的环境独立运行。
+现有 `TrainCartsBridge` 只有定义与缺席测试，运行路径没有调用者，按 `RW-P04` 移除；
+保留 Railway 已有的轨道/数学 helper 及其回归。物理改进集中在以下 `RW-P01`–`RW-P05`，
+参考算法须通过 Railway 的测试和实服量测验证，不把参考来源写成已支持的连接能力。
+源码依据：[模式选择](Railway/src/main/java/org/cubexmc/metro/train/TrainInstance.kt)、
+[Reactive](Railway/src/main/java/org/cubexmc/metro/physics/ReactiveRailPhysics.kt)、
+[Kinematic](Railway/src/main/java/org/cubexmc/metro/physics/KinematicRailPhysics.kt)、
+[Leashed](Railway/src/main/java/org/cubexmc/metro/physics/LeashedRailPhysics.kt)、[默认配置](Railway/src/main/resources/config.yml)。
+
+**施工顺序**：P1 表示完整可用/相关支持承诺收口前必须完成，P2 是流程与说明对齐。
+第一批 `RW-R01`/`RW-P01` 建立调度与运动命令边界；可先独立补 `RW-R02`/`RW-R03` 的领域回归。
+第二批按 `RW-R03 → RW-R02 → RW-R04` 接资金/乘车闭环，同时完成 `RW-P02 → RW-P03 → RW-P04 → RW-P05`。
+第三批完成 `RW-R05`/`RW-R06`/`RW-R07`，每个功能切片同步其说明；最后 `RW-D01` 汇总并执行 `RW-V01`。
+依赖交叉处先交付接口与测试，再接运行路径；每项单独提交，不把重构、玩法/配置/文案合成一个提交。
+
+- [ ] **`RW-R01` P1 — Folia 调度所有权与生命周期**。
+      **范围**：`LineServiceManager`、`LineService`、`TrainSpawner`、`TrainConsist`、`TrainInstance`、
+      `LocalDispatchStrategy`、`RailProtectionManager`、显示/模型监听器与启停入口。
+      全局心跳目前同步生成/更新所有列车、读取玩家位置；保护索引在启动/reload 同步读轨道；
+      服务构造时已启动心跳，早于 travel-time、票务、显示等依赖初始化完成。
+      **实施**：全局层只编排班次/虚拟列车及不可变快照；生成和轨道采样在对应 region，
+      每辆车/玩家/模型的读写在自身 entity scheduler，编组用快照和命令协作，不能假定各节车永远同 region。
+      保护索引按区块所属 region 构建后按 generation 原子发布；服务在依赖就绪后显式 start。
+      单线程拥有可变服务状态，事件经队列传入，避免 heartbeat 与实体事件同时修改 ArrayList/HashSet。
+      shutdown 前停止接收新任务；禁用/实体 retired/半生成失败取消回调并回收已生成实体。
+      **验收**：两区域同时运行、列车跨边界、启动已有服务与保护线路、reload/disable/生成中禁用有回归；
+      多节车分处不同 region 时无错误线程访问、重复 spawn 或清理后复活。目标 Folia 实服线程检查通过才关闭。
+
+- [ ] **`RW-R02` P1 — 统一登车权限、座位与票务事务**（资金补偿依赖 `RW-R03`）。
+      **范围**：`VehicleListener.onServiceTrainEnter`、`EntityModelListener`、`PlayerInteractListener`、
+      `TrainPassengerRegistry` 与 `TicketService`。
+      普通服务矿车没有 `railway.use` 门禁；实体外观入口自行 withdraw，忽略结果/票款去向，且先扣钱后检查座位。
+      **实施**：所有登车入口复用同一门禁，重新检查权限、线路状态、WAITING/非终点、座位与会话归属；
+      用玩家 UUID + 登车操作 ID 防重复，先保留座位再支付，挂载/事件未成功则补偿并释放；
+      不在 NORMAL 事件提前永久登记尚可能被后续监听器取消的上车，离线/取消/重复点击也走同一终态处理。
+      **验收**：无权限、停运、移动中、终点、满座、挂载 false、后续事件取消、扣款失败、重复事件、
+      Java/Bedrock 与外观多乘客路径均无越权、无重复扣费、无扣款未上车；成功只登记一次。
+
+- [ ] **`RW-R03` P1 — owner 支付失败与退款失败保全**。
+      **范围**：`TicketService.collectFare`、`VaultIntegration` 和票务补偿记录。
+      **实施**：检查 owner deposit 的结果，失败不返回 CHARGED；退款成功后明确返回失败。
+      退款失败、provider 抛异常或结果不确定必须保留可核账记录（玩家、owner、金额、操作 ID、阶段与结果），
+      禁止下一次点击盲目重付/重退；需要重启恢复时在付款前落盘意图，未知结果转人工复核。
+      无 owner 的 `economy.account` 路由保持共享模块既有语义，明确记录销毁、成功入账与已扣款但路由失败的区别；
+      不偷偷改变所有插件的共享经济语义。
+      **验收**：withdraw false/throw、deposit false/throw、refund false/throw、重复调用与中间重启有回归，
+      真实 Vault 核对玩家/owner/系统账户前后余额及复核记录；没有成功入账/已确认补偿不能记为付款完成。
+
+- [ ] **`RW-R04` P1 — 服务列车旅程结算**（依赖 `RW-R02`/`RW-R03`）。
+      **范围**：`TrainInstance`/`TrainNavigator`、乘客登记、`PriceService`/`TicketService`，及旧 `TrainMovementTask`。
+      正常右键/GUI 入口目前只请求服务；服务上车收 base，距离/站数结算仅在未被正常入口调用的旧单车流程。
+      旧 INTERVAL 路径还每站从 entryStopId 累算，A→B→C 会按 1+2 段重复收费。
+      **实施**：为每名乘客建独立会话，保存登车/已结算站序、真实累计路程、票价规则与已成功结算额；
+      base 只收一次，每站只收未结算增量；环线按实际经过的区间序号而非最短首尾站距计算。
+      flat/distance/interval 与时段折扣都使用统一定价入口。失败不推进已结算游标；
+      中途下车、离线、终点、脱轨、reload、虚拟化/传送不能跳过或重复结算，费用策略与退出自由同步写入配置/迁移。
+      **验收**：A→B→C、同站多次回环、多人不同站登车/下车、重复到站事件、余额不足及退出中断；
+      每个乘客累计收费等于规则应收额，跨世界传送位移不计轨道距离，无人在车内时不生成票款。
+
+- [ ] **`RW-R05` P1 — provider、运行模式与重载可恢复性**（依赖 `RW-R01`，涉及旅程时依赖 `RW-R04`）。
+      **范围**：`VaultIntegration`、`Metro.reloadRailway`、`LineServiceManager.rebuildFromLines`。
+      当前 provider/enabled 与 operationMode 在构造时固定，reload 只解析账户/重建服务，不重新绑定二者。
+      **实施**：借鉴 Metro 已提交实现监听 Vault service 注册/注销，在 enable/reload 重解析 provider 与账户；
+      service.mode 在重建前重新校验，取消旧心跳/实体命令后以新 generation 启动，失败保留明确停运状态。
+      停运、改模式、删线路、reload 先安全结束/结算旅程，清空占用，不让旧回调影响新服务。
+      **验收**：无 Vault、只有 Vault 无 provider、provider 晚注册/替换/移除与账户切换；
+      local→global→local、重复 reload、配置错误、写盘失败和带乘客重载无旧任务、占用/余额泄漏。
+
+- [ ] **`RW-R06` P1 — 编组传送门及跨世界导航**（依赖 `RW-R01`/`RW-P01`/`RW-R04`）。
+      **范围**：`VehicleListener.handleServiceTrainMove`、`PortalManager`、`TrainNavigator`、列车注册与各物理状态。
+      服务列车的 VehicleMove 分支提前 return，未走传送门检测；现有 PortalManager 只移交旧单车 task。
+      TrainNavigator 则直接对领车/目标停车点做 distanceSquared，没有异世界门禁。
+      **实施**：新增编组传送状态，整列暂停运动/结算采样，一次转移全部车、乘客/模型、UUID 映射与导航；
+      目的区块准备失败、部分车失败、玩家掉线或禁用时有确定清理/补偿终态，不能只移走领车。
+      成功后清除旧物理缓存/轨迹、重建朝向和占用；世界不同先判断传送路径，禁止直接比较 Location 距离。
+      **验收**：同世界/跨世界、1/4/32 节、多人/Bedrock、未加载区块、目的世界缺失、部分失败、
+      重复触发与传送中 reload 无断编组、旧实体、悬挂乘客、跨世界距离异常或二次收费。
+
+- [ ] **`RW-R07` P1 — 区间和区块资源的所有权**（与 `RW-R01` 设计一起确定，接入依赖 `RW-R06`）。
+      **范围**：`BlockSectionManager`、`LineService.buildSectionKey`、`TrainInstance` 的强制区块加载。
+      占用键目前含 lineId 和方向，只能阻挡同线路同方向，不能防止共享轨道上不同线路/反向列车同时进入；
+      每列车自行 setChunkForceLoaded(false)，重叠列车/其他 force-load 使用者可能被提前释放，键也不含世界。
+      **实施**：区间记录持有 trainId/generation，只有持有者可释放；共享轨道冲突按世界与物理区间处理，
+      route 数据不足时明确限制并拒绝宣告跨线路防撞。区块采用 plugin ticket 与插件内列车引用计数，
+      key 含世界 UUID；切世界先释放旧世界资源，最后持有者退出才撤销本插件 ticket，不改他人的 force-load。
+      **验收**：同轨双向/两线路、排队列车取消、重复 leave、两列车共享区块、传送/reload/脱轨/禁用后归零，
+      其他列车和其他插件/服主加载状态仍保留；与 `RW-V01` 的重叠场景一起验收。
+
+- [ ] **`RW-P01` P1 — 物理时钟与唯一运动命令**（和 `RW-R01` 同批确定接口）。
+      **范围**：`TrainInstance.update/maintainVelocity`、三个引擎、`MinecartPhysicsUtil.forceVelocity`。
+      当前每 heartbeat 固定积分 1 tick，向引擎传 -1；每子步再排未来 1–3 tick 的旧速度写入，
+      停站/换模式/清理后没有命令版本门禁。
+      **实施**：物理以实体所在区域每 tick 更新，班次 heartbeat 间隔不改变速度；若跳 tick，
+      明确 deltaTicks 和最大补步策略，传真实时间。每辆车每 tick 只提交最终运动命令，
+      原生物理和自定义积分只由选定控制方式推进一次；停站、换模式、传送、清理提升命令 generation。
+      删除无边界的重复 velocity 重放，确需兼容延迟补写时验证代次/车状态并绑定可取消任务。
+      **验收**：heartbeat=1/2/5、低 TPS/延迟回调、12 子步、移动→停站/换模式/清理后回调，
+      无旧速度复活；统计实际位移、命令数与待执行任务数，任务量随车数线性且不随子步数堆积。
+
+- [ ] **`RW-P02` P1 — Reactive/Leashed 缓存与车距**（依赖 `RW-P01`）。
+      **范围**：`ReactiveCartStateStore`、`ReactiveRailPhysics`、`ReactiveSpacingDecisions`。
+      **实施**：arrival/departure、外部移位、换模式/传送时从已确认实体位置重建缓存，
+      拒绝使用另一世界或超过容差的旧 commandedPosition；同步清理速度/方向。
+      controller 显式接收 service.trainSpacing（含实体模型推荐车距），去掉独立硬编码目标；
+      转弯以连通轨道距离代替车间直线距离，检查 PD 相对速度符号与阻尼，按测试调参。
+      **验收**：探针 x=10 后更新应从 10 续行；配置车距 0.8/1.6/3.0、1/4/32 节、
+      直线/S 弯/上下坡/停站再发车/反向重建无倒拉、挤叠和持续振荡。写明车距误差容限并附实服轨迹。
+
+- [ ] **`RW-P03` P1 — Kinematic 与通用轨道/到站判定**（依赖 `RW-P01`/`RW-P02`）。
+      **范围**：`KinematicLead*`、`KinematicTrailBuffer`/follower、`RailPathUtil`、Reactive 上坡补推、
+      `TrainNavigator`/`ArrivalHeuristics` 及服务列车 VehicleMove 到站路径。
+      **实施**：沿连通轨道行走并逐段消费位移，lookahead 同样沿轨道而非朝向直线；
+      不用“附近任一铁轨”把列车吸到平行线/断轨另一侧。每子步检测目标站点穿越并提前制动，
+      统一两条到站入口与实际停车容差，terminal 不重复触发；缺轨/无有效路径明确停运清理。
+      坡道 boost/安全限速/线路上限统一钳制，低速上坡不能输出大于配置 cap 的命令；
+      Kinematic 领车原生/积分两分支都要检查重复推进，重置轨迹时保持编组与乘客。
+      **验收**：全 Rail.Shape、连续 S 弯/坡顶/坡脚、平行轨、断轨、窄站/终点及环线；
+      cap=0.2/0.4/1.2/3.0/8.0、safe on/off 下不越过站点、不跳线，模式接受不了的速度拒绝并提示。
+
+- [ ] **`RW-P04` P1 — NMS/原生物理适配与废弃 TrainCarts 桥清理**（依赖 `RW-P01`/`RW-P03`）。
+      **范围**：`MinecartNmsUtil`、两个 snap 回退、`TrainCartsBridge.kt`、
+      `PhysicsBridgeMigrationTest.java` 与 architecture/compatibility 文档。
+      当前固定未带版本包 CraftMinecart 名称，且按任意三 double 签名猜测运动方法；
+      velocity 方法尚未找到时甚至可能选中位置 setter。回退 teleport 忽略 boolean，缓存仍继续推进。
+      **实施**：从实际运行对象/已知语义名称或受测适配器解析，删除仅凭签名选方法的宽泛回退；
+      对 position/velocity 分开能力检测，失败可观察且不会记作成功位置更新。
+      Bukkit/Paper/Folia 回退检查成功及载客状态、异步完成和所在线程，适配保持 Java 17/1.18.2 编译基线。
+      实验 Minecart Improvements 的位置/原生动力与自定义控制做独立测试，不能直接照搬 Metro 单车逻辑。
+      删除无调用者的 `physics/TrainCartsBridge.kt`，移除测试方法
+      `keepsTrainCartsAbsentAsANormalOptionalIntegrationState` 及其专用 import，保留同文件轨道几何/Leashed 回归。
+      删除 `Railway/docs/architecture.md` 中“装有 TrainCarts 时反射对接”的承诺，相关说明只记录算法参考。
+      不新增 TrainCarts 插件探测、ClassLoader 对接、provider 矩阵或编译依赖；Railway 的 Bukkit/NMS 适配独立保留。
+      **验收**：受测假 handle 故意提供同签名不同语义方法、adapter 不可用、teleport false、
+      载客/空车、普通/实验世界、Folia 跨区域失败时不改错方法、不继续推进虚假坐标，不吞乘客。
+      源码/成品中无废弃桥及 TrainCarts 运行连接，未安装 TrainCarts 时三种模式通过自身运行回归与 jarGate。
+
+- [ ] **`RW-P05` P1 — Leashed 与实体外观跟随/清理**（依赖 `RW-R01`/`RW-R02`/`RW-P04`）。
+      **范围**：`LeashCoupler`、`LeashedRailPhysics`、`EntityModelController`。
+      **实施**：检查 spawn 类型可拴/可生成，检查 setLeashHolder boolean；失败取消外观耦合并提示，不留无效 dummy。
+      dummy/model 以本插件/trainId 标记与完整对偶映射登记，跨世界不直接算 midpoint；
+      每实体最多一条在途跟随命令，旧异步传送结果受 generation 限制，载客外观失败进入安全退出。
+      换模式、virtualize、部分 spawn 失败、实体死亡、reload/disable 与重启残留均在所属线程清理，
+      不跨 Folia 区域扫描整个世界；重启残留随区块/实体可安全访问时识别。
+      **验收**：不可拴实体、无效 holder/teleport、死亡/跨世界、连续切换三模式、多人外观登车/下车，
+      100 次生成→运行→清理后活跃 dummy/model/映射/在途任务归零；本轮不将绳索称为物理牵引。
+
+- [ ] **`RW-D01` P2 — 可执行使用流程与文档/配置对齐**（随各切片增量更新，最终汇总）。
+      **范围**：双语 README、architecture/api/compatibility、regression-baseline/release-checklist、
+      config/lang、help、线路设置 GUI 与 `CHANGELOG.md`。
+      **实施**：给出建站→关联线路→`/rw line enableservice <lineId>`→查 ETA→点击到站车辆乘坐的最短流程，
+      标出新线路默认未启用服务；保留此默认，不靠静默自动启用掩盖流程缺口。
+      GUI 提供服务启停、班距/停站/编组与物理模式入口，命令/GUI 共用 service、权限与失败反馈；
+      删除或隔离不可达的旧自动生成/乘坐分支，避免维护第二条收费链。
+      修正 Reactive 位置控制、Leashed 外观、Kinematic 开关；将 TrainCarts 明确写为算法参考，移除运行桥接说明。
+      对齐当前 build 0.4.0 与 CHANGELOG 1.1.x 历史来源的版本关系。
+      默认模式暂保持 Reactive，验收后再单独决定是否改变并提供迁移。
+      **验收**：普通管理员只按 README/GUI 完成一条三站线；无服务/无权限/缺 provider 有明确反馈；
+      新增语言键七语言齐备、保留自定义文本，配置变更有版本化迁移与备份，说明只写实际已交付行为。
+
+- [ ] **`RW-V01` P1 — 当前候选包的完整实服与成熟度门禁**（依赖相关 `RW-R*`/`RW-P*` 和 `RW-D01`）。
+      **自动化**：将本次模拟复现转为正式失败路径回归；按改动域定向测后运行
+      `.\gradlew.bat :Railway:build :Railway:jarGate --console=plain`。修改共享模块才加模块/消费方验证；
+      只有改 buildSrc 才要求构建逻辑单测与相关全量门禁，不为纯文档重跑全仓。
+      **真实平台**：1.18.2/Java 17 基线、项目兼容清单中的 Paper 1.21.x 与 26.1.2 目标、目标 Folia；
+      按实际服务端要求选择运行 JDK，普通/实验矿车世界分开，不能用 Paper 结果替代 Folia。
+      **核心矩阵**：local/global × 三种 control mode × 1/4 节编组分别跑直线三站完整载客旅程；
+      32 节/高速/复杂轨道放压力与边界组。再覆盖 S 弯/上下坡、环线/重叠反向、
+      中途退出/脱轨、共享区块、跨世界 portal、模式/reload 切换，分别开关 safe-speed-mode 与 safe_mode；
+      实体外观/多乘客、Java/Bedrock、真实 Vault owner/系统账户及失败补偿单列。
+      无可选插件、仅 Vault 无 provider、真实 provider、地图插件分别开关运行，不把缺席能力宣告为可用。
+      **记录**：commit/工作树范围、jar SHA-256、平台/JDK/客户端、完整 config、场景线路及轨道、
+      实测位移/停车误差/车距误差、任务数/每 tick 耗时、余额前后值、资源/实体/日志和通过/失败。
+      **收口条件**：所有承诺支持路径通过，无错误线程访问、漏/双收费、跳线/越站、载客丢失和资源泄漏；
+      未覆盖或失败的模式/版本明确记为实验/不支持并同步发布说明，不能勾选为完整验收。
+      达标后才更新“完整可用/接近 Metro 成熟度”结论；已通过的 617 项旧测试不是此任务完成证据。
+
+线程与传送实现依据：[Folia 区域所有权/实体调度](https://docs.papermc.io/folia/reference/overview/)、
+[Paper 传送及乘客行为](https://docs.papermc.io/paper/dev/entity-teleport/)。后者标注适用版本，
+不能把新版本默认保留乘客的行为推定到 1.18.2；每个旧版本回退仍按上述真实矩阵验证。
 
 ### 5.8 StateCharge（已实服使用，待首个正式 release）
 
@@ -575,17 +893,25 @@ Vault 经济（无 provider 时 `abortEnable`）、在线时长计时（离线�
 - [x] **GUI 交易页**（2026-08-20）：一状态一按钮、点击 toggle、**只显示有权限的状态**、
       开着的发光；盾牌按钮设置余额保险（走 `cubex-gui` 的 `ChatInputState` 聊天输入）。
       StateCharge 因此接入 `cubex-gui`
-- [ ] **v1 范围外，后续可加**：BossBar 倒计时 · PlaceholderAPI · MySQL ·
-      bStats（**需先注册服务 ID**）· 跨服(BungeeCord)同步
-- [ ] **首发前冻结数据基线**（`StateStorage` 存档格式、`config-version`/`lang-version`）：同 §5.2 纪律
+- [ ] **`SC-D01` 后续扩展取舍（v1 范围外）**：BossBar、PlaceholderAPI、MySQL、bStats、跨服同步。
+      逐项决定是否纳入及顺序；纳入后先拆任务和验收，bStats 需先有服务 ID，MySQL/跨服需定恢复与一致性。
+      不纳入则继续留在长期候选，不能因本决策完成就标记功能已实现。
+- [ ] **`SC-B01` 首发数据基线**：登记最终 StateStorage schema、config/lang 版本、v1 预购存档告警
+      与 v2 按开启计费的迁移/回退边界；完成条件：首发检查单与存档兼容/损坏回退测试记录齐备。
 - [x] 补 `StateCharge/docs/release-checklist.md` 与 `StateCharge/REAL_SERVER_TEST.md`（2026-08-21）
-- [ ] 首发前实服验证
+- [ ] **`SC-V01` 首发验收剩余矩阵**：已投入使用，执行 `StateCharge/REAL_SERVER_TEST.md` 中仍无
+      逐项证据的余额/保险/离线计费、Paper/Folia、多区域、Regions 同时控制 scale/fly、损坏存档与
+      provider 故障/reload/停服恢复。完成条件：当前候选包各场景有余额、效果与存档前后记录；
+      既有使用证据可注明版本后复用，未覆盖项保持未验收。
 
 ### 5.9 Clarity（待首个正式 release）
 
 清理 Adapt 遗留 attribute modifier。仅接入 `cubex-core`。
 
-- [ ] 首发前实服验证；确认是否需要 i18n（目前无语言文件）
+- [ ] **`CL-V01` 首发验证与语言取舍**：执行 `Clarity/docs/release-checklist.md`，在隔离数据副本
+      核对 dry-run、清理范围/物品槽位、目标属性与正常/异常结束，比较清理前后数据；
+      完成条件：Java 21/目标服/最终 jar 记录、不可逆清理的备份与结果证据齐备；明确是否需要 i18n，
+      若需要则另列资源/迁移/双语验收任务，当前没有语言文件不代表已有国际化。
 - [x] 补 `Clarity/docs/release-checklist.md`（2026-08-25）：含 Java 21、bStats 31800、
       无 SQLite/Adventure、dry-run 与不可逆清理的发布纪律
 - [x] **保持编译到 Java 21**：`Clarity/build.gradle.kts` 显式 `options.release=21`，
@@ -599,7 +925,10 @@ Vault 模式共享信誉服务，bStats 31877。
 - [x] **`org.cubexmc.reputations.api` 的 4 个 `.java` 是故意的 Java API 面，不要迁 Kotlin**
 - [x] 补 `Reputations/docs/release-checklist.md` 与 `Reputations/REAL_SERVER_TEST.md`；
       Paper 1.20.1 / Java 21 已实测无 PAPI 独立启用、PAPI 2.11.6 expansion 注册与正常停服（2026-08-24）
-- [ ] 首发前真人验证：最低支持线 1.18.x、权限/GUI/真实字段排行榜、PAPI 返回值、异步事件与异常恢复
+- [ ] **`REP-V01` 首发真人验证**：执行 `Reputations/REAL_SERVER_TEST.md`，覆盖最低支持线 1.18.x、
+      权限/GUI/真实 Contract 字段排行榜、PAPI 返回值、异步事件与异常恢复；
+      完成条件：当前 jar 在无/有 PAPI 两轮的玩家流程与存档/事件记录齐备，最低版本实测或支持声明
+      明确收窄；2026-08-24 仅启动/注册证据不能替代。Java API 面保持原样。
 
 ### 5.11 FAWEReplacer（已公开）
 
@@ -625,7 +954,10 @@ Vault 模式共享信誉服务，bStats 31877。
 - [x] **CI 补跑 `buildSrc` 测试**（2026-08-19）：buildSrc 是独立构建，根构建的 `build` **不会**带上它的
       测试，`plugin.yml` 的 depend 注入逻辑住在那里；`build.yml` 已加 `./gradlew -p buildSrc test`，
       并把 CubeXLib 加进按插件构建的矩阵
-- [ ] `jarGate` **不查**的项仍需人工确认：`plugin.yml` 内容、bStats id、sqlite 平台数、adventure 是否单份
+- [ ] **`REPO-V01` 最终发布包人工检查**：按各插件 release-checklist 核对 jarGate 不查的
+      plugin.yml 内容、bStats id、SQLite 平台内容、Adventure 是否单份；无某依赖也要明确记“不适用”。
+      完成条件：每个准备发布的最终非 plain jar 都登记名称/hash/四项结果及门禁记录；后续换包重核，
+      不因检查单文件已存在就勾选本项。
 - [x] **修 `jarGate` 的 `sharedModulePrefixes`**（2026-08-19）：原先只列了 9 个模块里的 4 个
       （core/config/i18n/scheduler），缺 integrations/database/command/gui/spatial。缺失的模块类会被拿
       **插件自己的 java release** 去校验字节码——Clarity 是 release 21（major 65），一旦接入其中任何一个
@@ -656,8 +988,10 @@ Vault 模式共享信誉服务，bStats 31877。
       [`mirror.yml`](.github/workflows/mirror.yml) 的镜像名单内，但仍属于待首个正式 release；
       StateCharge / Reputations 尚无镜像 repo，同样不改变其 release 状态
 - [x] 删除历史残留目录 `Contracts/`（`Contract/` 的旧副本，含 169M 未跟踪的 build/run 产物）
-- [ ] `Railway/.claude/worktrees/` 有历史 agent worktree 副本（已 gitignore、未跟踪），
-      会污染全目录 grep 与文件计数；统计以 `kotlinMigrationStatus` 或 `<Plugin>/src` 为准
+- [ ] **`REPO-M01` 历史 worktree 目录维护**：检查 `Railway/.claude/worktrees/` 与 `git worktree list`，
+      区分活跃 worktree、可恢复改动及已废弃副本；有用改动先保全，托管 worktree 走归档工具。
+      完成条件：确认废弃且已保全的目录得到清理/归档，或需保留的目录有明确原因及统计排除方式。
+      目录已 gitignore，施工前未确认状态不得递归删除；当前统计继续只用 `kotlinMigrationStatus` 或 `<Plugin>/src`。
 
 **已知脆弱点**
 - `Metro:TrainTravelDisplayControllerTest.shouldThrottleUpdatesToConfiguredInterval` 偶发
@@ -864,7 +1198,7 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
       （名字解析要查 usercache/存档，不能落进每分钟一次的结算里）
 - [x] **RuleGems 包名撞车已消除（2026-08-27）**：删除本地 EconomyProvider/ItemBuilder；
       GUI 业务类移到 `org.cubexmc.rulegems.gui`。仍采用 EMBEDDED，不切外置模式。
-- [ ] **其余消费方迁移**（每个都是独立提交，不要和玩法改动混在一起）—— **2026-09-09 后只剩 Contract 一家，而它是被 §4 R1 卡住的，不是排期问题**：
+- **消费方迁移进度汇总**（唯一待办为下方 CT-E01；每个消费方独立提交）—— **2026-09-09 后只剩 Contract 一家，而它是被 §4 R1 卡住的，不是排期问题**：
       - [x] **MountLicense（2026-09-09）**：删掉反射实现的 `integration/EconomyHook.kt`，
             注册费改走 `VaultEconomy.charge()`；config v2→3 加 `economy.account`（`EconomyAccountStep`，3 条单测）。
             与 StateCharge 的**一处不同**：缺 Vault 不 `abortEnable` 而是降级成不收费 ——
@@ -900,7 +1234,9 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
             （故意不复用 `ModernizeLanguageStep`：v4 已是 MiniMessage，再跑一遍 legacy 转换会去动服主写的 `&`）。
             单测：`TaxTreasuryTest` 6 条（拒扣 / null 响应 / 入账失败仍算已缴 / 按名入账 / 关闭税金账户 / 非法账户名）
             + 迁移套件新增 "v4 文件只合新键、不重写服主文案"
-      - [ ] **Contract**：`SYSTEM_SINK` 接入本模块 —— **等 §4 R1 真钱故障注入验证之后再动**
+      - [ ] **`CT-E01` Contract SYSTEM_SINK 入账路由**：等 `R1-V01` 全部通过再接 cubex-economy；
+        先确定现有销毁语义与 economy.account 缺省兼容，补配置迁移、入账失败审计与余额守恒/重放回归。
+        完成条件：Contract build/jarGate、旧合同/资金恢复测试和实际入账账户核账有证据，独立重构提交。
 
 #### 已下沉的其余项（2026-08-19）
 
@@ -968,7 +1304,7 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
       > （CMI 很常见，这三家自己为了 Spigot 兼容也还在监听），Paper 就对全服走 legacy 链路，
       > 现代事件一次都不触发。补它换来的是**两条链路哪条来都能接住**，
       > 以及将来 Paper 移除 legacy 桥接时不会突然失灵
-- [ ] Contract / Regions 维持各自的 `@EventHandler` 直连（它们编译到 paper-api、不 relocate Adventure，
+- **保留的实现约束**：Contract / Regions 维持各自的 `@EventHandler` 直连（它们编译到 paper-api、不 relocate Adventure，
       直连更清楚）。**不要**为了统一而把它们也改成反射
 - [x] cookbook 范例已补（§3.2 (d)）：04 `rename-menu` 覆盖 `ChatInputState` 与 `ModernChatBridge`
 
@@ -976,21 +1312,29 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
 
 三项都**不做成 shade 模块**，全部落进 CubeXLib（§7.1），且**排在 §5.1/§5.2 参考实现首发验证之后**。
 
-- [ ] **effect**：玩家限时属性与租约（来源：Regions `ScopedEffectService` + StateCharge `EffectConfig`）。
-      跨插件 API 面不能有回调，到期通知走 Bukkit 事件
-- [ ] **quest**：行为目标追踪（来源：Contract `ObjectiveListener`）。
+- [ ] **`LIB-S01` effect**：玩家限时属性与租约（来源：Regions `ScopedEffectService` + StateCharge `EffectConfig`）。
+      等 Contract/Regions 参考实现首发验收与 SC-V01 跨插件效果场景通过后，先定义单实例 ownership/
+      lease/恢复协议，再迁使用方；跨插件 API 不含 Kotlin 回调，到期通知走 Bukkit 事件。
+      完成条件：两个真实消费方在不同关闭/reload/重启顺序下不会互相覆盖，CubeXLib 缺席时内嵌插件
+      可独立降级；模块/使用方自动化、jarGate、cookbook 与真实跨插件测试齐备。
+- [ ] **`LIB-S02` quest**：行为目标追踪（来源：Contract `ObjectiveListener`）。
       ⚠️ **目前只有 1 个真实使用方**——EcoBalancer 事件税（§4 R2）还没开工，
-      在 R2 落地前不满足 §3.2 (a)，先不动
-- [ ] **economy（有状态那一半）**：事务经济与审计流水（来源：EcoBalancer `TaxLedgerService` + Contract `EconomyEngine`）。
+      在 ECO-C01 落地前不满足 §3.2 (a)，先不动；届时重核两个使用方的真实共同形状。
+      完成条件：满足准入门槛后落在 CubeXLib，目标事件去重/取消/重载与消费方独立降级有回归和实服证据，
+      带可编译范例，不把仅有通用接口当作服务已落地。
+- [ ] **`LIB-S03` economy（有状态那一半）**：事务经济与审计流水（来源：EcoBalancer `TaxLedgerService` + Contract `EconomyEngine`）。
       **必须排在 §4 R1 真钱故障注入验证之后**——`EconomyEngine` 承载 §5.1 那四条跨阶段不变量，
       在唯一的正确性证据到位之前把它抽出来重构，等于把风险最高的代码放在验证最少的时刻动。
       ⚠️ **2026-08-21 拆分**：本条只剩"账本 / 流水"这一半。无状态的那一半
       （Vault 封装 + `economy.account` 入账路由）已按 §7.4 落成 `modules/cubex-economy`，
       **不受本条推后约束** —— 它不持有跨插件状态，也不碰 `EconomyEngine` 的不变量
+      完成条件：参考实现首发验收及 R1-V01 通过后，定义单实例事务/审计/迁移与人工复核协议，
+      分使用方迁移；旧 journal/账本兼容、每个外部付款中断点与实服余额守恒验证通过，
+      提供方缺席能降级，cookbook 和两侧构建/门禁齐备。
 
 ### 7.6 AI 协作上下文（原 DX-3 改形态）
 
-- [ ] 若要加 `.cursorrules` / `.github/copilot-instructions.md`，**只放一行指向 [`AGENTS.md`](AGENTS.md)
+- **条件性约束，当前无新增任务**：若以后加 `.cursorrules` / `.github/copilot-instructions.md`，**只放一行指向 [`AGENTS.md`](AGENTS.md)
       的指针**，按 [`CLAUDE.md`](CLAUDE.md) 的先例。三份会漂移的规则副本对 agent 是**反效果**——
       读到互相矛盾的规则比没有规则更糟
 - [x] **给 `modules/` 的约定插件加 `explicitApi()`**（2026-09-27）。理由不是对外契约（对内不需要），
@@ -1005,14 +1349,16 @@ MountLicense / StateCharge 直接 `withdrawPlayer` 后蒸发。除 EcoBalancer �
 
 ### 7.7 执行顺序
 
-1. **§7.1 CubeXLib + 双模式**（解锁其余一切）
-2. **§4 R1 + §5.1/§5.2/§5.8 首发验证**——框架的可信度就是参考实现的可信度；
-   样板不对，agent 的幻觉就是系统性的
-3. **§7.3 脚手架 + cookbook**
-4. **§7.2 薄糖层 + §7.4 无状态下沉**（每项配一篇范例）
-5. **§7.5 有状态能力进 CubeXLib**
+当前顺序以 §0 执行索引为入口：
 
-§6 的 Gradle 8.14.3+ 升级可以插在 1 和 2 之间：它解锁的 run-paper 3.x 正是第 2 步那批实服验证的提速前置。
+1. **`R1-V01` + Regions 本轮验收 + 各插件首发验证/基线**，补齐真实资金、多人及恢复证据。
+2. 缺少实服/真人条件时，可推进 **`CT-A02`、`ECO-C01`** 或小范围独立重构（CT-A01 自动化已完成）；
+   实服任务继续保持待验收，不用这些代码提交替代。
+3. **Contract 后续类型与 Regions D/E** 按正文依赖推进；可选扩展先做范围取舍。
+4. **`CT-E01` 与 `LIB-S01`–`LIB-S03`** 只在各自参考实现及资金/使用方前置满足后执行。
+
+CubeXLib 双模式、脚手架/cookbook、薄糖层、无状态模块、Gradle 升级与 explicitApi 已完成，
+不再作为待执行阶段重做。新增能力仍配可编译可测试范例。
 
 ---
 
