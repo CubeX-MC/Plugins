@@ -1,8 +1,24 @@
-# FAWEReplace
-
-> **[中文](#中文文档) | [English](README_EN.md)**
-
----
+<div align="center">
+  <img src="img/fawereplace.webp" width="112" alt="FAWEReplace Logo">
+  <h1>FAWEReplace</h1>
+  <p>面向大型世界清理任务的高性能 Paper 插件</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/FAWEReplace"><img src="https://img.shields.io/github/stars/CubeX-MC/FAWEReplace?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/FAWEReplace/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/FAWEReplace?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/FAWEReplace/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/FAWEReplace?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Spigot%20%2F%20Paper-1.20.2%2B-5D8AA8?style=flat-square" alt="Spigot / Paper 1.20.2+">
+  </p>
+  <p>
+    <a href="README_EN.md">English</a>
+    ·
+    <a href="https://github.com/CubeX-MC/FAWEReplace">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/FAWEReplace/issues">问题反馈</a>
+    ·
+    <a href="https://modrinth.com/plugin/fawereplace">Modrinth</a>
+  </p>
+</div>
 
 ## 中文文档
 

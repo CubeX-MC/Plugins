@@ -1,4 +1,11 @@
-# StateCharge
+<div align="center">
+  <h1>StateCharge</h1>
+  <p>按实际开启时长计费的玩家状态插件</p>
+  <p>
+    <img src="https://img.shields.io/badge/Java-21%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 21+">
+    <img src="https://img.shields.io/badge/Paper-1.20.5%2B-5D8AA8?style=flat-square" alt="Paper 1.20.5+">
+  </p>
+</div>
 
 按**实际开启时长**计费的玩家状态插件：变小、变大、飞行等状态由玩家自己开关，开着才扣钱。
 

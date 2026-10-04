@@ -1,11 +1,28 @@
-# Railway 地铁系统
-
-[English](README_en.md) · 简体中文
-[Discord](https://discord.com/invite/7tJeSZPZgv) · [QQ频道](https://pd.qq.com/s/1n3hpe4e7?b=9) · [Wiki](https://github.com/CubeX-MC/Railway/wiki)
-
-![](https://img.shields.io/badge/Minecraft-1.18%2B-blue) ![](https://img.shields.io/badge/Folia-supported-brightgreen) ![](https://img.shields.io/badge/Java-17%2B-orange) ![](https://img.shields.io/github/v/release/CubeX-MC/Railway?label=version)
-
----
+<div align="center">
+  <img src="img/railway.webp" width="112" alt="Railway Logo">
+  <h1>Railway 地铁系统</h1>
+  <p>Minecraft 地铁交通系统插件</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/Railway"><img src="https://img.shields.io/github/stars/CubeX-MC/Railway?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/Railway/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/Railway?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/Railway/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/Railway?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Paper-1.18%2B-5D8AA8?style=flat-square" alt="Paper 1.18+">
+    <img src="https://img.shields.io/badge/Folia-supported-brightgreen?style=flat-square" alt="Folia">
+    <a href="https://github.com/CubeX-MC/Railway/actions/workflows/ci.yml"><img src="https://github.com/CubeX-MC/Railway/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  </p>
+  <p>
+    <a href="README_en.md">English</a>
+    ·
+    <a href="https://github.com/CubeX-MC/Railway/wiki">Wiki</a>
+    ·
+    <a href="https://discord.com/invite/7tJeSZPZgv">Discord</a>
+    ·
+    <a href="https://pd.qq.com/s/1n3hpe4e7?b=9">QQ频道</a>
+    ·
+    <a href="https://modrinth.com/plugin/metro-railway">Modrinth</a>
+  </p>
+</div>
 
 Railway 是一个 Minecraft 地铁交通系统插件。管理员创建自动化的地铁线路网络，玩家右键红石铁轨即可呼叫矿车并自动乘坐。
 

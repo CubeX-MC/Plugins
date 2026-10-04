@@ -1,4 +1,20 @@
-# Regions
+<div align="center">
+  <h1>Regions</h1>
+  <p>可发布场地与小游戏框架</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/Regions"><img src="https://img.shields.io/github/stars/CubeX-MC/Regions?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/Regions/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/Regions?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/Regions/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/Regions?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-21%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 21+">
+    <img src="https://img.shields.io/badge/Paper-1.21.11%2B-5D8AA8?style=flat-square" alt="Paper 1.21.11+">
+    <img src="https://img.shields.io/badge/Folia-supported-brightgreen?style=flat-square" alt="Folia">
+  </p>
+  <p>
+    <a href="https://github.com/CubeX-MC/Regions">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/Regions/issues">问题反馈</a>
+  </p>
+</div>
 
 Regions 是 CubeX-MC 的可发布场地与小游戏框架。它将 Lands/Cuboid 区域来源、RuleGems 管理权限、可组合 Flag/Effect/Trigger，以及战斗、赛跑和捉迷藏 Mode 统一在带 revision 的发布流程中。
 

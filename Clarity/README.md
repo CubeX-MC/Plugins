@@ -1,6 +1,20 @@
-# Clarity
-
-扫描并清除已卸载插件遗留在玩家和物品上的属性、药水效果与元数据。
+<div align="center">
+  <h1>Clarity</h1>
+  <p>扫描并清除已卸载插件遗留在玩家和物品上的属性、药水效果与元数据</p>
+  <p>
+    <a href="https://github.com/CubeX-MC/Clarity"><img src="https://img.shields.io/github/stars/CubeX-MC/Clarity?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/Clarity/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/Clarity?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/Clarity/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/Clarity?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <img src="https://img.shields.io/badge/Java-21%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 21+">
+    <img src="https://img.shields.io/badge/Paper-1.21%2B-5D8AA8?style=flat-square" alt="Paper 1.21+">
+    <img src="https://img.shields.io/badge/Folia-supported-brightgreen?style=flat-square" alt="Folia">
+  </p>
+  <p>
+    <a href="https://github.com/CubeX-MC/Clarity">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/Clarity/issues">问题反馈</a>
+  </p>
+</div>
 
 ## 定位
 

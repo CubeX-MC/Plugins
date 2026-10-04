@@ -10,18 +10,49 @@
 2. **章节顺序固定**，缺内容就整节删掉，不要留空标题，也不要调换顺序。
 3. **命令、权限、配置三张表以 `plugin.yml` 和默认 `config.yml` 为准**，改代码时同步改表；
    新节点和提示遵守 [`COMMAND_PERMISSION_GUIDE.md`](COMMAND_PERMISSION_GUIDE.md)。
-4. 有 `README_en.md` 的插件，两份保持章节结构一致。
+4. 有 `README_en.md` 的插件，两份保持章节结构一致（头部徽章与链接也要对应）。
 5. 不在 README 里写实现细节与设计理由——那些属于 `DESIGN.md`。
+6. **头部统一为居中卡片**（见下方模板开头）：`<div align="center">` 内依次放 logo（112px，图片放
+   `<Plugin>/img/` 用相对路径）、`<h1>`、一句话副标题、徽章行、快捷链接行，bStats 签名图也在其中；
+   徽章只放有真实来源的（Stars/Forks/Issues 需要 GitHub 仓库，CI 需要对应工作流，Release 需要有已发布
+   版本，Folia 需要 README 明确声明支持），链接行按实际拥有的入口增删。
 
 ---
 
 ## 模板
 
 ```markdown
-# <PluginName>
-
-<!-- 已在 bStats 注册的插件放徽章，未注册的删掉这一行 -->
-![](https://bstats.org/signatures/bukkit/<PluginName>.svg)
+<div align="center">
+  <!-- 有 logo 才放这一行，无 logo 删掉。图片放 <Plugin>/img/，用相对路径引用 -->
+  <img src="img/<logo 文件名>" width="112" alt="<PluginName> Logo">
+  <h1><PluginName></h1>
+  <p><一句话副标题，不带句号></p>
+  <p>
+    <!-- Stars / Forks / Issues：有 GitHub 仓库的插件放；仓库名按实际替换（例：FAWEReplace） -->
+    <a href="https://github.com/CubeX-MC/<PluginName>"><img src="https://img.shields.io/github/stars/CubeX-MC/<PluginName>?style=flat-square&logo=github&label=Stars" alt="GitHub Stars"></a>
+    <a href="https://github.com/CubeX-MC/<PluginName>/network/members"><img src="https://img.shields.io/github/forks/CubeX-MC/<PluginName>?style=flat-square&logo=github&label=Forks" alt="GitHub Forks"></a>
+    <a href="https://github.com/CubeX-MC/<PluginName>/issues"><img src="https://img.shields.io/github/issues/CubeX-MC/<PluginName>?style=flat-square&label=Issues" alt="GitHub Issues"></a>
+    <!-- Java / 服务端：按真实要求改数字；Spigot/Paper 混合写法为 Spigot%20%2F%20Paper-1.x%2B -->
+    <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17+">
+    <img src="https://img.shields.io/badge/Paper-1.18%2B-5D8AA8?style=flat-square" alt="Paper 1.18+">
+    <!-- 以下三行按需保留：Folia 支持 / 仓库有 CI 工作流 / 已有 Release -->
+    <!--<img src="https://img.shields.io/badge/Folia-supported-brightgreen?style=flat-square" alt="Folia">-->
+    <!--<a href="https://github.com/CubeX-MC/<PluginName>/actions/workflows/ci.yml"><img src="https://github.com/CubeX-MC/<PluginName>/actions/workflows/ci.yml/badge.svg" alt="CI"></a>-->
+    <!--<a href="https://github.com/CubeX-MC/<PluginName>/releases"><img src="https://img.shields.io/github/v/release/CubeX-MC/<PluginName>?style=flat-square&label=Release" alt="Release"></a>-->
+  </p>
+  <p>
+    <!-- 快捷链接行：按实际入口增删（语言切换 / Wiki / Discord / QQ / Modrinth / 项目主页 / 问题反馈） -->
+    <a href="README_en.md">English</a>
+    ·
+    <a href="https://github.com/CubeX-MC/<PluginName>">项目主页</a>
+    ·
+    <a href="https://github.com/CubeX-MC/<PluginName>/issues">问题反馈</a>
+  </p>
+  <p>
+    <!-- 已在 bStats 注册的插件放签名图；未注册删掉这个 <p> 块 -->
+    <img src="https://bstats.org/signatures/bukkit/<PluginName>.svg" alt="bStats">
+  </p>
+</div>
 
 <一句话说明这个插件是什么。不超过两行。>
 
